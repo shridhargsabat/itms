@@ -29,7 +29,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
   const specEntries = Object.entries(asset.specs ?? {});
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[60]">
       <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-slate-800 bg-slate-900 shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-800 px-5 py-4">
