@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Boxes,
+  Download,
   LayoutDashboard,
   LogOut,
   Network,
@@ -15,6 +16,7 @@ import OfflineBanner from '@/components/OfflineBanner';
 import UpdateToast from '@/components/UpdateToast';
 import BottomNav from '@/components/BottomNav';
 import { clearSession, getCachedUser, logout } from '@/api/client';
+import { usePwaInstallable } from '@/lib/pwa';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -26,14 +28,26 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [showIosTip, setShowIosTip] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const user = getCachedUser();
+  const { installable, promptInstall } = usePwaInstallable();
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
   const signOut = async () => {
     await logout().catch(() => {});
     clearSession();
     navigate('/login', { replace: true });
+  };
+
+  const handleInstall = () => {
+    if (installable) {
+      promptInstall();
+    } else if (isIOS) {
+      setShowIosTip(true);
+      window.setTimeout(() => setShowIosTip(false), 6000);
+    }
   };
 
   return (
@@ -51,6 +65,15 @@ export default function Layout() {
           <span className="block truncate text-xs text-slate-300">{user?.name ?? user?.email ?? ''}</span>
           <span className="block text-[9px] text-slate-500">build {__BUILD_SHA__}</span>
         </div>
+        <button
+          type="button"
+          onClick={handleInstall}
+          aria-label="Install app"
+          title={isIOS ? 'Install via Share → Add to Home Screen' : 'Install app'}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-indigo-300"
+        >
+          <Download className="h-5 w-5" />
+        </button>
         <button
           type="button"
           onClick={signOut}
@@ -135,11 +158,32 @@ export default function Layout() {
             <LogOut className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Sign out</span>}
           </button>
+          {installable && (
+            <button
+              type="button"
+              onClick={promptInstall}
+              className={cn(
+                'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-slate-800/60 hover:text-indigo-300',
+                collapsed && 'justify-center px-0',
+              )}
+              title="Install app"
+            >
+              <Download className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>Install app</span>}
+            </button>
+          )}
           {!collapsed && (
             <p className="mt-2 px-2 text-center text-[10px] text-slate-600">build {__BUILD_SHA__}</p>
           )}
         </div>
       </aside>
+
+      {showIosTip && (
+        <div className="animate-fade-in fixed right-4 top-[calc(3.75rem+env(safe-area-inset-top))] z-[60] max-w-[260px] rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 shadow-2xl">
+          Tap <b className="text-white">Share</b> → <b className="text-white">Add to Home Screen</b>{' '}
+          to install ITMS like an app
+        </div>
+      )}
 
       <main
         className={cn(
@@ -149,8 +193,11 @@ export default function Layout() {
         )}
       >
         <div className="mx-auto max-w-7xl p-6 lg:p-8">
-          {/* keyed by pathname: fresh fade-up entrance per route change */}
-          <div key={location.pathname} className="animate-fade-up">
+          {/* keyed by pathname: fresh entrance per route change.
+              NOTE: opacity-only — a transform here would make every
+              position:fixed descendant (sheets, drawers, dropdowns)
+              position against this element instead of the viewport. */}
+          <div key={location.pathname} className="animate-fade-in">
             <Outlet />
           </div>
         </div>

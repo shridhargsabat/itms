@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn, inputCls } from '@/lib/utils';
 
@@ -93,35 +94,37 @@ export default function Select({
           )}
         />
       </button>
-      {open && menu && (
-        <div
-          style={{ position: 'fixed', top: menu.top, left: menu.left, width: menu.width }}
-          role="listbox"
-          className="z-[70] max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-800/95 p-1 shadow-2xl backdrop-blur"
-        >
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              role="option"
-              aria-selected={o.value === value}
-              onClick={() => {
-                onChange(o.value);
-                close();
-              }}
-              className={cn(
-                'flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
-                o.value === value
-                  ? 'bg-slate-700/70 text-white'
-                  : 'text-slate-300 hover:bg-slate-700/40 hover:text-white',
-              )}
-            >
-              {o.label}
-              {o.value === value && <Check className="h-4 w-4 shrink-0 text-indigo-400" />}
-            </button>
-          ))}
-        </div>
-      )}
+      {open && menu &&
+        createPortal(
+          <div
+            style={{ position: 'fixed', top: menu.top, left: menu.left, width: menu.width }}
+            role="listbox"
+            className="z-[70] max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-800/95 p-1 shadow-2xl backdrop-blur"
+          >
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={o.value === value}
+                onClick={() => {
+                  onChange(o.value);
+                  close();
+                }}
+                className={cn(
+                  'flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                  o.value === value
+                    ? 'bg-slate-700/70 text-white'
+                    : 'text-slate-300 hover:bg-slate-700/40 hover:text-white',
+                )}
+              >
+                {o.label}
+                {o.value === value && <Check className="h-4 w-4 shrink-0 text-indigo-400" />}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
