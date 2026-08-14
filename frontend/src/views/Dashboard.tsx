@@ -355,10 +355,11 @@ export default function Dashboard() {
                 <div className="h-3 w-32 animate-pulse rounded bg-slate-800" />
               </div>
             ))}
-          {(audit.data ?? []).map((e) => (
+          {(audit.data ?? []).map((e, i) => (
             <div
               key={e.id}
-              className="flex flex-col gap-1 px-5 py-3 text-sm sm:flex-row sm:items-center sm:gap-3"
+              className="animate-list-in flex flex-col gap-1 px-5 py-3 text-sm sm:flex-row sm:items-center sm:gap-3"
+              style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
             >
               <div className="flex min-w-0 items-center gap-3">
                 <span className="shrink-0 text-xs text-slate-500">{formatDate(e.created_at)}</span>

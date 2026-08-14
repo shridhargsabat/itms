@@ -72,14 +72,15 @@ export default function DataTable<T extends { id: string }>({
       <table className={cn('w-full text-left text-sm', minWidth)}>
         {head}
         <tbody className="divide-y divide-slate-800 bg-slate-950">
-          {rows.map((row) => (
+          {rows.map((row, i) => (
             <tr
               key={row.id}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={cn(
-                'transition-colors',
+                'animate-list-in transition-colors',
                 onRowClick && 'cursor-pointer hover:bg-slate-900',
               )}
+              style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
             >
               {columns.map((c) => (
                 <td key={c.key} className={cn('px-4 py-3', c.className)}>

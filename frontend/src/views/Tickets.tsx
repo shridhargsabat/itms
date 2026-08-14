@@ -300,15 +300,16 @@ export default function Tickets() {
                       </span>
                     </div>
                     <div className="space-y-2">
-                      {items.map((t) => (
+                      {items.map((t, i) => (
                         <button
                           key={t.id}
                           type="button"
                           onClick={() => setSelectedId(t.id)}
                           className={cn(
-                            'w-full rounded-lg border border-slate-800 bg-slate-950 p-3 text-left transition-colors hover:border-slate-700',
+                            'animate-list-in w-full rounded-lg border border-slate-800 bg-slate-950 p-3 text-left transition-colors hover:border-slate-700',
                             selectedId === t.id && 'border-indigo-500/60',
                           )}
+                          style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-mono text-[10px] text-slate-500">
