@@ -27,3 +27,10 @@ dotenvy = "0.15"
 argon2 = "0.5"
 rand = "0.8"
 sha2 = "0.10"
+
+[profile.release]
+# Single-binary backend: thinner + smaller artifact, marginally faster at
+# runtime. Trade-off: longer compile time (crates unified).
+lto = "thin"
+codegen-units = 1
+strip = true

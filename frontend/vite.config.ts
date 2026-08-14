@@ -82,6 +82,25 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  build: {
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        // Stable vendor chunk: framework libs change rarely → cached long-term;
+        // lazy route chunks + small app core change every build.
+        manualChunks(id) {
+          if (
+            id.includes('node_modules/react') ||
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react-router') ||
+            id.includes('node_modules/@tanstack')
+          ) {
+            return 'vendor';
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

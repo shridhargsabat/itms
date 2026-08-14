@@ -1,18 +1,20 @@
-import { StrictMode, type ReactNode } from 'react';
+import { lazy, StrictMode, Suspense, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { LoaderCircle } from 'lucide-react';
 import './index.css';
 import Layout from '@/components/Layout';
-import Dashboard from '@/views/Dashboard';
-import Assets from '@/views/Assets';
-import Tickets from '@/views/Tickets';
-import CMDB from '@/views/CMDB';
-import AuditLog from '@/views/AuditLog';
-import Masters from '@/views/Masters';
-import Offline from '@/views/Offline';
-import Login from '@/views/Login';
+// Route-level code splitting: each view is its own chunk, loaded on first
+// navigation (Vite emits per-lazy-import chunks + a vendor chunk below).
+const Dashboard = lazy(() => import('@/views/Dashboard'));
+const Assets = lazy(() => import('@/views/Assets'));
+const Tickets = lazy(() => import('@/views/Tickets'));
+const CMDB = lazy(() => import('@/views/CMDB'));
+const AuditLog = lazy(() => import('@/views/AuditLog'));
+const Masters = lazy(() => import('@/views/Masters'));
+const Offline = lazy(() => import('@/views/Offline'));
+const Login = lazy(() => import('@/views/Login'));
 import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
 import { ApiError, clearSession, getCachedUser, getToken, me } from '@/api/client';
 
@@ -45,8 +47,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
   if (!token) return <Navigate to="/login" replace />;
   if (isLoading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-slate-950">
-        <LoaderCircle className="h-6 w-6 animate-spin text-indigo-400" />
+      <div className="flex min-h-dvh items-center justify-center bg-base">
+        <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
       </div>
     );
   }
@@ -61,28 +63,39 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** Shown while a lazy route chunk downloads (first visit to a view). */
+function RouteFallback() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-base">
+      <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
+    </div>
+  );
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            element={
-              <RequireAuth>
-                <Layout />
-              </RequireAuth>
-            }
-          >
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/assets" element={<Assets />} />
-            <Route path="/tickets" element={<Tickets />} />
-            <Route path="/cmdb" element={<CMDB />} />
-            <Route path="/audit" element={<AuditLog />} />
-            <Route path="/masters" element={<Masters />} />
-            <Route path="/offline" element={<Offline />} />
-          </Route>
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              element={
+                <RequireAuth>
+                  <Layout />
+                </RequireAuth>
+              }
+            >
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/assets" element={<Assets />} />
+              <Route path="/tickets" element={<Tickets />} />
+              <Route path="/cmdb" element={<CMDB />} />
+              <Route path="/audit" element={<AuditLog />} />
+              <Route path="/masters" element={<Masters />} />
+              <Route path="/offline" element={<Offline />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,
