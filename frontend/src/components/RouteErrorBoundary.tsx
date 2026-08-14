@@ -34,7 +34,7 @@ export default class RouteErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.error) return this.props.children;
-    const failed = /dynamic import|import\(|chunk|Loading/i.test(this.state.error.message);
+    const failed = /dynamically imported|dynamic import|import\(|chunk|Loading/i.test(this.state.error.message);
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-base px-6 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-edge bg-surface">
