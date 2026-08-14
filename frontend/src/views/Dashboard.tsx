@@ -10,6 +10,7 @@ import {
   Plus,
   Ticket,
   TriangleAlert,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createAsset, createTicket, getAuditLog, getDashboardMetrics } from '@/api/client';
@@ -166,8 +167,23 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
     category: 'LAPTOP',
     status: 'IN_STOCK',
   });
+  const [specRows, setSpecRows] = useState<Array<[string, string]>>([]);
+  const [purchaseDate, setPurchaseDate] = useState('');
+  const [warrantyExpiry, setWarrantyExpiry] = useState('');
   const mutation = useMutation({
-    mutationFn: createAsset,
+    mutationFn: () => {
+      const specs: Record<string, string> = {};
+      for (const [k, v] of specRows) {
+        const key = k.trim();
+        if (key) specs[key] = v.trim();
+      }
+      return createAsset({
+        ...form,
+        purchase_date: purchaseDate || undefined,
+        warranty_expiry: warrantyExpiry || undefined,
+        specs: Object.keys(specs).length ? specs : undefined,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assets'] });
       qc.invalidateQueries({ queryKey: ['metrics'] });
@@ -234,6 +250,66 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
           onChange={(v) => set('status', v as CreateAssetInput['status'])}
           options={ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))}
         />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className={labelCls}>Purchase Date</label>
+          <input
+            type="date"
+            className={inputCls}
+            value={purchaseDate}
+            onChange={(e) => setPurchaseDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Warranty Expiry</label>
+          <input
+            type="date"
+            className={inputCls}
+            value={warrantyExpiry}
+            onChange={(e) => setWarrantyExpiry(e.target.value)}
+          />
+        </div>
+      </div>
+      <div>
+        <label className={labelCls}>Specifications</label>
+        <div className="space-y-2">
+          {specRows.map(([k, v], i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                className={cn(inputCls, 'w-2/5')}
+                placeholder="Key (e.g. processor)"
+                value={k}
+                onChange={(e) =>
+                  setSpecRows((rows) => rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))
+                }
+              />
+              <input
+                className={cn(inputCls, 'flex-1')}
+                placeholder="Value (e.g. Intel i7-13700H)"
+                value={v}
+                onChange={(e) =>
+                  setSpecRows((rows) => rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))
+                }
+              />
+              <button
+                type="button"
+                aria-label={`Remove spec ${k || i + 1}`}
+                onClick={() => setSpecRows((rows) => rows.filter((_, j) => j !== i))}
+                className="shrink-0 rounded-lg border border-edge p-2 text-secondary transition-colors hover:bg-elevated hover:text-red-400"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setSpecRows((rows) => [...rows, ['', '']])}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-edge2 px-3 py-1.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add specification
+          </button>
+        </div>
       </div>
       {mutation.isError && (
         <p className="text-xs text-red-400">
