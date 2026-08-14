@@ -40,9 +40,23 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
+            // Fresh-first: audit log + dashboard metrics — users expect CURRENT
+            // data (the audit page looked "broken" when SWR served a 7-day-old
+            // cached response after a reseed). Network wins when online; the
+            // short cache is only an offline fallback.
+            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(audit|dashboard)(\/|\?|$).*/,
+            handler: 'NetworkFirst',
+            method: 'GET',
+            options: {
+              cacheName: 'api-fresh',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Read-only catalog GETs — offline-usable via SWR (stale-first, revalidate bg).
             // ORDER: must precede the NetworkOnly catch-all (first match wins).
-            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(dashboard|assets|tickets|cmdb|audit)(\/|\?|$).*/,
+            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(assets|tickets|cmdb|users|masters)(\/|\?|$).*/,
             handler: 'StaleWhileRevalidate',
             method: 'GET',
             options: {
