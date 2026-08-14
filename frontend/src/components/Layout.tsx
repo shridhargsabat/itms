@@ -10,6 +10,8 @@ import {
   Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import OfflineBanner from '@/components/OfflineBanner';
+import UpdateToast from '@/components/UpdateToast';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -24,6 +26,8 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen">
+      <OfflineBanner />
+      <UpdateToast />
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-800 bg-slate-900/80 backdrop-blur transition-all duration-300',

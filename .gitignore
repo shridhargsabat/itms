@@ -5,6 +5,10 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 
+# PWA / service worker dev artifacts
+frontend/dev-dist/
+dev-dist/
+
 # Env & secrets
 .env
 

@@ -9,6 +9,10 @@ import Assets from '@/views/Assets';
 import Tickets from '@/views/Tickets';
 import CMDB from '@/views/CMDB';
 import AuditLog from '@/views/AuditLog';
+import Offline from '@/views/Offline';
+import { captureInstallPrompt } from '@/lib/pwa';
+
+captureInstallPrompt();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +34,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/cmdb" element={<CMDB />} />
             <Route path="/audit" element={<AuditLog />} />
+            <Route path="/offline" element={<Offline />} />
           </Route>
         </Routes>
       </BrowserRouter>
