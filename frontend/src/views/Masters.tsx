@@ -271,12 +271,12 @@ function UsersTab() {
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className={labelCls}>Full name</label>
-                <input className={inputCls} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <label className={labelCls} htmlFor="user-name">Full name</label>
+                <input id="user-name" className={inputCls} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
-                <label className={labelCls}>Email</label>
-                <input className={inputCls} required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <label className={labelCls} htmlFor="user-email">Email</label>
+                <input id="user-email" className={inputCls} required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
               </div>
               <div>
                 <label className={labelCls}>Role</label>
@@ -292,8 +292,9 @@ function UsersTab() {
               </div>
             </div>
             <div>
-              <label className={labelCls}>{editing ? 'New password (leave blank to keep)' : 'Password'}</label>
+              <label className={labelCls} htmlFor="user-password">{editing ? 'New password (leave blank to keep)' : 'Password'}</label>
               <input
+                id="user-password"
                 className={inputCls}
                 type="password"
                 minLength={editing ? undefined : 8}
