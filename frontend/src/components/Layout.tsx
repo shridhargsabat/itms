@@ -76,8 +76,10 @@ export default function Layout() {
         navigate(href);
       });
     };
-    document.addEventListener('click', onClick);
-    return () => document.removeEventListener('click', onClick);
+    // Capture phase: runs BEFORE react-router's Link handler, so we can
+    // preventDefault first and wrap the navigation in a view transition.
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
   }, [navigate]);
 
   return (

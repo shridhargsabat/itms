@@ -40,6 +40,21 @@ export default function Select({
 
   useEffect(() => {
     if (!open) return;
+    let raf = 0;
+    const reposition = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - r.bottom;
+        setMenu({
+          top: spaceBelow > 280 ? r.bottom + 6 : Math.max(8, r.top - 280),
+          left: r.left,
+          width: r.width,
+        });
+      });
+    };
     const onDown = (e: MouseEvent) => {
       // Ignore mousedowns inside the trigger OR the portaled menu —
       // otherwise the click that selects an option never lands (the menu
@@ -51,16 +66,18 @@ export default function Select({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
     };
-    const onScrollOrResize = () => close();
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', onScrollOrResize, true);
-    window.addEventListener('resize', onScrollOrResize);
+    // Follow the trigger while the page scrolls instead of closing
+    // (mobile users scroll under an open dropdown all the time).
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', onScrollOrResize, true);
-      window.removeEventListener('resize', onScrollOrResize);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+      cancelAnimationFrame(raf);
     };
   }, [open]);
 
