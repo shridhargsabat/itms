@@ -93,7 +93,11 @@
   }
 }
 .animate-menu-in {
-  animation: menu-in 0.14s ease-out both;
+  /* NO fill-mode (iOS WebKit bug): if the animation never runs/completes
+     (page mounted while backgrounded), 'both' freezes the element at the
+     from keyframe — opacity 0 — making content permanently invisible.
+     Without fill, the persistent state is the natural (visible) one. */
+  animation: menu-in 0.14s ease-out;
   transform-origin: top;
 }
 
@@ -108,7 +112,7 @@
   }
 }
 .animate-list-in {
-  animation: list-in 0.24s ease-out both;
+  animation: list-in 0.24s ease-out;
 }
 
 /* ---------- page transitions (View Transitions API) ---------- */
@@ -212,7 +216,10 @@
 }
 
 .animate-fade-up {
-  animation: fade-up 0.38s cubic-bezier(0.22, 0.68, 0.32, 1) both;
+  /* NO fill-mode (iOS WebKit): a frozen 'both' animation pins content at
+     the from keyframe (opacity 0) — invisible titles/buttons on phones.
+     Natural state must stay visible; animation is pure enhancement. */
+  animation: fade-up 0.38s cubic-bezier(0.22, 0.68, 0.32, 1);
 }
 .animate-fade-in {
   /* NO fill-mode: a filled opacity animation keeps a stacking context

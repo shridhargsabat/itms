@@ -62,6 +62,11 @@ export default function Layout() {
   useEffect(() => {
     applyTheme();
     watchSystemTheme();
+    // Every navigation starts at the top (SPA convention). Phones resumed
+    // mid-page and reported the dashboard actions as "missing" — they were
+    // just scrolled above the fold; combined with the sticky actions row
+    // this makes the add buttons effectively always reachable.
+    window.scrollTo(0, 0);
     if (!('startViewTransition' in document)) return;
     const onClick = (e: MouseEvent) => {
       if (
@@ -87,7 +92,7 @@ export default function Layout() {
     // preventDefault first and wrap the navigation in a view transition.
     document.addEventListener('click', onClick, true);
     return () => document.removeEventListener('click', onClick, true);
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   return (
     <div className="min-h-screen">
