@@ -203,8 +203,9 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className={labelCls}>Name</label>
+          <label className={labelCls} htmlFor="asset-name">Name</label>
           <input
+            id="asset-name"
             required
             className={inputCls}
             value={form.name}
@@ -213,8 +214,9 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
           />
         </div>
         <div>
-          <label className={labelCls}>Asset Tag</label>
+          <label className={labelCls} htmlFor="asset-tag">Asset Tag</label>
           <input
+            id="asset-tag"
             className={inputCls}
             value={form.asset_tag ?? ''}
             onChange={(e) => set('asset_tag', e.target.value)}
@@ -224,8 +226,9 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className={labelCls}>Serial Number</label>
+          <label className={labelCls} htmlFor="asset-serial">Serial Number</label>
           <input
+            id="asset-serial"
             className={inputCls}
             value={form.serial_number ?? ''}
             onChange={(e) => set('serial_number', e.target.value)}
@@ -253,8 +256,9 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className={labelCls}>Purchase Date</label>
+          <label className={labelCls} htmlFor="asset-purchase-date">Purchase Date</label>
           <input
+            id="asset-purchase-date"
             type="date"
             className={inputCls}
             value={purchaseDate}
@@ -262,8 +266,9 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
           />
         </div>
         <div>
-          <label className={labelCls}>Warranty Expiry</label>
+          <label className={labelCls} htmlFor="asset-warranty-expiry">Warranty Expiry</label>
           <input
+            id="asset-warranty-expiry"
             type="date"
             className={inputCls}
             value={warrantyExpiry}
