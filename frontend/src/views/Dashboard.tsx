@@ -4,12 +4,14 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
   Boxes,
+  ChevronRight,
   LoaderCircle,
   PackageCheck,
   Plus,
   Ticket,
   TriangleAlert,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { createAsset, createTicket, getAuditLog, getDashboardMetrics } from '@/api/client';
 import { ASSET_CATEGORIES, ASSET_STATUSES, PRIORITIES, TICKET_TYPES } from '@/api/types';
 import type { CreateAssetInput, CreateTicketInput, DashboardMetrics } from '@/api/types';
@@ -22,11 +24,12 @@ const METRIC_CARDS: {
   key: keyof DashboardMetrics;
   icon: LucideIcon;
   accent: string;
+  to: string;
 }[] = [
-  { label: 'Total Assets', key: 'asset_count', icon: Boxes, accent: 'bg-indigo-500/10 text-indigo-400' },
-  { label: 'Open Tickets', key: 'open_tickets', icon: Ticket, accent: 'bg-blue-500/10 text-blue-400' },
-  { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400' },
-  { label: 'In Stock', key: 'in_stock_count', icon: PackageCheck, accent: 'bg-emerald-500/10 text-emerald-400' },
+  { label: 'Total Assets', key: 'asset_count', icon: Boxes, accent: 'bg-indigo-500/10 text-indigo-400', to: '/assets' },
+  { label: 'Open Tickets', key: 'open_tickets', icon: Ticket, accent: 'bg-blue-500/10 text-blue-400', to: '/tickets?status=OPEN' },
+  { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
+  { label: 'In Stock', key: 'in_stock_count', icon: PackageCheck, accent: 'bg-emerald-500/10 text-emerald-400', to: '/assets?status=IN_STOCK' },
 ];
 
 function CountUp({ value }: { value: number }) {
@@ -300,10 +303,11 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {METRIC_CARDS.map(({ label, key, icon: Icon, accent }, i) => (
-          <div
+        {METRIC_CARDS.map(({ label, key, icon: Icon, accent, to }, i) => (
+          <Link
             key={key}
-            className="animate-fade-up rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-colors duration-150 hover:border-slate-600/80 hover:bg-slate-900 sm:p-5"
+            to={to}
+            className="group animate-fade-up rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-all duration-150 hover:border-slate-600/80 hover:bg-slate-900 active:scale-[0.98] sm:p-5"
             style={{ animationDelay: `${i * 70}ms` }}
           >
             <div className="flex items-center justify-between gap-2">
@@ -312,7 +316,7 @@ export default function Dashboard() {
               </p>
               <span
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9',
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-110 sm:h-9 sm:w-9',
                   accent,
                 )}
               >
@@ -322,11 +326,14 @@ export default function Dashboard() {
             {metrics.isLoading ? (
               <div className="mt-3 h-8 w-16 animate-pulse rounded bg-slate-800" />
             ) : (
-              <p className="mt-2 text-3xl font-semibold text-slate-100">
-                <CountUp value={metrics.data?.[key] ?? 0} />
-              </p>
+              <div className="mt-2 flex items-baseline justify-between gap-2">
+                <p className="text-3xl font-semibold text-slate-100">
+                  <CountUp value={metrics.data?.[key] ?? 0} />
+                </p>
+                <ChevronRight className="h-4 w-4 shrink-0 translate-x-[-4px] text-slate-600 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:text-slate-300 group-hover:opacity-100" />
+              </div>
             )}
-          </div>
+          </Link>
         ))}
       </div>
 
