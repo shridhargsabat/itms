@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -7,9 +8,14 @@ interface ModalProps {
   children: ReactNode;
 }
 
-/** Centered dialog on sm+; bottom sheet <sm (grab handle, 92dvh, scrollable body). */
+/**
+ * Centered dialog on sm+; bottom sheet <sm (grab handle, 92dvh, scrollable body).
+ * PORTALED to document.body: the route wrapper's (filled) entrance animation
+ * creates a stacking context that would cap this z-[60] below the z-50 bottom
+ * nav (real bug: submit buttons behind the nav on mobile).
+ */
 export default function Modal({ title, onClose, children }: ModalProps) {
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
       <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="animate-sheet-up relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-edge bg-surface shadow-2xl sm:max-w-lg sm:rounded-xl">
@@ -29,6 +35,7 @@ export default function Modal({ title, onClose, children }: ModalProps) {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

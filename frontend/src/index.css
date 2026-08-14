@@ -215,7 +215,10 @@
   animation: fade-up 0.38s cubic-bezier(0.22, 0.68, 0.32, 1) both;
 }
 .animate-fade-in {
-  animation: fade-in 0.22s ease-out both;
+  /* NO fill-mode: a filled opacity animation keeps a stacking context
+     alive on the route wrapper, capping portaled/child z-indexes below
+     the bottom nav (real bug: modal buttons behind nav on mobile). */
+  animation: fade-in 0.22s ease-out;
 }
 .animate-sheet-up {
   animation: sheet-up 0.32s cubic-bezier(0.22, 0.68, 0.32, 1) both;
