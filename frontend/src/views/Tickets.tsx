@@ -7,6 +7,7 @@ import { PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
 import type { CreateTicketInput, Ticket, TicketStatus } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import Modal from '@/components/Modal';
+import Select from '@/components/Select';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 
@@ -65,31 +66,19 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={labelCls}>Type</label>
-          <select
-            className={inputCls}
+          <Select
             value={form.ticket_type}
-            onChange={(e) => set('ticket_type', e.target.value as CreateTicketInput['ticket_type'])}
-          >
-            {TICKET_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set('ticket_type', v as CreateTicketInput['ticket_type'])}
+            options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
+          />
         </div>
         <div>
           <label className={labelCls}>Priority</label>
-          <select
-            className={inputCls}
+          <Select
             value={form.priority}
-            onChange={(e) => set('priority', e.target.value as CreateTicketInput['priority'])}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set('priority', v as CreateTicketInput['priority'])}
+            options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+          />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -251,42 +240,30 @@ export default function Tickets() {
               <Columns3 className="h-4 w-4" /> Kanban
             </button>
           </div>
-          <select
-            className={`${inputCls} w-auto`}
+          <Select
+            className="w-auto"
             value={status}
-            onChange={(e) => update('status', e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {TICKET_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-          <select
-            className={`${inputCls} w-auto`}
+            onChange={(v) => update('status', v)}
+            options={[
+              { value: '', label: 'All Statuses' },
+              ...TICKET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
+            ]}
+          />
+          <Select
+            className="w-auto"
             value={priority}
-            onChange={(e) => update('priority', e.target.value)}
-          >
-            <option value="">All Priorities</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            className={`${inputCls} w-auto`}
+            onChange={(v) => update('priority', v)}
+            options={[{ value: '', label: 'All Priorities' }, ...PRIORITIES.map((p) => ({ value: p, label: p }))]}
+          />
+          <Select
+            className="w-auto"
             value={type}
-            onChange={(e) => update('type', e.target.value)}
-          >
-            <option value="">All Types</option>
-            {TICKET_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => update('type', v)}
+            options={[
+              { value: '', label: 'All Types' },
+              ...TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') })),
+            ]}
+          />
           <button
             type="button"
             onClick={() => setNewOpen(true)}

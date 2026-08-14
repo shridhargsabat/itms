@@ -7,6 +7,7 @@ import { ASSET_CATEGORIES, ASSET_STATUSES } from '@/api/types';
 import type { Asset } from '@/api/types';
 import AssetSpecModal from '@/components/AssetSpecModal';
 import DataTable, { type Column } from '@/components/DataTable';
+import Select from '@/components/Select';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import { inputCls } from '@/lib/utils';
 
@@ -88,30 +89,24 @@ export default function Assets() {
               onChange={(e) => update('search', e.target.value)}
             />
           </div>
-          <select
-            className={`${inputCls} w-auto`}
+          <Select
+            className="w-auto"
             value={category}
-            onChange={(e) => update('category', e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {ASSET_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-          <select
-            className={`${inputCls} w-auto`}
+            onChange={(v) => update('category', v)}
+            options={[
+              { value: '', label: 'All Categories' },
+              ...ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') })),
+            ]}
+          />
+          <Select
+            className="w-auto"
             value={status}
-            onChange={(e) => update('status', e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {ASSET_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => update('status', v)}
+            options={[
+              { value: '', label: 'All Statuses' },
+              ...ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
+            ]}
+          />
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import { createAsset, createTicket, getAuditLog, getDashboardMetrics } from '@/a
 import { ASSET_CATEGORIES, ASSET_STATUSES, PRIORITIES, TICKET_TYPES } from '@/api/types';
 import type { CreateAssetInput, CreateTicketInput, DashboardMetrics } from '@/api/types';
 import Modal from '@/components/Modal';
+import Select from '@/components/Select';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 
 const METRIC_CARDS: {
@@ -101,31 +102,19 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>Type</label>
-          <select
-            className={inputCls}
+          <Select
             value={form.ticket_type}
-            onChange={(e) => set('ticket_type', e.target.value as CreateTicketInput['ticket_type'])}
-          >
-            {TICKET_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set('ticket_type', v as CreateTicketInput['ticket_type'])}
+            options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
+          />
         </div>
         <div>
           <label className={labelCls}>Priority</label>
-          <select
-            className={inputCls}
+          <Select
             value={form.priority}
-            onChange={(e) => set('priority', e.target.value as CreateTicketInput['priority'])}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set('priority', v as CreateTicketInput['priority'])}
+            options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+          />
         </div>
       </div>
       <div>
@@ -224,32 +213,20 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
         </div>
         <div>
           <label className={labelCls}>Category</label>
-          <select
-            className={inputCls}
+          <Select
             value={form.category}
-            onChange={(e) => set('category', e.target.value as CreateAssetInput['category'])}
-          >
-            {ASSET_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set('category', v as CreateAssetInput['category'])}
+            options={ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
+          />
         </div>
       </div>
       <div>
         <label className={labelCls}>Status</label>
-        <select
-          className={inputCls}
-          value={form.status}
-          onChange={(e) => set('status', e.target.value as CreateAssetInput['status'])}
-        >
-          {ASSET_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s.replace('_', ' ')}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={form.status ?? ''}
+          onChange={(v) => set('status', v as CreateAssetInput['status'])}
+          options={ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))}
+        />
       </div>
       {mutation.isError && (
         <p className="text-xs text-red-400">
@@ -326,7 +303,7 @@ export default function Dashboard() {
         {METRIC_CARDS.map(({ label, key, icon: Icon, accent }, i) => (
           <div
             key={key}
-            className="animate-fade-up rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5"
+            className="animate-fade-up rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-colors duration-150 hover:border-slate-600/80 hover:bg-slate-900 sm:p-5"
             style={{ animationDelay: `${i * 70}ms` }}
           >
             <div className="flex items-center justify-between gap-2">
@@ -394,7 +371,13 @@ export default function Dashboard() {
             </div>
           ))}
           {!audit.isLoading && (audit.data ?? []).length === 0 && (
-            <p className="px-5 py-8 text-center text-sm text-slate-500">No audit entries yet.</p>
+            <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
+              <Activity className="h-8 w-8 text-slate-700" />
+              <p className="text-sm text-slate-500">No audit entries yet.</p>
+              <p className="max-w-xs text-xs text-slate-600">
+                Asset updates and ticket changes will show up here automatically.
+              </p>
+            </div>
           )}
         </div>
       </div>
