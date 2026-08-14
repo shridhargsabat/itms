@@ -70,23 +70,32 @@ pub fn router() -> Router<AppState> {
 async fn list_users(
     State(state): State<AppState>,
     Query(q): Query<ListParams>,
-) -> Result<Json<Vec<UserRow>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let mut qb = sqlx::QueryBuilder::new(
         "SELECT id, email, name, role, department, active, created_at FROM users WHERE 1=1",
     );
+    // Count query mirrors the SAME filter pushes (same bind order).
+    let mut cqb = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM users WHERE 1=1");
     if let Some(search) = q.search.filter(|s| !s.trim().is_empty()) {
         let like = format!("%{}%", search.trim());
         qb.push(" AND (name ILIKE ")
             .push_bind(like.clone())
             .push(" OR email ILIKE ")
-            .push_bind(like)
+            .push_bind(like.clone())
+            .push(")");
+        cqb.push(" AND (name ILIKE ")
+            .push_bind(like.clone())
+            .push(" OR email ILIKE ")
+            .push_bind(like.clone())
             .push(")");
     }
     if let Some(role) = q.role.filter(|r| !r.is_empty()) {
-        qb.push(" AND role = ").push_bind(role);
+        qb.push(" AND role = ").push_bind(role.clone());
+        cqb.push(" AND role = ").push_bind(role.clone());
     }
     if let Some(dept) = q.department.filter(|d| !d.is_empty()) {
-        qb.push(" AND department = ").push_bind(dept);
+        qb.push(" AND department = ").push_bind(dept.clone());
+        cqb.push(" AND department = ").push_bind(dept.clone());
     }
     qb.push(" ORDER BY name");
     // Optional pagination (client lists default to unlimited for now).
@@ -97,7 +106,12 @@ async fn list_users(
         }
     }
     let users = qb.build_query_as::<UserRow>().fetch_all(&state.pool).await?;
-    Ok(Json(users))
+    let total: i64 = if q.limit.is_some() {
+        cqb.build_query_scalar().fetch_one(&state.pool).await?
+    } else {
+        users.len() as i64
+    };
+    Ok(([("x-total-count", total.to_string())], Json(users)))
 }
 
 async fn create_user(

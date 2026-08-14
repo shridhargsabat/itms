@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, Columns3, Link2, LoaderCircle, Plus, Table, User } from 'lucide-react';
@@ -133,6 +133,8 @@ export default function Tickets() {
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const status = params.get('status') ?? '';
   const priority = params.get('priority') ?? '';
@@ -144,11 +146,19 @@ export default function Tickets() {
     type: type || undefined,
   };
   const { data, isLoading } = useQuery({
-    queryKey: ['tickets', filters],
-    queryFn: () => listTickets(filters),
+    queryKey: ['tickets', filters, view === 'table' ? { page, pageSize } : 'all'],
+    queryFn: () =>
+      view === 'table'
+        ? listTickets({ ...filters, limit: pageSize, offset: (page - 1) * pageSize })
+        : listTickets(filters),
   });
+  const rows = data?.items ?? [];
+  const selected = rows.find((t) => t.id === selectedId) ?? null;
 
-  const selected = data?.find((t) => t.id === selectedId) ?? null;
+  // any filter change or view switch resets to page 1
+  useEffect(() => {
+    setPage(1);
+  }, [status, priority, type, view]);
 
   const advance = useMutation({
     mutationFn: ({ id, st }: { id: string; st: TicketStatus }) => patchTicketStatus(id, st),
@@ -214,7 +224,8 @@ export default function Tickets() {
         <div>
           <h1 className="text-xl font-semibold text-slate-100">Tickets</h1>
           <p className="mt-0.5 text-sm text-slate-400">
-            {data?.length ?? 0} ticket{data?.length === 1 ? '' : 's'} matching filters
+            {view === 'table' ? data?.total ?? rows.length : rows.length} ticket
+            {view === 'table' ? (data?.total ?? rows.length) === 1 ? '' : 's' : rows.length === 1 ? '' : 's'} matching filters
           </p>
         </div>
         <div className="w-full min-w-0 sm:w-auto">
@@ -281,7 +292,15 @@ export default function Tickets() {
           {view === 'table' ? (
             <DataTable
               columns={columns}
-              rows={data ?? []}
+              rows={rows}
+              total={data?.total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
               loading={isLoading}
               emptyMessage="No tickets match the current filters."
               minWidth="min-w-[760px]"
@@ -290,7 +309,7 @@ export default function Tickets() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               {TICKET_STATUSES.map((st) => {
-                const items = (data ?? []).filter((t) => t.status === st);
+                const items = rows.filter((t) => t.status === st);
                 return (
                   <div key={st} className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
                     <div className="mb-3 flex items-center justify-between px-1">

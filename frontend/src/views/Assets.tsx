@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
@@ -14,6 +14,8 @@ import { inputCls } from '@/lib/utils';
 export default function Assets() {
   const [params, setParams] = useSearchParams();
   const [selected, setSelected] = useState<Asset | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const search = params.get('search') ?? '';
   const category = params.get('category') ?? '';
@@ -25,9 +27,14 @@ export default function Assets() {
     status: status || undefined,
   };
   const { data, isLoading } = useQuery({
-    queryKey: ['assets', filters],
-    queryFn: () => listAssets(filters),
+    queryKey: ['assets', filters, page, pageSize],
+    queryFn: () => listAssets({ ...filters, limit: pageSize, offset: (page - 1) * pageSize }),
   });
+
+  // any filter change resets to page 1
+  useEffect(() => {
+    setPage(1);
+  }, [search, category, status]);
 
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -112,7 +119,15 @@ export default function Assets() {
 
       <DataTable
         columns={columns}
-        rows={data ?? []}
+        rows={data?.items ?? []}
+        total={data?.total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => {
+          setPageSize(s);
+          setPage(1);
+        }}
         loading={isLoading}
         emptyMessage="No assets match the current filters."
         onRowClick={(a) => setSelected(a)}

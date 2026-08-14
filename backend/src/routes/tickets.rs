@@ -42,35 +42,42 @@ pub struct TicketListParams {
 async fn list_tickets(
     State(state): State<AppState>,
     Query(params): Query<TicketListParams>,
-) -> Result<Json<Vec<Ticket>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let mut qb = QueryBuilder::new(TICKET_SELECT);
-    qb.push(" WHERE ");
+    let mut cqb = QueryBuilder::new("SELECT COUNT(*) FROM tickets t");
     let mut any = false;
 
     if let Some(status) = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         if any {
             qb.push(" AND ");
+            cqb.push(" AND ");
         }
-        qb.push("t.status = ").push_bind(status);
+        qb.push("t.status = ").push_bind(status.clone());
+        cqb.push("t.status = ").push_bind(status.clone());
         any = true;
     }
     if let Some(priority) = params.priority.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         if any {
             qb.push(" AND ");
+            cqb.push(" AND ");
         }
-        qb.push("t.priority = ").push_bind(priority);
+        qb.push("t.priority = ").push_bind(priority.clone());
+        cqb.push("t.priority = ").push_bind(priority.clone());
         any = true;
     }
     if let Some(ticket_type) = params.ticket_type.as_deref().map(str::trim).filter(|s| !s.is_empty())
     {
         if any {
             qb.push(" AND ");
+            cqb.push(" AND ");
         }
-        qb.push("t.ticket_type = ").push_bind(ticket_type);
+        qb.push("t.ticket_type = ").push_bind(ticket_type.clone());
+        cqb.push("t.ticket_type = ").push_bind(ticket_type.clone());
         any = true;
     }
     if !any {
-        qb.push("1 = 1");
+        qb.push(" WHERE 1 = 1");
+        cqb.push(" WHERE 1 = 1");
     }
 
     qb.push(" ORDER BY t.created_at DESC");
@@ -82,7 +89,12 @@ async fn list_tickets(
     }
 
     let tickets = qb.build_query_as::<Ticket>().fetch_all(&state.pool).await?;
-    Ok(Json(tickets))
+    let total: i64 = if params.limit.is_some() {
+        cqb.build_query_scalar().fetch_one(&state.pool).await?
+    } else {
+        tickets.len() as i64
+    };
+    Ok(([("x-total-count", total.to_string())], Json(tickets)))
 }
 
 /// POST /api/v1/tickets → 201 with auto-generated INC-XXXX tag + audit row.

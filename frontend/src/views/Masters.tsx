@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Database, LoaderCircle, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
@@ -95,15 +95,27 @@ function UsersTab() {
   const [editing, setEditing] = useState<UserRecord | null>(null);
   const [form, setForm] = useState({ name: '', email: '', role: 'EMPLOYEE', department: 'IT', password: '' });
   const [formError, setFormError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const search = params.get('search') ?? '';
   const role = params.get('role') ?? '';
   const department = params.get('department') ?? '';
 
   const users = useQuery({
-    queryKey: ['users', { search, role, department }],
-    queryFn: () => listUsers({ search: search || undefined, role: role || undefined, department: department || undefined }),
+    queryKey: ['users', { search, role, department }, page, pageSize],
+    queryFn: () =>
+      listUsers({
+        search: search || undefined,
+        role: role || undefined,
+        department: department || undefined,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      }),
   });
+  useEffect(() => {
+    setPage(1);
+  }, [search, role, department]);
   const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
   const departments = masters.data?.department ?? [];
 
@@ -242,7 +254,15 @@ function UsersTab() {
         </div>
       ) : (
         <DataTable<UserRecord>
-          rows={users.data ?? []}
+          rows={users.data?.items ?? []}
+          total={users.data?.total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => {
+            setPageSize(s);
+            setPage(1);
+          }}
           columns={columns}
           emptyMessage="No users match the filters."
         />

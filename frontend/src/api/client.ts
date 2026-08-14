@@ -53,6 +53,16 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await apiFetchRaw(path, init);
+  // 204 No Content (e.g. DELETE) has no body — don't try to parse it.
+  if (res.status === 204) {
+    return undefined as T;
+  }
+  return res.json() as Promise<T>;
+}
+
+/** Raw fetch with auth + 401/error handling — returns the Response so headers (X-Total-Count) can be read. */
+async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -79,11 +89,7 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     throw new ApiError(res.status, detail);
   }
-  // 204 No Content (e.g. DELETE) has no body — don't try to parse it.
-  if (res.status === 204) {
-    return undefined as T;
-  }
-  return res.json() as Promise<T>;
+  return res;
 }
 
 // ---- auth ----
@@ -103,13 +109,27 @@ export const getDashboardMetrics = () => apiFetch<DashboardMetrics>('/dashboard/
 export const getAuditLog = (limit = 50) => apiFetch<AuditLogEntry[]>(`/audit/log?limit=${limit}`);
 
 // ---- assets ----
-export const listAssets = (params?: { search?: string; category?: string; status?: string }) => {
+export interface ListResult<T> {
+  items: T[];
+  total: number;
+}
+
+/** Fetch with the X-Total-Count header (lists that support pagination). */
+async function apiFetchCount<T>(path: string): Promise<ListResult<T>> {
+  const res = await apiFetchRaw(path);
+  const total = Number(res.headers.get('x-total-count')) || 0;
+  return { items: (await res.json()) as T[], total };
+}
+
+export const listAssets = (params?: { search?: string; category?: string; status?: string; limit?: number; offset?: number }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.category) q.set('category', params.category);
   if (params?.status) q.set('status', params.status);
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return apiFetch<Asset[]>(`/assets${qs ? `?${qs}` : ''}`);
+  return apiFetchCount<Asset>(`/assets${qs ? `?${qs}` : ''}`);
 };
 export const createAsset = (input: CreateAssetInput) =>
   apiFetch<Asset>('/assets', { method: 'POST', body: JSON.stringify(input) });
@@ -117,13 +137,15 @@ export const assignAsset = (assetId: string, userId: string | null) =>
   apiFetch<Asset>(`/assets/${assetId}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to_user_id: userId }) });
 
 // ---- tickets ----
-export const listTickets = (params?: { status?: string; priority?: string; type?: string }) => {
+export const listTickets = (params?: { status?: string; priority?: string; type?: string; limit?: number; offset?: number }) => {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.priority) q.set('priority', params.priority);
   if (params?.type) q.set('type', params.type);
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return apiFetch<Ticket[]>(`/tickets${qs ? `?${qs}` : ''}`);
+  return apiFetchCount<Ticket>(`/tickets${qs ? `?${qs}` : ''}`);
 };
 export const createTicket = (input: CreateTicketInput) =>
   apiFetch<Ticket>('/tickets', { method: 'POST', body: JSON.stringify(input) });
@@ -135,13 +157,15 @@ export const getTopology = () => apiFetch<Topology>('/cmdb/topology');
 export const getImpact = (assetId: string) => apiFetch<ImpactResult>(`/cmdb/impact/${assetId}`);
 
 // ---- users master ----
-export const listUsers = (params?: { search?: string; role?: string; department?: string }) => {
+export const listUsers = (params?: { search?: string; role?: string; department?: string; limit?: number; offset?: number }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.role) q.set('role', params.role);
   if (params?.department) q.set('department', params.department);
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return apiFetch<UserRecord[]>(`/users${qs ? `?${qs}` : ''}`);
+  return apiFetchCount<UserRecord>(`/users${qs ? `?${qs}` : ''}`);
 };
 export const createUser = (input: CreateUserInput) =>
   apiFetch<UserRecord>('/users', { method: 'POST', body: JSON.stringify(input) });

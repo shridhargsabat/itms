@@ -43,14 +43,16 @@ pub struct AssetListParams {
 async fn list_assets(
     State(state): State<AppState>,
     Query(params): Query<AssetListParams>,
-) -> Result<Json<Vec<Asset>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
+    // Data query + count query share the SAME filter pushes (same bind order).
     let mut qb = QueryBuilder::new(ASSET_SELECT);
-    qb.push(" WHERE ");
+    let mut cqb = QueryBuilder::new("SELECT COUNT(*) FROM assets a");
     let mut any = false;
 
     if let Some(search) = params.search.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         if any {
             qb.push(" AND ");
+            cqb.push(" AND ");
         }
         let pattern = format!("%{search}%");
         qb.push("(a.name ILIKE ")
@@ -58,26 +60,38 @@ async fn list_assets(
             .push(" OR a.asset_tag ILIKE ")
             .push_bind(pattern.clone())
             .push(" OR a.serial_number ILIKE ")
-            .push_bind(pattern)
+            .push_bind(pattern.clone())
+            .push(")");
+        cqb.push("(a.name ILIKE ")
+            .push_bind(pattern.clone())
+            .push(" OR a.asset_tag ILIKE ")
+            .push_bind(pattern.clone())
+            .push(" OR a.serial_number ILIKE ")
+            .push_bind(pattern.clone())
             .push(")");
         any = true;
     }
     if let Some(category) = params.category.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         if any {
             qb.push(" AND ");
+            cqb.push(" AND ");
         }
         qb.push("a.category = ").push_bind(category);
+        cqb.push("a.category = ").push_bind(category);
         any = true;
     }
     if let Some(status) = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         if any {
             qb.push(" AND ");
+            cqb.push(" AND ");
         }
         qb.push("a.status = ").push_bind(status);
+        cqb.push("a.status = ").push_bind(status);
         any = true;
     }
     if !any {
-        qb.push("1 = 1");
+        qb.push(" WHERE 1 = 1");
+        cqb.push(" WHERE 1 = 1");
     }
 
     qb.push(" ORDER BY a.created_at DESC");
@@ -89,7 +103,12 @@ async fn list_assets(
     }
 
     let assets = qb.build_query_as::<Asset>().fetch_all(&state.pool).await?;
-    Ok(Json(assets))
+    let total: i64 = if params.limit.is_some() {
+        cqb.build_query_scalar().fetch_one(&state.pool).await?
+    } else {
+        assets.len() as i64
+    };
+    Ok(([("x-total-count", total.to_string())], Json(assets)))
 }
 
 /// POST /api/v1/assets → 201 with auto-generated AST-XXXX tag + audit row.
