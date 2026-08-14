@@ -133,7 +133,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       POSTGRES_DB: itms
     volumes:
-      - itms_pgdata:/var/lib/postgresql/data
+      - itms_pgdata:/var/lib/postgresql   # PG18+: mount parent dir — /var/lib/postgresql/data is rejected by 18+ images (pg_ctlcluster layout)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U itms -d itms"]
       interval: 10s
