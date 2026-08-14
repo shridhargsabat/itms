@@ -225,13 +225,13 @@ function UsersTab() {
           onChange={(e) => setParams(e.target.value ? { search: e.target.value } : {}, { replace: true })}
         />
         <Select
-          className="w-auto"
+          className="w-auto min-w-[130px]"
           value={role}
           onChange={(v) => setParams(v ? { role: v } : {}, { replace: true })}
           options={[{ value: '', label: 'All Roles' }, ...ROLES.map((r) => ({ value: r, label: r }))]}
         />
         <Select
-          className="w-auto"
+          className="w-auto min-w-[150px]"
           value={department}
           onChange={(v) => setParams(v ? { department: v } : {}, { replace: true })}
           options={[
@@ -300,11 +300,12 @@ function UsersTab() {
               </div>
               <div>
                 <label className={labelCls}>Role</label>
-                <Select value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={ROLES.map((r) => ({ value: r, label: r }))} />
+                <Select className="w-full" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={ROLES.map((r) => ({ value: r, label: r }))} />
               </div>
               <div>
                 <label className={labelCls}>Department</label>
                 <Select
+                  className="w-full"
                   value={form.department}
                   onChange={(v) => setForm({ ...form, department: v })}
                   options={departments.filter((d) => d.active).map((d) => ({ value: d.code, label: d.label }))}

@@ -67,6 +67,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         <div>
           <label className={labelCls}>Type</label>
           <Select
+            className="w-full"
             value={form.ticket_type}
             onChange={(v) => set('ticket_type', v as CreateTicketInput['ticket_type'])}
             options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
@@ -75,6 +76,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         <div>
           <label className={labelCls}>Priority</label>
           <Select
+            className="w-full"
             value={form.priority}
             onChange={(v) => set('priority', v as CreateTicketInput['priority'])}
             options={PRIORITIES.map((p) => ({ value: p, label: p }))}
@@ -253,7 +255,7 @@ export default function Tickets() {
               </button>
             </div>
             <Select
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto sm:min-w-[130px]"
               value={status}
               onChange={(v) => update('status', v)}
               options={[
@@ -262,13 +264,13 @@ export default function Tickets() {
               ]}
           />
           <Select
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto sm:min-w-[130px]"
             value={priority}
             onChange={(v) => update('priority', v)}
             options={[{ value: '', label: 'All Priorities' }, ...PRIORITIES.map((p) => ({ value: p, label: p }))]}
           />
           <Select
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto sm:min-w-[130px]"
             value={type}
             onChange={(v) => update('type', v)}
             options={[

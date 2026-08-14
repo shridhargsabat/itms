@@ -83,7 +83,7 @@ export default function Assets() {
         <div>
           <h1 className="text-xl font-semibold text-slate-100">Assets</h1>
           <p className="mt-0.5 text-sm text-slate-400">
-            {data?.length ?? 0} asset{data?.length === 1 ? '' : 's'} in the registry
+            {data?.total ?? 0} asset{data?.total === 1 ? '' : 's'} in the registry
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -97,7 +97,7 @@ export default function Assets() {
             />
           </div>
           <Select
-            className="w-auto"
+            className="w-auto min-w-[130px]"
             value={category}
             onChange={(v) => update('category', v)}
             options={[
@@ -106,7 +106,7 @@ export default function Assets() {
             ]}
           />
           <Select
-            className="w-auto"
+            className="w-auto min-w-[130px]"
             value={status}
             onChange={(v) => update('status', v)}
             options={[

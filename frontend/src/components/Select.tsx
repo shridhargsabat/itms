@@ -29,7 +29,7 @@ export default function Select({
   className,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
-  const [menu, setMenu] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [menu, setMenu] = useState<{ top: number; left: number; width: number; maxWidth: number } | null>(null);
   const menuHeight = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -45,12 +45,16 @@ export default function Select({
     const r = el.getBoundingClientRect();
     const mh = menuHeight.current || 224;
     const spaceBelow = window.innerHeight - r.bottom;
+    // Cap: never wider than 340px nor wider than the viewport (minus a
+    // small margin). The menu grows to fit its longest option up to this.
+    const cappedW = Math.min(340, window.innerWidth - 16);
     setMenu({
       // Flip upward only when the menu wouldn't fit below; exact height
       // (measured, not guessed) so there's never a floating gap.
       top: spaceBelow >= mh + 12 ? r.bottom + 6 : Math.max(8, r.top - mh - 6),
       left: r.left,
       width: r.width,
+      maxWidth: cappedW,
     });
   };
 
@@ -131,7 +135,17 @@ export default function Select({
         createPortal(
           <div
             ref={menuRef}
-            style={{ position: 'fixed', top: menu.top, left: menu.left, width: menu.width }}
+            style={{
+              position: 'fixed',
+              top: menu.top,
+              left: menu.left,
+              // Menu is at least as wide as the trigger, grows to fit its
+              // longest option (max-content), capped so it never overflows
+              // the viewport on narrow screens.
+              minWidth: menu.width,
+              width: 'max-content',
+              maxWidth: menu.maxWidth,
+            }}
             role="listbox"
             className="animate-menu-in z-[70] max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-800/95 p-1 shadow-2xl backdrop-blur"
           >
@@ -146,13 +160,13 @@ export default function Select({
                   close();
                 }}
                 className={cn(
-                  'flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                  'flex w-full items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md px-3 py-2 text-left text-sm transition-colors',
                   o.value === value
                     ? 'bg-slate-700/70 text-white'
                     : 'text-slate-300 hover:bg-slate-700/40 hover:text-white',
                 )}
               >
-                {o.label}
+                <span className="min-w-0 truncate">{o.label}</span>
                 {o.value === value && <Check className="h-4 w-4 shrink-0 text-indigo-400" />}
               </button>
             ))}

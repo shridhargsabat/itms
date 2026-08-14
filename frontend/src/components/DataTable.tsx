@@ -72,20 +72,76 @@ export default function DataTable<T extends { id: string }>({
     );
   }
 
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-800 p-10 text-center text-sm text-slate-500">
-        {emptyMessage}
-      </div>
-    );
-  }
-
   const paginated = onPageChange !== undefined;
   const pages = total !== undefined && total > 0 ? Math.ceil(total / pageSize) : 0;
-  const from = total !== undefined && total > 0 ? (page - 1) * pageSize + 1 : 0;
+  // Clamp `from` to total so a stale page (data shrank while sitting on a
+  // page past the last one) never renders a range like "Showing 81–45 of 45".
+  const from = total !== undefined && total > 0 ? Math.min((page - 1) * pageSize + 1, total) : 0;
   const to = total !== undefined ? Math.min(page * pageSize, total) : rows.length;
   const navBtn =
     'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
+
+  const footer = paginated && (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-slate-800 bg-slate-900/70 px-3 py-2.5 text-xs text-slate-400">
+      <span>
+        {total !== undefined && total > 0 && rows.length > 0
+          ? `Showing ${from}–${to} of ${total}`
+          : `${rows.length} row${rows.length === 1 ? '' : 's'}`}
+      </span>
+      <div className="flex items-center gap-2">
+        <Select
+          className="w-auto"
+          value={String(pageSize)}
+          onChange={(v) => onPageSizeChange?.(Number(v))}
+          options={[
+            { value: '10', label: '10 / page' },
+            { value: '20', label: '20 / page' },
+            { value: '50', label: '50 / page' },
+          ]}
+        />
+        <button
+          type="button"
+          aria-label="Previous page"
+          className={navBtn}
+          disabled={page <= 1}
+          onClick={() => onPageChange?.(page - 1)}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="min-w-[76px] text-center tabular-nums">
+          {pages > 0 ? `Page ${page} of ${pages}` : ''}
+        </span>
+        <button
+          type="button"
+          aria-label="Next page"
+          className={navBtn}
+          disabled={pages === 0 || page >= pages}
+          onClick={() => onPageChange?.(page + 1)}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+
+  if (rows.length === 0) {
+    if (!paginated) {
+      return (
+        <div className="rounded-xl border border-dashed border-slate-800 p-10 text-center text-sm text-slate-500">
+          {emptyMessage}
+        </div>
+      );
+    }
+    // Paginated empty state: keep the footer so total=0 shows "0 rows" with
+    // both nav buttons disabled, and a stale page (rows gone, total > 0)
+    // still offers Prev to navigate back.
+    return (
+      <div className="rounded-xl border border-slate-800">
+        <div className="p-10 text-center text-sm text-slate-500">{emptyMessage}</div>
+        {footer}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-slate-800">
@@ -113,48 +169,7 @@ export default function DataTable<T extends { id: string }>({
           </tbody>
         </table>
       </div>
-      {paginated && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-slate-800 bg-slate-900/70 px-3 py-2.5 text-xs text-slate-400">
-          <span>
-            {total !== undefined && total > 0
-              ? `Showing ${from}–${to} of ${total}`
-              : `${rows.length} row${rows.length === 1 ? '' : 's'}`}
-          </span>
-          <div className="flex items-center gap-2">
-            <Select
-              className="w-auto"
-              value={String(pageSize)}
-              onChange={(v) => onPageSizeChange?.(Number(v))}
-              options={[
-                { value: '10', label: '10 / page' },
-                { value: '20', label: '20 / page' },
-                { value: '50', label: '50 / page' },
-              ]}
-            />
-            <button
-              type="button"
-              aria-label="Previous page"
-              className={navBtn}
-              disabled={page <= 1}
-              onClick={() => onPageChange?.(page - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="min-w-[76px] text-center tabular-nums">
-              Page {page} of {pages || 1}
-            </span>
-            <button
-              type="button"
-              aria-label="Next page"
-              className={navBtn}
-              disabled={pages > 0 && page >= pages}
-              onClick={() => onPageChange?.(page + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      {footer}
     </div>
   );
 }

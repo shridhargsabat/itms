@@ -106,6 +106,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         <div>
           <label className={labelCls}>Type</label>
           <Select
+            className="w-full"
             value={form.ticket_type}
             onChange={(v) => set('ticket_type', v as CreateTicketInput['ticket_type'])}
             options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
@@ -114,6 +115,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         <div>
           <label className={labelCls}>Priority</label>
           <Select
+            className="w-full"
             value={form.priority}
             onChange={(v) => set('priority', v as CreateTicketInput['priority'])}
             options={PRIORITIES.map((p) => ({ value: p, label: p }))}
@@ -217,6 +219,7 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
         <div>
           <label className={labelCls}>Category</label>
           <Select
+            className="w-full"
             value={form.category}
             onChange={(v) => set('category', v as CreateAssetInput['category'])}
             options={ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
@@ -226,6 +229,7 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
       <div>
         <label className={labelCls}>Status</label>
         <Select
+          className="w-full"
           value={form.status ?? ''}
           onChange={(v) => set('status', v as CreateAssetInput['status'])}
           options={ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))}
