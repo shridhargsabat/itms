@@ -19,10 +19,11 @@ async fn metrics(
         r#"
         SELECT
             (SELECT COUNT(*) FROM assets)                                                        AS asset_count,
-            (SELECT COUNT(*) FROM tickets WHERE status IN ('OPEN', 'IN_PROGRESS'))               AS open_tickets,
-            (SELECT COUNT(*) FROM tickets
-                WHERE priority IN ('HIGH', 'URGENT')
-                  AND status IN ('OPEN', 'IN_PROGRESS'))                                         AS high_priority_count,
+            -- Semantics MUST match the drill-down filters (tickets?status=OPEN,
+            -- tickets?priority=HIGH, assets?status=IN_STOCK) so a card's number
+            -- always equals the rows its link shows.
+            (SELECT COUNT(*) FROM tickets WHERE status = 'OPEN')                                 AS open_tickets,
+            (SELECT COUNT(*) FROM tickets WHERE priority = 'HIGH')                                AS high_priority_count,
             (SELECT COUNT(*) FROM assets WHERE status = 'IN_STOCK')                              AS in_stock_count
         "#,
     )
