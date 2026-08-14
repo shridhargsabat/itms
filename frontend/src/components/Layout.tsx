@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Boxes,
@@ -49,6 +49,36 @@ export default function Layout() {
       window.setTimeout(() => setShowIosTip(false), 6000);
     }
   };
+
+  // Smooth page transitions via the View Transitions API (Chromium/Safari 18+).
+  // Intercepts internal <a> clicks and wraps the navigation so the browser
+  // crossfades between screens. No transforms on wrappers — that would break
+  // position:fixed children (see dropdown alignment incident).
+  useEffect(() => {
+    if (!('startViewTransition' in document)) return;
+    const onClick = (e: MouseEvent) => {
+      if (
+        e.defaultPrevented ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey ||
+        e.button !== 0
+      ) {
+        return;
+      }
+      const anchor = (e.target as Element).closest('a[href^="/"]');
+      if (!anchor || anchor.getAttribute('target') === '_blank') return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('http')) return;
+      e.preventDefault();
+      document.startViewTransition(() => {
+        navigate(href);
+      });
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen">

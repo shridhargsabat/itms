@@ -59,6 +59,14 @@
   animation: list-in 0.24s ease-out both;
 }
 
+/* ---------- page transitions (View Transitions API) ---------- */
+::view-transition-old(root) {
+  animation: fade-out 0.14s ease-in both;
+}
+::view-transition-new(root) {
+  animation: fade-in 0.24s ease-out both;
+}
+
 /* ---------- UI animations (reduced-motion guarded below) ---------- */
 @keyframes fade-up {
   from {

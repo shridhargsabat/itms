@@ -18,7 +18,11 @@ export default function Login() {
       login(e, p),
     onSuccess: (res) => {
       setSession(res.token, res.user);
-      navigate('/', { replace: true });
+      if ('startViewTransition' in document) {
+        document.startViewTransition(() => navigate('/', { replace: true }));
+      } else {
+        navigate('/', { replace: true });
+      }
     },
   });
 
