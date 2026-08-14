@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { LoaderCircle } from 'lucide-react';
 import './index.css';
 import Layout from '@/components/Layout';
+import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 // Route-level code splitting: each view is its own chunk, loaded on first
 // navigation (Vite emits per-lazy-import chunks + a vendor chunk below).
 const Dashboard = lazy(() => import('@/views/Dashboard'));
@@ -77,24 +78,26 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              element={
-                <RequireAuth>
-                  <Layout />
-                </RequireAuth>
-              }
-            >
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/assets" element={<Assets />} />
-              <Route path="/tickets" element={<Tickets />} />
-              <Route path="/cmdb" element={<CMDB />} />
-              <Route path="/audit" element={<AuditLog />} />
-              <Route path="/masters" element={<Masters />} />
-              <Route path="/offline" element={<Offline />} />
-            </Route>
-          </Routes>
+          <RouteErrorBoundary>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                element={
+                  <RequireAuth>
+                    <Layout />
+                  </RequireAuth>
+                }
+              >
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/assets" element={<Assets />} />
+                <Route path="/tickets" element={<Tickets />} />
+                <Route path="/cmdb" element={<CMDB />} />
+                <Route path="/audit" element={<AuditLog />} />
+                <Route path="/masters" element={<Masters />} />
+                <Route path="/offline" element={<Offline />} />
+              </Route>
+            </Routes>
+          </RouteErrorBoundary>
         </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
