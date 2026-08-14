@@ -467,7 +467,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
       <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-800 p-3">
         <div>
           <label className={labelCls}>New label</label>
-          <input className={cn(inputCls, 'w-48')} value={newRow.label} onChange={(e) => setNewRow({ ...newRow, label: e.target.value })} />
+          <input className={cn(inputCls, 'w-48')} placeholder="e.g. Blocker" value={newRow.label} onChange={(e) => setNewRow({ ...newRow, label: e.target.value })} />
         </div>
         <div>
           <label className={labelCls}>Code</label>

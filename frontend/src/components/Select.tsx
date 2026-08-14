@@ -30,6 +30,7 @@ export default function Select({
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<{ top: number; left: number; width: number } | null>(null);
+  const menuHeight = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,21 +39,28 @@ export default function Select({
     setMenu(null);
   };
 
+  const placeMenu = () => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const mh = menuHeight.current || 224;
+    const spaceBelow = window.innerHeight - r.bottom;
+    setMenu({
+      // Flip upward only when the menu wouldn't fit below; exact height
+      // (measured, not guessed) so there's never a floating gap.
+      top: spaceBelow >= mh + 12 ? r.bottom + 6 : Math.max(8, r.top - mh - 6),
+      left: r.left,
+      width: r.width,
+    });
+  };
+
   useEffect(() => {
     if (!open) return;
     let raf = 0;
     const reposition = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        const el = ref.current;
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - r.bottom;
-        setMenu({
-          top: spaceBelow > 280 ? r.bottom + 6 : Math.max(8, r.top - 280),
-          left: r.left,
-          width: r.width,
-        });
+        placeMenu();
       });
     };
     const onDown = (e: MouseEvent) => {
@@ -86,14 +94,16 @@ export default function Select({
       close();
       return;
     }
-    const r = ref.current!.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - r.bottom;
-    setMenu({
-      top: spaceBelow > 280 ? r.bottom + 6 : Math.max(8, r.top - 280),
-      left: r.left,
-      width: r.width,
-    });
+    const el = ref.current;
+    if (!el) return;
+    el.scrollIntoView({ block: 'nearest' });
     setOpen(true);
+    // Measure the rendered menu height, then place it precisely below the
+    // trigger (or above when it wouldn't fit) — no guessed heights.
+    requestAnimationFrame(() => {
+      if (menuRef.current) menuHeight.current = menuRef.current.offsetHeight;
+      placeMenu();
+    });
   };
 
   const selected = options.find((o) => o.value === value);

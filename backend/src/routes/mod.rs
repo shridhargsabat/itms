@@ -28,15 +28,10 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/tickets", tickets::router())
         .nest("/cmdb", cmdb::router())
         .nest("/audit", audit::router())
-        // Users + masters: reads for everyone, writes for admins only.
-        .nest(
-            "/users",
-            users::router().route_layer(middleware::from_fn(auth::require_admin)),
-        )
-        .nest(
-            "/masters",
-            masters::router().route_layer(middleware::from_fn(auth::require_admin)),
-        )
+        // Users + masters: reads open to all authenticated users, mutations
+        // ADMIN-only — the per-route split lives inside each module.
+        .nest("/users", users::router())
+        .nest("/masters", masters::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
 
     Router::new()
