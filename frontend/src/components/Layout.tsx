@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Boxes,
+  Database,
   Download,
   LayoutDashboard,
   LogOut,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/cmdb', label: 'CMDB', icon: Network },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
+  { to: '/masters', label: 'Masters', icon: Database, admin: true },
 ];
 
 export default function Layout() {
@@ -138,7 +140,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 space-y-1 p-2">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          {NAV_ITEMS.filter((i) => !i.admin || user?.role === 'ADMIN').map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

@@ -3,7 +3,9 @@ pub mod audit;
 pub mod auth;
 pub mod cmdb;
 pub mod dashboard;
+pub mod masters;
 pub mod tickets;
+pub mod users;
 
 use axum::http::StatusCode;
 use axum::middleware;
@@ -26,6 +28,15 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/tickets", tickets::router())
         .nest("/cmdb", cmdb::router())
         .nest("/audit", audit::router())
+        // Users + masters: reads for everyone, writes for admins only.
+        .nest(
+            "/users",
+            users::router().route_layer(middleware::from_fn(auth::require_admin)),
+        )
+        .nest(
+            "/masters",
+            masters::router().route_layer(middleware::from_fn(auth::require_admin)),
+        )
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
 
     Router::new()

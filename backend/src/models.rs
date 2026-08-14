@@ -17,6 +17,20 @@ pub struct User {
     pub name: String,
     pub role: String,
     pub department: String,
+    pub active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// One row of master data (lookup_options). `family` is one of
+/// department | asset_category | ticket_type | ticket_priority | ticket_status.
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LookupOption {
+    pub id: Uuid,
+    pub family: String,
+    pub code: String,
+    pub label: String,
+    pub sort_order: i32,
+    pub active: bool,
     pub created_at: DateTime<Utc>,
 }
 

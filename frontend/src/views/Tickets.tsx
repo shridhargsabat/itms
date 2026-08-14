@@ -217,46 +217,47 @@ export default function Tickets() {
             {data?.length ?? 0} ticket{data?.length === 1 ? '' : 's'} matching filters
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex overflow-hidden rounded-lg border border-slate-700">
-            <button
-              type="button"
-              onClick={() => setView('table')}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-2 text-sm transition-colors',
-                view === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              <Table className="h-4 w-4" /> Table
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('kanban')}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-2 text-sm transition-colors',
-                view === 'kanban' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200',
-              )}
-            >
-              <Columns3 className="h-4 w-4" /> Kanban
-            </button>
-          </div>
-          <Select
-            className="w-auto"
-            value={status}
-            onChange={(v) => update('status', v)}
-            options={[
-              { value: '', label: 'All Statuses' },
-              ...TICKET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
-            ]}
+        <div className="w-full min-w-0 sm:w-auto">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+            <div className="col-span-2 flex overflow-hidden rounded-lg border border-slate-700 sm:col-auto">
+              <button
+                type="button"
+                onClick={() => setView('table')}
+                className={cn(
+                  'inline-flex h-10 flex-1 items-center justify-center gap-1.5 px-3 text-sm transition-colors sm:flex-none',
+                  view === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200',
+                )}
+              >
+                <Table className="h-4 w-4" /> Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('kanban')}
+                className={cn(
+                  'inline-flex h-10 flex-1 items-center justify-center gap-1.5 px-3 text-sm transition-colors sm:flex-none',
+                  view === 'kanban' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200',
+                )}
+              >
+                <Columns3 className="h-4 w-4" /> Kanban
+              </button>
+            </div>
+            <Select
+              className="w-full sm:w-auto"
+              value={status}
+              onChange={(v) => update('status', v)}
+              options={[
+                { value: '', label: 'All Statuses' },
+                ...TICKET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
+              ]}
           />
           <Select
-            className="w-auto"
+            className="w-full sm:w-auto"
             value={priority}
             onChange={(v) => update('priority', v)}
             options={[{ value: '', label: 'All Priorities' }, ...PRIORITIES.map((p) => ({ value: p, label: p }))]}
           />
           <Select
-            className="w-auto"
+            className="w-full sm:w-auto"
             value={type}
             onChange={(v) => update('type', v)}
             options={[
@@ -267,10 +268,11 @@ export default function Tickets() {
           <button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+            className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-500 sm:col-auto sm:inline-flex"
           >
             <Plus className="h-4 w-4" /> New Ticket
           </button>
+          </div>
         </div>
       </div>
 

@@ -4,11 +4,17 @@ import type {
   AuthUser,
   CreateAssetInput,
   CreateTicketInput,
+  CreateUserInput,
   DashboardMetrics,
   ImpactResult,
   LoginResponse,
+  LookupOption,
+  MasterFamily,
+  MastersMap,
   Ticket,
   Topology,
+  UpdateUserInput,
+  UserRecord,
 } from '@/api/types';
 
 const TOKEN_KEY = 'itms_token';
@@ -123,3 +129,32 @@ export const patchTicketStatus = (ticketId: string, status: string) =>
 // ---- cmdb ----
 export const getTopology = () => apiFetch<Topology>('/cmdb/topology');
 export const getImpact = (assetId: string) => apiFetch<ImpactResult>(`/cmdb/impact/${assetId}`);
+
+// ---- users master ----
+export const listUsers = (params?: { search?: string; role?: string; department?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.role) q.set('role', params.role);
+  if (params?.department) q.set('department', params.department);
+  const qs = q.toString();
+  return apiFetch<UserRecord[]>(`/users${qs ? `?${qs}` : ''}`);
+};
+export const createUser = (input: CreateUserInput) =>
+  apiFetch<UserRecord>('/users', { method: 'POST', body: JSON.stringify(input) });
+export const updateUser = (userId: string, input: UpdateUserInput) =>
+  apiFetch<UserRecord>(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(input) });
+
+// ---- masters ----
+export const getMasters = () => apiFetch<MastersMap>('/masters');
+export const createMasterOption = (input: {
+  family: MasterFamily;
+  code: string;
+  label: string;
+  sort_order?: number;
+}) => apiFetch<LookupOption>('/masters', { method: 'POST', body: JSON.stringify(input) });
+export const updateMasterOption = (
+  optionId: string,
+  input: { label?: string; sort_order?: number; active?: boolean },
+) => apiFetch<LookupOption>(`/masters/${optionId}`, { method: 'PATCH', body: JSON.stringify(input) });
+export const deleteMasterOption = (optionId: string) =>
+  apiFetch<void>(`/masters/${optionId}`, { method: 'DELETE' });

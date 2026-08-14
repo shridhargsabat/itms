@@ -18,6 +18,54 @@ export interface AuthUser {
   department: string;
 }
 
+/** Master lookup option (lookup_options row from the API). */
+export interface LookupOption {
+  id: string;
+  family: string;
+  code: string;
+  label: string;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+}
+
+export type MasterFamily =
+  | 'department'
+  | 'asset_category'
+  | 'ticket_type'
+  | 'ticket_priority'
+  | 'ticket_status';
+
+export type MastersMap = Record<MasterFamily, LookupOption[]>;
+
+/** User row for the Users master (never contains password fields). */
+export interface UserRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  department: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface CreateUserInput {
+  email: string;
+  name: string;
+  role: string;
+  department: string;
+  password: string;
+}
+
+export interface UpdateUserInput {
+  email?: string;
+  name?: string;
+  role?: string;
+  department?: string;
+  active?: boolean;
+  password?: string;
+}
+
 export interface LoginResponse {
   token: string;
   expires_at: string;

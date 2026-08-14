@@ -36,15 +36,21 @@ pub async fn login(
     State(state): State<AppState>,
     Json(body): Json<LoginRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, Option<String>)>(
-        "SELECT id, email, name, role, department, password_hash FROM users WHERE email = $1",
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, Option<String>, bool)>(
+        "SELECT id, email, name, role, department, password_hash, active FROM users WHERE email = $1",
     )
     .bind(body.email.trim().to_lowercase())
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "invalid email or password"))?;
 
-    let (id, email, name, role, department, password_hash) = row;
+    let (id, email, name, role, department, password_hash, active) = row;
+    if !active {
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "account disabled — contact your administrator",
+        ));
+    }
     let valid = password_hash
         .as_deref()
         .map(|h| verify_password(&body.password, h))
@@ -94,6 +100,8 @@ pub async fn me(
 }
 
 /// Axum middleware: 401 unless a valid Bearer session is presented.
+/// Inserts the authenticated user's id + role into request extensions so
+/// downstream handlers/middleware can enforce RBAC.
 pub async fn require_auth(
     State(state): State<AppState>,
     mut req: Request,
@@ -101,6 +109,24 @@ pub async fn require_auth(
 ) -> Result<Response, AppError> {
     let user = current_user(&state.pool, req.headers()).await?;
     req.extensions_mut().insert(user.id);
+    req.extensions_mut().insert(user.role);
+    Ok(next.run(req).await)
+}
+
+/// RBAC: 403 unless the authenticated user is an ADMIN. Must run inside
+/// `require_auth` (the role extension is populated there).
+pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppError> {
+    let role = req
+        .extensions()
+        .get::<String>()
+        .map(|r| r.as_str())
+        .unwrap_or("");
+    if role != "ADMIN" {
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "admin role required",
+        ));
+    }
     Ok(next.run(req).await)
 }
 
@@ -124,7 +150,7 @@ async fn current_user(pool: &PgPool, headers: &HeaderMap) -> Result<AuthUser, Ap
         "SELECT u.id, u.email, u.name, u.role, u.department
          FROM sessions s
          JOIN users u ON u.id = s.user_id
-         WHERE s.token_hash = $1 AND s.expires_at > NOW()",
+         WHERE s.token_hash = $1 AND s.expires_at > NOW() AND u.active = TRUE",
     )
     .bind(hash_token(&token))
     .fetch_optional(pool)

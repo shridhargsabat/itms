@@ -10,6 +10,7 @@ import Assets from '@/views/Assets';
 import Tickets from '@/views/Tickets';
 import CMDB from '@/views/CMDB';
 import AuditLog from '@/views/AuditLog';
+import Masters from '@/views/Masters';
 import Offline from '@/views/Offline';
 import Login from '@/views/Login';
 import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
@@ -78,6 +79,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/cmdb" element={<CMDB />} />
             <Route path="/audit" element={<AuditLog />} />
+            <Route path="/masters" element={<Masters />} />
             <Route path="/offline" element={<Offline />} />
           </Route>
         </Routes>
