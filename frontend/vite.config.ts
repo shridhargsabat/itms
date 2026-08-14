@@ -33,7 +33,20 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            // Workbox v7: urlPattern regexes match the FULL url (url.href) — anchor on origin
+            // Read-only catalog GETs — offline-usable via SWR (stale-first, revalidate bg).
+            // ORDER: must precede the NetworkOnly catch-all (first match wins).
+            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(dashboard|assets|tickets|cmdb|audit)(\/|\?|$).*/,
+            handler: 'StaleWhileRevalidate',
+            method: 'GET',
+            options: {
+              cacheName: 'api-catalog',
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Everything else under /api — never cache (mutations bypass SW anyway;
+            // this guards unknown/uncached GETs). Workbox v7: regex matches FULL url.
             urlPattern: /^https?:\/\/[^/]+\/api\/.*/,
             handler: 'NetworkOnly',
             method: 'GET',
