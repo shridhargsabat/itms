@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateToast from '@/components/UpdateToast';
+import BottomNav from '@/components/BottomNav';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -28,9 +29,10 @@ export default function Layout() {
     <div className="min-h-screen">
       <OfflineBanner />
       <UpdateToast />
+      <BottomNav />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-800 bg-slate-900/80 backdrop-blur transition-all duration-300',
+          'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-slate-800 bg-slate-900/80 backdrop-blur transition-all duration-300 lg:flex',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
@@ -97,7 +99,8 @@ export default function Layout() {
       <main
         className={cn(
           'min-h-screen transition-all duration-300',
-          collapsed ? 'ml-16' : 'ml-60',
+          'ml-0 pb-24 lg:pb-8', // pb clears the mobile bottom nav (56px + safe area)
+          collapsed ? 'lg:ml-16' : 'lg:ml-60',
         )}
       >
         <div className="mx-auto max-w-7xl p-6 lg:p-8">

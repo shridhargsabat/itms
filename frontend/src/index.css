@@ -1,8 +1,31 @@
 @import "tailwindcss";
 
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-slate-950 text-slate-100 antialiased min-h-screen;
+    min-height: 100dvh; /* iOS URL-bar / Android keyboard: dvh beats vh */
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  button,
+  a,
+  select,
+  input,
+  textarea {
+    touch-action: manipulation; /* no 300ms delay / double-tap zoom on controls */
+  }
+}
+
+/* iOS auto-zoom guard: inputs/selects >=16px under lg, else Safari zooms on focus.
+   Unlayered + !important so it beats Tailwind text-sm utilities. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }

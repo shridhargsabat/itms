@@ -305,6 +305,7 @@ export default function Tickets() {
               rows={data ?? []}
               loading={isLoading}
               emptyMessage="No tickets match the current filters."
+              minWidth="min-w-[760px]"
               onRowClick={(t) => setSelectedId(t.id)}
             />
           ) : (

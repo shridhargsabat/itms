@@ -22,7 +22,7 @@ export default function AuditLog() {
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-800">
+      <div className="overflow-x-auto rounded-xl border border-slate-800">
         {isLoading ? (
           <div className="space-y-2 p-5">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -30,7 +30,7 @@ export default function AuditLog() {
             ))}
           </div>
         ) : (
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-medium">Time</th>

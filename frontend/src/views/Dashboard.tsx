@@ -75,7 +75,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
           placeholder="Details (optional)"
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>Type</label>
           <select
@@ -168,7 +168,7 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
         mutation.mutate(form);
       }}
     >
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>Name</label>
           <input
@@ -189,7 +189,7 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
           />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>Serial Number</label>
           <input
@@ -278,14 +278,14 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+            className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-500"
           >
             <Plus className="h-4 w-4" /> New Ticket
           </button>
           <button
             type="button"
             onClick={() => setAssetOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-800"
+            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-slate-700 px-4 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> Add Asset
           </button>

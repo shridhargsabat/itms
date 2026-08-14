@@ -14,6 +14,8 @@ interface DataTableProps<T> {
   loading?: boolean;
   emptyMessage?: string;
   onRowClick?: (row: T) => void;
+  /** Tailwind min-width class for the table (scrolls horizontally under it on mobile). */
+  minWidth?: string;
 }
 
 export default function DataTable<T extends { id: string }>({
@@ -22,6 +24,7 @@ export default function DataTable<T extends { id: string }>({
   loading = false,
   emptyMessage = 'No records found.',
   onRowClick,
+  minWidth = 'min-w-[640px]',
 }: DataTableProps<T>) {
   const head = (
     <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
@@ -37,8 +40,8 @@ export default function DataTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-xl border border-slate-800">
-        <table className="w-full text-left text-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-800">
+        <table className={cn('w-full text-left text-sm', minWidth)}>
           {head}
           <tbody className="divide-y divide-slate-800 bg-slate-950">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -65,8 +68,8 @@ export default function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-800">
-      <table className="w-full text-left text-sm">
+    <div className="overflow-x-auto rounded-xl border border-slate-800">
+      <table className={cn('w-full text-left text-sm', minWidth)}>
         {head}
         <tbody className="divide-y divide-slate-800 bg-slate-950">
           {rows.map((row) => (
