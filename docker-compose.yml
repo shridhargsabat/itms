@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: itms
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       POSTGRES_DB: itms
+      TZ: Asia/Kolkata
+    command: ["postgres", "-c", "timezone=Asia/Kolkata"]
     volumes:
       - itms_pgdata:/var/lib/postgresql   # PG18+: mount parent dir (pg_ctlcluster layout); /var/lib/postgresql/data is REJECTED by 18+ images
     healthcheck:
@@ -25,6 +27,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://itms:${POSTGRES_PASSWORD:?set in .env}@db:5432/itms
+      TZ: Asia/Kolkata
     depends_on:
       db:
         condition: service_healthy
@@ -42,6 +45,8 @@ services:
     build: ./frontend
     container_name: itms-frontend
     restart: unless-stopped
+    environment:
+      TZ: Asia/Kolkata
     depends_on:
       backend:
         condition: service_healthy

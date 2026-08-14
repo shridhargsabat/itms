@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import AnimatedBackground from '@/components/AnimatedBackground';
 import {
   Boxes,
   Database,
@@ -86,6 +87,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen">
+      <AnimatedBackground />
       <OfflineBanner />
       <UpdateToast />
       <BottomNav />

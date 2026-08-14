@@ -31,6 +31,8 @@ pub struct ListParams {
     pub search: Option<String>,
     pub role: Option<String>,
     pub department: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -87,6 +89,13 @@ async fn list_users(
         qb.push(" AND department = ").push_bind(dept);
     }
     qb.push(" ORDER BY name");
+    // Optional pagination (client lists default to unlimited for now).
+    if let Some(limit) = q.limit {
+        qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
+        if let Some(offset) = q.offset {
+            qb.push(" OFFSET ").push_bind(offset.max(0));
+        }
+    }
     let users = qb.build_query_as::<UserRow>().fetch_all(&state.pool).await?;
     Ok(Json(users))
 }
@@ -215,7 +224,14 @@ async fn update_user(
     .bind(password_hash)
     .bind(id)
     .fetch_optional(&state.pool)
-    .await?
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::Database(db) if db.constraint().is_some() => AppError::new(
+            axum::http::StatusCode::CONFLICT,
+            "email already exists",
+        ),
+        other => AppError::from(other),
+    })?
     .ok_or_else(|| AppError::not_found("user not found"))?;
 
     let mut new = serde_json::Map::new();

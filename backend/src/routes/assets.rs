@@ -35,6 +35,8 @@ pub struct AssetListParams {
     pub search: Option<String>,
     pub category: Option<String>,
     pub status: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 /// GET /api/v1/assets?search=&category=&status=
@@ -79,6 +81,12 @@ async fn list_assets(
     }
 
     qb.push(" ORDER BY a.created_at DESC");
+    if let Some(limit) = params.limit {
+        qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
+        if let Some(offset) = params.offset {
+            qb.push(" OFFSET ").push_bind(offset.max(0));
+        }
+    }
 
     let assets = qb.build_query_as::<Asset>().fetch_all(&state.pool).await?;
     Ok(Json(assets))

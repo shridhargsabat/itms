@@ -34,6 +34,8 @@ pub struct TicketListParams {
     pub priority: Option<String>,
     #[serde(rename = "type")]
     pub ticket_type: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 /// GET /api/v1/tickets?status=&priority=&type=
@@ -72,6 +74,12 @@ async fn list_tickets(
     }
 
     qb.push(" ORDER BY t.created_at DESC");
+    if let Some(limit) = params.limit {
+        qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
+        if let Some(offset) = params.offset {
+            qb.push(" OFFSET ").push_bind(offset.max(0));
+        }
+    }
 
     let tickets = qb.build_query_as::<Ticket>().fetch_all(&state.pool).await?;
     Ok(Json(tickets))

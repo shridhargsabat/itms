@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
+import AnimatedBackground from '@/components/AnimatedBackground';
 import { login, setSession } from '@/api/client';
 
 const DEMO_EMAIL = 'admin@itms.local';
@@ -35,30 +36,7 @@ export default function Login() {
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-slate-950 px-4">
-      {/* aurora blobs */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="animate-aurora absolute -left-32 -top-40 h-[480px] w-[480px] rounded-full bg-indigo-600/25 blur-[110px]" />
-        <div className="animate-aurora-slow absolute -bottom-48 -right-24 h-[520px] w-[520px] rounded-full bg-violet-600/20 blur-[120px]" />
-        <div className="animate-aurora absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-blue-500/15 blur-[100px]" />
-      </div>
-
-      {/* faint grid */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(148,163,184,0.4)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.4)_1px,transparent_1px)] [background-size:44px_44px]" />
-
-      {/* rising particles */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {Array.from({ length: 14 }).map((_, i) => (
-          <span
-            key={i}
-            className="animate-particle absolute bottom-[-12px] h-1.5 w-1.5 rounded-full bg-indigo-300/60"
-            style={{
-              left: `${(i * 7.3 + 4) % 100}%`,
-              animationDelay: `${(i % 7) * 1.1}s`,
-              animationDuration: `${9 + (i % 5)}s`,
-            }}
-          />
-        ))}
-      </div>
+      <AnimatedBackground />
 
       {/* glass card */}
       <div className="animate-fade-up relative w-full max-w-md">
