@@ -19,7 +19,7 @@ const NAV_ITEMS = [
 /** SAPL-style compact glassy bottom nav — mobile only (desktop keeps the sidebar). */
 export default function BottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-900 pb-[env(safe-area-inset-bottom)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-900 lg:hidden">
       <div className="flex h-14 items-stretch">
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink

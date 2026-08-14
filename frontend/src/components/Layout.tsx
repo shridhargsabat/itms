@@ -47,9 +47,10 @@ export default function Layout() {
           <Network className="h-5 w-5" />
         </span>
         <span className="text-sm font-semibold text-slate-100">ITMS</span>
-        <span className="ml-auto min-w-0 truncate text-xs text-slate-400">
-          {user?.name ?? user?.email ?? ''}
-        </span>
+        <div className="ml-auto min-w-0 text-right leading-tight">
+          <span className="block truncate text-xs text-slate-300">{user?.name ?? user?.email ?? ''}</span>
+          <span className="block text-[9px] text-slate-500">build {__BUILD_SHA__}</span>
+        </div>
         <button
           type="button"
           onClick={signOut}
@@ -134,6 +135,9 @@ export default function Layout() {
             <LogOut className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Sign out</span>}
           </button>
+          {!collapsed && (
+            <p className="mt-2 px-2 text-center text-[10px] text-slate-600">build {__BUILD_SHA__}</p>
+          )}
         </div>
       </aside>
 
