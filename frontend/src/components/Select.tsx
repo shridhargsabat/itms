@@ -31,6 +31,7 @@ export default function Select({
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<{ top: number; left: number; width: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const close = () => {
     setOpen(false);
@@ -40,7 +41,12 @@ export default function Select({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
+      // Ignore mousedowns inside the trigger OR the portaled menu —
+      // otherwise the click that selects an option never lands (the menu
+      // unmounts between mousedown and click).
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
+      close();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
@@ -97,6 +103,7 @@ export default function Select({
       {open && menu &&
         createPortal(
           <div
+            ref={menuRef}
             style={{ position: 'fixed', top: menu.top, left: menu.left, width: menu.width }}
             role="listbox"
             className="z-[70] max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-800/95 p-1 shadow-2xl backdrop-blur"
