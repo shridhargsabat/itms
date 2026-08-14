@@ -246,7 +246,11 @@ export default function Layout() {
               NOTE: opacity-only — a transform here would make every
               position:fixed descendant (sheets, drawers, dropdowns)
               position against this element instead of the viewport. */}
-          <div key={location.pathname} className="animate-fade-in">
+          {/* No animation class on the route wrapper: opacity-only entrance
+              animations froze at 0 on iOS when the app was backgrounded,
+              hiding the whole page (and a transform would break fixed
+              children). View Transitions provides the crossfade. */}
+          <div key={location.pathname}>
             <Outlet />
           </div>
         </div>

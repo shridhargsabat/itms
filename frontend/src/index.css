@@ -84,30 +84,26 @@
 
 @keyframes menu-in {
   from {
-    opacity: 0;
     transform: translateY(-6px) scale(0.98);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
 .animate-menu-in {
-  /* NO fill-mode (iOS WebKit bug): if the animation never runs/completes
-     (page mounted while backgrounded), 'both' freezes the element at the
-     from keyframe — opacity 0 — making content permanently invisible.
-     Without fill, the persistent state is the natural (visible) one. */
+  /* TRANSFORM-ONLY, no fill-mode: iOS WebKit freezes CSS animations when
+     the app is backgrounded — an opacity-0 from-state pinned rows/sheets
+     invisible forever ("table body missing" bug). A frozen transform can
+     only shift content a few px; it can never hide it. */
   animation: menu-in 0.14s ease-out;
   transform-origin: top;
 }
 
 @keyframes list-in {
   from {
-    opacity: 0;
     transform: translateY(5px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
@@ -126,11 +122,9 @@
 /* ---------- UI animations (reduced-motion guarded below) ---------- */
 @keyframes fade-up {
   from {
-    opacity: 0;
     transform: translateY(10px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
@@ -144,17 +138,15 @@
 }
 @keyframes sheet-up {
   from {
-    opacity: 0;
     transform: translateY(56px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
 @keyframes slide-in-right {
   from {
-    transform: translateX(100%);
+    transform: translateX(24px);
   }
   to {
     transform: none;
