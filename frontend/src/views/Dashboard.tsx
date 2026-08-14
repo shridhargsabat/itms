@@ -294,7 +294,8 @@ export default function Dashboard() {
         <div>
           <h1 className="text-xl font-semibold text-slate-100">Dashboard</h1>
           <p className="mt-0.5 text-sm text-slate-400">
-            Inventory, tickets and recent activity at a glance.
+            Inventory, tickets and recent activity at a glance.{' '}
+            <span className="text-[10px] text-slate-600">build {__BUILD_SHA__}</span>
           </p>
         </div>
         <div className="flex gap-2">

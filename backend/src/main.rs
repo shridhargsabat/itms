@@ -1,3 +1,4 @@
+mod auth;
 mod db;
 mod models;
 mod routes;
@@ -38,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_headers(Any);
 
     let app: Router<db::AppState> = Router::new()
-        .nest("/api/v1", routes::api_router())
+        .nest("/api/v1", routes::api_router(state.clone()))
         .layer(cors)
         .layer(TraceLayer::new_for_http());
 

@@ -36,27 +36,53 @@ export function usePwaInstallable() {
   return { installable, promptInstall: () => deferredPrompt?.prompt() };
 }
 
-/** Surfaces the vite-plugin-pwa update event: returns true + reload callback when a new SW waits. */
+/**
+ * Manual service-worker lifecycle handling (the plugin's injected registerSW.js
+ * is bare — no update wiring). Dispatches `itms:update` when a newer build is
+ * installed/activated so the UpdateToast can surface it.
+ */
+export function initSwUpdateHandling() {
+  if (!('serviceWorker' in navigator)) return;
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js', { scope: '/' })
+      .then((reg) => {
+        const check = () => reg.update().catch(() => {});
+        check();
+        const interval = window.setInterval(check, 60_000); // check every minute
+        window.addEventListener('beforeunload', () => window.clearInterval(interval));
+
+        reg.addEventListener('updatefound', () => {
+          const next = reg.installing;
+          if (!next) return;
+          next.addEventListener('statechange', () => {
+            if (next.state === 'installed' && navigator.serviceWorker.controller) {
+              window.dispatchEvent(new CustomEvent('itms:update', { detail: { phase: 'installed' } }));
+            }
+          });
+        });
+      })
+      .catch(() => {});
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.dispatchEvent(new CustomEvent('itms:update', { detail: { phase: 'activated' } }));
+    });
+  });
+}
+
+/** Surfaces the update event: true + reload callback when a newer build is ready. */
 export function useUpdatePrompt() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
-    const onUpdate = (e: Event) => {
-      const detail = (e as CustomEvent<{ updateSW: () => Promise<void> }>).detail;
-      if (detail?.updateSW) {
-        setUpdateAvailable(true);
-        // Persist the reload trigger on window so the toast can invoke it
-        (window as unknown as { __itms_updateSW?: () => Promise<void> }).__itms_updateSW =
-          detail.updateSW;
-      }
-    };
-    window.addEventListener('sw-updated' as keyof WindowEventMap, onUpdate as EventListener);
-    return () => window.removeEventListener('sw-updated' as keyof WindowEventMap, onUpdate as EventListener);
+    const onUpdate = () => setUpdateAvailable(true);
+    window.addEventListener('itms:update' as keyof WindowEventMap, onUpdate as EventListener);
+    return () => window.removeEventListener('itms:update' as keyof WindowEventMap, onUpdate as EventListener);
   }, []);
 
-  const reload = async () => {
-    const fn = (window as unknown as { __itms_updateSW?: () => Promise<void> }).__itms_updateSW;
-    if (fn) await fn();
+  const reload = () => {
+    setUpdateAvailable(false);
     window.location.reload();
   };
 

@@ -12,6 +12,13 @@ use sqlx::postgres::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
 
+/// Shared with the server binary via `#[path]` include so hashing stays identical.
+#[path = "../auth.rs"]
+mod auth;
+
+/// Demo password for every seeded user (documented on the login page).
+const DEMO_PASSWORD: &str = "demo1234";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
@@ -271,6 +278,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await?;
         println!("  {table}: {count}");
     }
+    println!("Login credentials (all users): {DEMO_PASSWORD}");
 
     Ok(())
 }
@@ -286,13 +294,17 @@ async fn insert_user(
     role: &str,
     department: &str,
 ) -> Result<Uuid, sqlx::Error> {
+    let password_hash = auth::hash_password(DEMO_PASSWORD)
+        .map_err(|e| sqlx::Error::Protocol(format!("hash failed: {e}")))?;
     Ok(sqlx::query_scalar(
-        "INSERT INTO users (email, name, role, department) VALUES ($1, $2, $3, $4) RETURNING id",
+        "INSERT INTO users (email, name, role, department, password_hash)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id",
     )
     .bind(email)
     .bind(name)
     .bind(role)
     .bind(department)
+    .bind(password_hash)
     .fetch_one(pool)
     .await?)
 }

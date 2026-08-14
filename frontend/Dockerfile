@@ -1,4 +1,6 @@
 FROM node:22-alpine AS build
+ARG BUILD_SHA=local
+ENV BUILD_SHA=$BUILD_SHA
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Boxes,
   LayoutDashboard,
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateToast from '@/components/UpdateToast';
 import BottomNav from '@/components/BottomNav';
+import { clearSession, getCachedUser, logout } from '@/api/client';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -26,10 +27,13 @@ const NAV_ITEMS = [
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const user = getCachedUser();
 
-  const signOut = () => {
-    localStorage.removeItem('itms_demo');
-    window.location.href = '/login';
+  const signOut = async () => {
+    await logout().catch(() => {});
+    clearSession();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -37,6 +41,24 @@ export default function Layout() {
       <OfflineBanner />
       <UpdateToast />
       <BottomNav />
+      {/* Mobile top bar (sidebar is hidden <lg): brand + user + logout */}
+      <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-slate-800/60 bg-slate-950/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg lg:hidden">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
+          <Network className="h-5 w-5" />
+        </span>
+        <span className="text-sm font-semibold text-slate-100">ITMS</span>
+        <span className="ml-auto min-w-0 truncate text-xs text-slate-400">
+          {user?.name ?? user?.email ?? ''}
+        </span>
+        <button
+          type="button"
+          onClick={signOut}
+          aria-label="Sign out"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-red-400"
+        >
+          <LogOut className="h-5 w-5" />
+        </button>
+      </header>
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-slate-800 bg-slate-900/80 backdrop-blur transition-all duration-300 lg:flex',

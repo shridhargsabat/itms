@@ -1,21 +1,33 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Network, ShieldCheck } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { ArrowRight, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
+import { login, setSession } from '@/api/client';
 
-/** Stunning animated demo login — no real auth in the prototype;
- *  any credentials (or one-tap demo entry) sets the session flag. */
+const DEMO_EMAIL = 'admin@itms.local';
+const DEMO_PASSWORD = 'demo1234';
+
+/** Real auth login (backend + DB). Any seeded user works: <email> / demo1234. */
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const enter = () => {
-    localStorage.setItem(
-      'itms_demo',
-      JSON.stringify({ user: email.trim() || 'demo@itms.local', at: Date.now() }),
-    );
-    navigate('/');
+  const mutation = useMutation({
+    mutationFn: ({ email: e, password: p }: { email: string; password: string }) =>
+      login(e, p),
+    onSuccess: (res) => {
+      setSession(res.token, res.user);
+      navigate('/', { replace: true });
+    },
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate({ email, password });
   };
+
+  const demoLogin = () => mutation.mutate({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-slate-950 px-4">
@@ -63,13 +75,15 @@ export default function Login() {
               </div>
             </div>
 
-            <form
-              className="space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                enter();
-              }}
-            >
+            {mutation.isError && (
+              <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+                {mutation.error instanceof Error
+                  ? mutation.error.message
+                  : 'Sign-in failed. Try again.'}
+              </div>
+            )}
+
+            <form className="space-y-4" onSubmit={submit}>
               <div>
                 <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
                   Email
@@ -77,6 +91,7 @@ export default function Login() {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
@@ -90,6 +105,7 @@ export default function Login() {
                 <input
                   type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -98,28 +114,45 @@ export default function Login() {
               </div>
               <button
                 type="submit"
-                className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97]"
+                disabled={mutation.isPending}
+                className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60"
               >
-                Sign In
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                {mutation.isPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </>
+                )}
               </button>
             </form>
 
             <div className="mt-5 flex items-center gap-3 text-[11px] text-slate-500">
               <span className="h-px flex-1 bg-slate-800" />
-              or
+              demo
               <span className="h-px flex-1 bg-slate-800" />
             </div>
             <button
-              onClick={enter}
-              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-700 text-sm font-medium text-slate-200 transition-all hover:border-indigo-500/50 hover:bg-slate-800/60 active:scale-[0.97]"
+              onClick={demoLogin}
+              disabled={mutation.isPending}
+              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-700 text-sm font-medium text-slate-200 transition-all hover:border-indigo-500/50 hover:bg-slate-800/60 active:scale-[0.97] disabled:opacity-60"
             >
-              Enter demo workspace
+              Use demo account
             </button>
+            <p className="mt-4 text-center text-[11px] text-slate-500">
+              <code className="rounded bg-slate-800/80 px-1.5 py-0.5 text-indigo-300">
+                {DEMO_EMAIL}
+              </code>{' '}
+              ·{' '}
+              <code className="rounded bg-slate-800/80 px-1.5 py-0.5 text-indigo-300">
+                {DEMO_PASSWORD}
+              </code>
+            </p>
 
             <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-500">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400/80" />
-              Prototype — no real credentials needed
+              Real auth — argon2 hashes + revocable sessions · build {__BUILD_SHA__}
             </p>
           </div>
         </div>

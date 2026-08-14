@@ -5,15 +5,19 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  define: {
+    __BUILD_SHA__: JSON.stringify(process.env.BUILD_SHA || 'local'),
+  },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
-      // autoUpdate: new SW activates itself (skipWaiting+clientsClaim) so
-      // phones never stay on a stale bundle — prompt mode left 110px safe-area
-      // gaps from old precached index.html (Aug 2026 incident)
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+    // autoUpdate: new SW activates itself (skipWaiting+clientsClaim) so
+    // phones never stay on a stale bundle — prompt mode left 110px safe-area
+    // gaps from old precached index.html (Aug 2026 incident)
+    registerType: 'autoUpdate',
+    // manual registration in src/lib/pwa.ts (update toast + periodic checks)
+    injectRegister: null,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'ITMS — IT Management System',

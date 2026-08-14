@@ -1,25 +1,37 @@
 pub mod assets;
 pub mod audit;
+pub mod auth;
 pub mod cmdb;
 pub mod dashboard;
 pub mod tickets;
 
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::response::{IntoResponse, Response};
+use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
 use serde_json::json;
 
 use crate::db::AppState;
 
-/// Assemble every /api/v1 sub-router.
-pub fn api_router() -> Router<AppState> {
-    Router::new()
+/// Assemble every /api/v1 sub-router. `/auth/login` is public; everything else
+/// (including /auth/logout and /auth/me) sits behind the Bearer-token guard.
+pub fn api_router(state: AppState) -> Router<AppState> {
+    let protected = Router::new()
+        .route("/auth/logout", post(auth::logout))
+        .route("/auth/me", get(auth::me))
         .nest("/dashboard", dashboard::router())
         .nest("/assets", assets::router())
         .nest("/tickets", tickets::router())
         .nest("/cmdb", cmdb::router())
         .nest("/audit", audit::router())
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
+
+    Router::new()
+        .route("/healthz", get(|| async { "ok" }))
+        .route("/auth/login", post(auth::login))
+        .merge(protected)
 }
 
 /// Uniform JSON error for the whole API: `{"error": "..."}`.

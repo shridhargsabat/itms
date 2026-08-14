@@ -1,7 +1,8 @@
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { LoaderCircle } from 'lucide-react';
 import './index.css';
 import Layout from '@/components/Layout';
 import Dashboard from '@/views/Dashboard';
@@ -11,9 +12,11 @@ import CMDB from '@/views/CMDB';
 import AuditLog from '@/views/AuditLog';
 import Offline from '@/views/Offline';
 import Login from '@/views/Login';
-import { captureInstallPrompt } from '@/lib/pwa';
+import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
+import { ApiError, clearSession, getCachedUser, getToken, me } from '@/api/client';
 
 captureInstallPrompt();
+initSwUpdateHandling();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,13 +27,37 @@ const queryClient = new QueryClient({
   },
 });
 
-/** Demo session gate: prototype has no real auth; login sets the flag. */
-function RequireDemo({ children }: { children: ReactNode }) {
-  return localStorage.getItem('itms_demo') ? (
-    <>{children}</>
-  ) : (
-    <Navigate to="/login" replace />
-  );
+/** Real auth gate: token present AND valid against /auth/me.
+ *  Offline (network failure) falls back to the cached session so the SWR
+ *  data cache still renders; only a hard 401 bounces to /login. */
+function RequireAuth({ children }: { children: ReactNode }) {
+  const token = getToken();
+  const cached = getCachedUser();
+  const location = useLocation();
+  const { isLoading, isError, error } = useQuery({
+    queryKey: ['me'],
+    queryFn: me,
+    enabled: !!token,
+    retry: false,
+  });
+
+  if (!token) return <Navigate to="/login" replace />;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-slate-950">
+        <LoaderCircle className="h-6 w-6 animate-spin text-indigo-400" />
+      </div>
+    );
+  }
+  if (isError) {
+    const real401 = error instanceof ApiError && error.status === 401;
+    if (!real401 && cached) {
+      return <>{children}</>; // offline — cached session, cached data
+    }
+    clearSession();
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+  return <>{children}</>;
 }
 
 createRoot(document.getElementById('root')!).render(
@@ -41,9 +68,9 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/login" element={<Login />} />
           <Route
             element={
-              <RequireDemo>
+              <RequireAuth>
                 <Layout />
-              </RequireDemo>
+              </RequireAuth>
             }
           >
             <Route path="/" element={<Dashboard />} />

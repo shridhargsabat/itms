@@ -10,6 +10,20 @@ export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
 export type TicketType = 'INCIDENT' | 'SERVICE_REQUEST' | 'CHANGE';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  department: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  expires_at: string;
+  user: AuthUser;
+}
+
 export const ASSET_STATUSES: AssetStatus[] = ['IN_STOCK', 'ASSIGNED', 'MAINTENANCE', 'RETIRED'];
 export const ASSET_CATEGORIES: AssetCategory[] = [
   'LAPTOP',

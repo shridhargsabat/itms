@@ -1,87 +1,125 @@
 import type {
   Asset,
   AuditLogEntry,
+  AuthUser,
   CreateAssetInput,
   CreateTicketInput,
   DashboardMetrics,
   ImpactResult,
+  LoginResponse,
   Ticket,
-  TicketStatus,
   Topology,
-} from './types';
+} from '@/api/types';
+
+const TOKEN_KEY = 'itms_token';
+const USER_KEY = 'itms_user';
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setSession(token: string, user: AuthUser) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+export function getCachedUser(): AuthUser | null {
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
+}
 
 export class ApiError extends Error {
   status: number;
-
-  constructor(message: string, status: number) {
+  constructor(status: number, message: string) {
     super(message);
-    this.name = 'ApiError';
     this.status = status;
   }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers);
-  if (init?.body && !headers.has('Content-Type')) {
+async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
+
   const res = await fetch(`/api/v1${path}`, { ...init, headers });
-  if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    try {
-      const body = (await res.json()) as { detail?: unknown; error?: unknown };
-      if (body.detail != null) {
-        message = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
-      } else if (body.error != null) {
-        message = typeof body.error === 'string' ? body.error : JSON.stringify(body.error);
-      }
-    } catch {
-      // non-JSON error body — keep generic message
+
+  if (res.status === 401 && !path.startsWith('/auth/login')) {
+    clearSession();
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(401, 'Session expired — please sign in again');
   }
-  if (res.status === 204) {
-    return undefined as T;
+  if (!res.ok) {
+    let detail = `Request failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) detail = body.error;
+    } catch {
+      /* keep default */
+    }
+    throw new ApiError(res.status, detail);
   }
-  return (await res.json()) as T;
+  return res.json() as Promise<T>;
 }
 
-function qs(params: Record<string, string | undefined>): string {
-  const sp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v) sp.set(k, v);
-  }
-  const s = sp.toString();
-  return s ? `?${s}` : '';
-}
-
-export const getDashboardMetrics = () => apiFetch<DashboardMetrics>('/dashboard/metrics');
-
-export const listAssets = (params?: { search?: string; category?: string; status?: string }) =>
-  apiFetch<Asset[]>(`/assets${qs(params ?? {})}`);
-
-export const createAsset = (body: CreateAssetInput) =>
-  apiFetch<Asset>('/assets', { method: 'POST', body: JSON.stringify(body) });
-
-export const assignAsset = (id: string, userIdOrNull: string | null) =>
-  apiFetch<Asset>(`/assets/${id}/assign`, {
-    method: 'PATCH',
-    body: JSON.stringify({ user_id: userIdOrNull }),
+// ---- auth ----
+export const login = (email: string, password: string) =>
+  apiFetch<LoginResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
   });
 
-export type TicketFilters = Record<string, string | undefined>;
+export const logout = () =>
+  apiFetch<{ ok: boolean }>('/auth/logout', { method: 'POST' }).catch(() => ({ ok: false }));
 
-export const listTickets = (params?: TicketFilters) =>
-  apiFetch<Ticket[]>(`/tickets${qs(params ?? {})}`);
+export const me = () => apiFetch<AuthUser>('/auth/me');
 
-export const createTicket = (body: CreateTicketInput) =>
-  apiFetch<Ticket>('/tickets', { method: 'POST', body: JSON.stringify(body) });
-
-export const patchTicketStatus = (id: string, status: TicketStatus) =>
-  apiFetch<Ticket>(`/tickets/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
-
-export const getTopology = () => apiFetch<Topology>('/cmdb/topology');
-
-export const getImpact = (assetId: string) => apiFetch<ImpactResult>(`/cmdb/impact/${assetId}`);
-
+// ---- dashboard ----
+export const getDashboardMetrics = () => apiFetch<DashboardMetrics>('/dashboard/metrics');
 export const getAuditLog = (limit = 50) => apiFetch<AuditLogEntry[]>(`/audit/log?limit=${limit}`);
+
+// ---- assets ----
+export const listAssets = (params?: { search?: string; category?: string; status?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.category) q.set('category', params.category);
+  if (params?.status) q.set('status', params.status);
+  const qs = q.toString();
+  return apiFetch<Asset[]>(`/assets${qs ? `?${qs}` : ''}`);
+};
+export const createAsset = (input: CreateAssetInput) =>
+  apiFetch<Asset>('/assets', { method: 'POST', body: JSON.stringify(input) });
+export const assignAsset = (assetId: string, userId: string | null) =>
+  apiFetch<Asset>(`/assets/${assetId}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to_user_id: userId }) });
+
+// ---- tickets ----
+export const listTickets = (params?: { status?: string; priority?: string; type?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.priority) q.set('priority', params.priority);
+  if (params?.type) q.set('type', params.type);
+  const qs = q.toString();
+  return apiFetch<Ticket[]>(`/tickets${qs ? `?${qs}` : ''}`);
+};
+export const createTicket = (input: CreateTicketInput) =>
+  apiFetch<Ticket>('/tickets', { method: 'POST', body: JSON.stringify(input) });
+export const patchTicketStatus = (ticketId: string, status: string) =>
+  apiFetch<Ticket>(`/tickets/${ticketId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+
+// ---- cmdb ----
+export const getTopology = () => apiFetch<Topology>('/cmdb/topology');
+export const getImpact = (assetId: string) => apiFetch<ImpactResult>(`/cmdb/impact/${assetId}`);
