@@ -70,7 +70,16 @@ async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Respon
     headers.set('Content-Type', 'application/json');
   }
 
-  const res = await fetch(`/api/v1${path}`, { ...init, headers });
+  // GETs hang forever on iOS when the service worker's CacheStorage stalls
+  // (permanent loading skeletons). Never wait longer than 20s: a timeout
+  // surfaces as a normal fetch error the query layer can retry/show.
+  // Mutations are exempt — aborting a POST client-side while the server
+  // still processes it invites double-submits.
+  const method = (init.method ?? 'GET').toUpperCase();
+  const signal =
+    method === 'GET' ? (init.signal ?? AbortSignal.timeout(20_000)) : init.signal;
+
+  const res = await fetch(`/api/v1${path}`, { ...init, headers, signal });
 
   if (res.status === 401 && !path.startsWith('/auth/login')) {
     clearSession();

@@ -40,11 +40,14 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            // Fresh-first: audit log, dashboard metrics, masters + users —
-            // these are CRUD surfaces where stale data looks broken
-            // (deleted lookup options reappear, new users missing). Network
-            // wins when online; the short cache is only an offline fallback.
-            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(audit|dashboard|masters|users)(\/|\?|$).*/,
+            // Fresh-first: ALL list/CRUD surfaces — audit log, dashboard
+            // metrics, masters, users, assets, tickets, cmdb. Network wins
+            // when online; the short cache is only an offline fallback.
+            // NetworkFirst never blocks the page on CacheStorage (iOS hangs
+            // on cache.match with a stale SWR cache — permanent loading
+            // skeletons). Cache reads happen only when the network fetch
+            // fails or exceeds the 3s Workbox timeout.
+            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(audit|dashboard|masters|users|assets|tickets|cmdb)(\/|\?|$).*/,
             handler: 'NetworkFirst',
             method: 'GET',
             options: {
