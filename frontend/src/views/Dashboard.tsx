@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -27,6 +27,29 @@ const METRIC_CARDS: {
   { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400' },
   { label: 'In Stock', key: 'in_stock_count', icon: PackageCheck, accent: 'bg-emerald-500/10 text-emerald-400' },
 ];
+
+function CountUp({ value }: { value: number }) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplay(value);
+      return;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const dur = 650;
+    const tick = (t: number) => {
+      const p = Math.min((t - t0) / dur, 1);
+      setDisplay(Math.round(value * (1 - Math.pow(1 - p, 3)))); // ease-out cubic
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+
+  return <>{display}</>;
+}
 
 function NewTicketForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
@@ -278,14 +301,14 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+            className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-all duration-150 hover:bg-blue-500 active:scale-[0.97]"
           >
             <Plus className="h-4 w-4" /> New Ticket
           </button>
           <button
             type="button"
             onClick={() => setAssetOpen(true)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-slate-700 px-4 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-800"
+            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-slate-700 px-4 text-sm font-medium text-slate-200 transition-all duration-150 hover:bg-slate-800 active:scale-[0.97]"
           >
             <Plus className="h-4 w-4" /> Add Asset
           </button>
@@ -299,25 +322,31 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {METRIC_CARDS.map(({ label, key, icon: Icon, accent }) => (
-          <div key={key} className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        {METRIC_CARDS.map(({ label, key, icon: Icon, accent }, i) => (
+          <div
+            key={key}
+            className="animate-fade-up rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5"
+            style={{ animationDelay: `${i * 70}ms` }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:text-xs">
+                {label}
+              </p>
               <span
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-lg',
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9',
                   accent,
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </span>
             </div>
             {metrics.isLoading ? (
               <div className="mt-3 h-8 w-16 animate-pulse rounded bg-slate-800" />
             ) : (
               <p className="mt-2 text-3xl font-semibold text-slate-100">
-                {metrics.data?.[key] ?? 0}
+                <CountUp value={metrics.data?.[key] ?? 0} />
               </p>
             )}
           </div>
@@ -343,17 +372,25 @@ export default function Dashboard() {
               </div>
             ))}
           {(audit.data ?? []).map((e) => (
-            <div key={e.id} className="flex items-center gap-3 px-5 py-3 text-sm">
-              <span className="w-36 shrink-0 text-xs text-slate-500">{formatDate(e.created_at)}</span>
-              <span className="w-32 shrink-0 truncate text-slate-300">
-                {e.actor_name ?? 'system'}
-              </span>
-              <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
-                {e.action}
-              </span>
-              <span className="truncate text-xs text-slate-500">
-                {e.target_type} · <span className="font-mono text-indigo-400">{e.target_id}</span>
-              </span>
+            <div
+              key={e.id}
+              className="flex flex-col gap-1 px-5 py-3 text-sm sm:flex-row sm:items-center sm:gap-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="shrink-0 text-xs text-slate-500">{formatDate(e.created_at)}</span>
+                <span className="min-w-0 truncate text-slate-300">
+                  {e.actor_name ?? 'system'}
+                </span>
+              </div>
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="shrink-0 rounded bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
+                  {e.action}
+                </span>
+                <span className="min-w-0 truncate text-xs text-slate-500">
+                  {e.target_type} ·{' '}
+                  <span className="font-mono text-indigo-400">{e.target_id}</span>
+                </span>
+              </div>
             </div>
           ))}
           {!audit.isLoading && (audit.data ?? []).length === 0 && (

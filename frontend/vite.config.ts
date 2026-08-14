@@ -9,7 +9,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt',
+      // autoUpdate: new SW activates itself (skipWaiting+clientsClaim) so
+      // phones never stay on a stale bundle — prompt mode left 110px safe-area
+      // gaps from old precached index.html (Aug 2026 incident)
+      registerType: 'autoUpdate',
       injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {

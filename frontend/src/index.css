@@ -29,3 +29,137 @@
     font-size: 16px !important;
   }
 }
+
+/* ---------- UI animations (reduced-motion guarded below) ---------- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(56px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+/* login page: aurora drift, rising particles, shimmer title, pulse ring */
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(36px, -28px) scale(1.08);
+  }
+  66% {
+    transform: translate(-24px, 22px) scale(0.95);
+  }
+}
+@keyframes particle {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-105vh);
+    opacity: 0;
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% center;
+  }
+}
+@keyframes ping-slow {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+@keyframes pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(99 102 241 / 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgb(99 102 241 / 0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.38s cubic-bezier(0.22, 0.68, 0.32, 1) both;
+}
+.animate-fade-in {
+  animation: fade-in 0.22s ease-out both;
+}
+.animate-sheet-up {
+  animation: sheet-up 0.32s cubic-bezier(0.22, 0.68, 0.32, 1) both;
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.28s cubic-bezier(0.22, 0.68, 0.32, 1) both;
+}
+.animate-aurora {
+  animation: aurora 14s ease-in-out infinite;
+}
+.animate-aurora-slow {
+  animation: aurora 20s ease-in-out infinite reverse;
+}
+.animate-particle {
+  animation: particle linear infinite;
+}
+.animate-shimmer {
+  animation: shimmer 3.2s linear infinite;
+}
+.animate-ping-slow {
+  animation: ping-slow 2.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.animate-pulse-ring {
+  animation: pulse-ring 3s ease-in-out infinite;
+}
+
+/* accessibility kill-switch */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

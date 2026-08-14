@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Boxes,
   LayoutDashboard,
+  LogOut,
   Network,
   PanelLeftClose,
   PanelLeftOpen,
@@ -24,6 +25,12 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+
+  const signOut = () => {
+    localStorage.removeItem('itms_demo');
+    window.location.href = '/login';
+  };
 
   return (
     <div className="min-h-screen">
@@ -93,6 +100,18 @@ export default function Layout() {
               </>
             )}
           </button>
+          <button
+            type="button"
+            onClick={signOut}
+            className={cn(
+              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400',
+              collapsed && 'justify-center px-0',
+            )}
+            title="Sign out"
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            {!collapsed && <span>Sign out</span>}
+          </button>
         </div>
       </aside>
 
@@ -104,7 +123,10 @@ export default function Layout() {
         )}
       >
         <div className="mx-auto max-w-7xl p-6 lg:p-8">
-          <Outlet />
+          {/* keyed by pathname: fresh fade-up entrance per route change */}
+          <div key={location.pathname} className="animate-fade-up">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
