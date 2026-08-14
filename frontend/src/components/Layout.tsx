@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import ThemeToggle from '@/components/ThemeToggle';
+import { applyTheme, watchSystemTheme } from '@/lib/theme';
 import {
   Boxes,
   Database,
@@ -58,6 +60,8 @@ export default function Layout() {
   // crossfades between screens. No transforms on wrappers — that would break
   // position:fixed children (see dropdown alignment incident).
   useEffect(() => {
+    applyTheme();
+    watchSystemTheme();
     if (!('startViewTransition' in document)) return;
     const onClick = (e: MouseEvent) => {
       if (
@@ -92,50 +96,51 @@ export default function Layout() {
       <UpdateToast />
       <BottomNav />
       {/* Mobile top bar (sidebar is hidden <lg): brand + user + logout */}
-      <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-slate-800/60 bg-slate-950/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg lg:hidden">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
+      <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-edge/60 bg-base/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg lg:hidden">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
           <Network className="h-5 w-5" />
         </span>
-        <span className="text-sm font-semibold text-slate-100">ITMS</span>
+        <span className="text-sm font-semibold text-primary">ITMS</span>
         <div className="ml-auto min-w-0 text-right leading-tight">
-          <span className="block truncate text-xs text-slate-300">{user?.name ?? user?.email ?? ''}</span>
-          <span className="block text-[9px] text-slate-500">build {__BUILD_SHA__}</span>
+          <span className="block truncate text-xs text-secondary">{user?.name ?? user?.email ?? ''}</span>
+          <span className="block text-[9px] text-muted">build {__BUILD_SHA__}</span>
         </div>
         <button
           type="button"
           onClick={handleInstall}
           aria-label="Install app"
           title={isIOS ? 'Install via Share → Add to Home Screen' : 'Install app'}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-indigo-300"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated/60 hover:text-accent"
         >
           <Download className="h-5 w-5" />
         </button>
+        <ThemeToggle className="h-11 w-11 rounded-lg text-secondary hover:text-accent" />
         <button
           type="button"
           onClick={signOut}
           aria-label="Sign out"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-red-400"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated/60 hover:text-red-400"
         >
           <LogOut className="h-5 w-5" />
         </button>
       </header>
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-slate-800 bg-slate-900/80 backdrop-blur transition-all duration-300 lg:flex',
+          'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-edge bg-surface/80 backdrop-blur transition-all duration-300 lg:flex',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
         <div
           className={cn(
-            'flex h-16 items-center border-b border-slate-800 px-4',
+            'flex h-16 items-center border-b border-edge px-4',
             collapsed ? 'justify-center px-0' : 'gap-3',
           )}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
             <Network className="h-4 w-4" />
           </span>
           {!collapsed && (
-            <span className="truncate text-sm font-semibold tracking-wide text-slate-100">
+            <span className="truncate text-sm font-semibold tracking-wide text-primary">
               ITMS
             </span>
           )}
@@ -153,8 +158,8 @@ export default function Layout() {
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                   collapsed && 'justify-center px-0',
                   isActive
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200',
+                    ? 'bg-elevated text-primary'
+                    : 'text-secondary hover:bg-elevated/60 hover:text-primary',
                 )
               }
             >
@@ -164,12 +169,12 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="border-t border-slate-800 p-2">
+        <div className="border-t border-edge p-2">
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
             className={cn(
-              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-200',
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated/60 hover:text-primary',
               collapsed && 'justify-center px-0',
             )}
           >
@@ -186,7 +191,7 @@ export default function Layout() {
             type="button"
             onClick={signOut}
             className={cn(
-              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400',
+              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-red-500/10 hover:text-red-400',
               collapsed && 'justify-center px-0',
             )}
             title="Sign out"
@@ -199,7 +204,7 @@ export default function Layout() {
               type="button"
               onClick={promptInstall}
               className={cn(
-                'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-slate-800/60 hover:text-indigo-300',
+                'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-elevated/60 hover:text-accent',
                 collapsed && 'justify-center px-0',
               )}
               title="Install app"
@@ -208,14 +213,17 @@ export default function Layout() {
               {!collapsed && <span>Install app</span>}
             </button>
           )}
+          <div className={cn('mt-1', !collapsed && 'px-2')}>
+            <ThemeToggle className={cn('w-full', collapsed ? 'h-9 w-9' : 'h-9')} />
+          </div>
           {!collapsed && (
-            <p className="mt-2 px-2 text-center text-[10px] text-slate-600">build {__BUILD_SHA__}</p>
+            <p className="mt-2 px-2 text-center text-[10px] text-muted">build {__BUILD_SHA__}</p>
           )}
         </div>
       </aside>
 
       {showIosTip && (
-        <div className="animate-fade-in fixed right-4 top-[calc(3.75rem+env(safe-area-inset-top))] z-[60] max-w-[260px] rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 shadow-2xl">
+        <div className="animate-fade-in fixed right-4 top-[calc(3.75rem+env(safe-area-inset-top))] z-[60] max-w-[260px] rounded-lg border border-edge2 bg-elevated px-3 py-2 text-xs text-primary shadow-2xl">
           Tap <b className="text-white">Share</b> → <b className="text-white">Add to Home Screen</b>{' '}
           to install ITMS like an app
         </div>

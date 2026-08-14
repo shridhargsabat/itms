@@ -33,6 +33,19 @@ pub struct ListParams {
     pub department: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+/// Whitelisted ORDER BY columns.
+fn user_sort(col: &str) -> &'static str {
+    match col {
+        "email" => "email",
+        "role" => "role",
+        "department" => "department",
+        "created_at" => "created_at",
+        _ => "name",
+    }
 }
 
 #[derive(Deserialize)]
@@ -97,7 +110,13 @@ async fn list_users(
         qb.push(" AND department = ").push_bind(dept.clone());
         cqb.push(" AND department = ").push_bind(dept.clone());
     }
-    qb.push(" ORDER BY name");
+    qb.push(" ORDER BY ").push(user_sort(q.sort.as_deref().unwrap_or("name")));
+    if q.order.as_deref() == Some("desc") {
+        qb.push(" DESC");
+    } else {
+        qb.push(" ASC");
+    }
+    qb.push(", name ASC");
     // Optional pagination (client lists default to unlimited for now).
     if let Some(limit) = q.limit {
         qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));

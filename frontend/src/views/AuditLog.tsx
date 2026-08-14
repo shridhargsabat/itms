@@ -16,22 +16,22 @@ export default function AuditLog() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Audit Log</h1>
-        <p className="mt-0.5 text-sm text-slate-400">
+        <h1 className="text-xl font-semibold text-primary">Audit Log</h1>
+        <p className="mt-0.5 text-sm text-secondary">
           {rows.length} recent events — click a row to inspect the diff.
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
+      <div className="overflow-x-auto rounded-xl border border-edge">
         {isLoading ? (
           <div className="space-y-2 p-5">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-800/70" />
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-elevated/70" />
             ))}
           </div>
         ) : (
           <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
+            <thead className="bg-surface text-xs uppercase tracking-wide text-secondary">
               <tr>
                 <th className="px-4 py-3 font-medium">Time</th>
                 <th className="px-4 py-3 font-medium">Actor</th>
@@ -41,33 +41,33 @@ export default function AuditLog() {
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 bg-slate-950">
+            <tbody className="divide-y divide-edge/60 bg-base">
               {rows.map((e) => {
                 const expanded = expandedId === e.id;
                 return (
                   <Fragment key={e.id}>
                     <tr
                       onClick={() => setExpandedId(expanded ? null : e.id)}
-                      className="cursor-pointer transition-colors hover:bg-slate-900"
+                      className="cursor-pointer transition-colors hover:bg-surface"
                     >
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-secondary">
                         {formatDate(e.created_at)}
                       </td>
-                      <td className="px-4 py-3 text-slate-300">
+                      <td className="px-4 py-3 text-secondary">
                         {e.actor_name ?? (
-                          <span className="text-slate-500">system</span>
+                          <span className="text-muted">system</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
+                        <span className="rounded bg-elevated px-2 py-0.5 font-mono text-xs text-secondary">
                           {e.action}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{e.target_type}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-indigo-400">
+                      <td className="px-4 py-3 text-xs text-secondary">{e.target_type}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-accent">
                         {e.target_id}
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-500">
+                      <td className="px-4 py-3 text-right text-muted">
                         {expanded ? (
                           <ChevronDown className="ml-auto h-4 w-4" />
                         ) : (
@@ -76,9 +76,9 @@ export default function AuditLog() {
                       </td>
                     </tr>
                     {expanded && (
-                      <tr className="bg-slate-900/60">
+                      <tr className="bg-surface/60">
                         <td colSpan={6} className="px-4 py-3">
-                          <pre className="max-h-72 overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-300">
+                          <pre className="max-h-72 overflow-auto rounded-lg bg-base p-3 font-mono text-xs leading-relaxed text-secondary">
                             {JSON.stringify(e.diff, null, 2)}
                           </pre>
                         </td>
@@ -89,7 +89,7 @@ export default function AuditLog() {
               })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted">
                     No audit entries yet.
                   </td>
                 </tr>

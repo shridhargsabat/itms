@@ -121,12 +121,12 @@ export default function Select({
         aria-expanded={open}
         className={cn(inputCls, 'flex items-center justify-between gap-2 py-2.5 text-left')}
       >
-        <span className={cn('truncate', selected ? 'text-slate-100' : 'text-slate-500')}>
+        <span className={cn('truncate', selected ? 'text-primary' : 'text-muted')}>
           {selected?.label ?? placeholder}
         </span>
         <ChevronDown
           className={cn(
-            'h-4 w-4 shrink-0 text-slate-500 transition-transform duration-150',
+            'h-4 w-4 shrink-0 text-muted transition-transform duration-150',
             open && 'rotate-180',
           )}
         />
@@ -147,7 +147,7 @@ export default function Select({
               maxWidth: menu.maxWidth,
             }}
             role="listbox"
-            className="animate-menu-in z-[70] max-h-64 overflow-auto rounded-lg border border-slate-700 bg-slate-800/95 p-1 shadow-2xl backdrop-blur"
+            className="animate-menu-in z-[70] max-h-64 overflow-auto rounded-lg border border-edge2 bg-elevated/95 p-1 shadow-2xl backdrop-blur"
           >
             {options.map((o) => (
               <button
@@ -162,12 +162,12 @@ export default function Select({
                 className={cn(
                   'flex w-full items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md px-3 py-2 text-left text-sm transition-colors',
                   o.value === value
-                    ? 'bg-slate-700/70 text-white'
-                    : 'text-slate-300 hover:bg-slate-700/40 hover:text-white',
+                    ? 'bg-elevated2/70 text-white'
+                    : 'text-secondary hover:bg-elevated2/40 hover:text-white',
                 )}
               >
                 <span className="min-w-0 truncate">{o.label}</span>
-                {o.value === value && <Check className="h-4 w-4 shrink-0 text-indigo-400" />}
+                {o.value === value && <Check className="h-4 w-4 shrink-0 text-accent" />}
               </button>
             ))}
           </div>,

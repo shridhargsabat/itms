@@ -6,8 +6,8 @@ export default function Offline() {
       <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
         <WifiOff className="h-8 w-8" />
       </span>
-      <h1 className="text-xl font-semibold text-slate-100">You're offline</h1>
-      <p className="max-w-sm text-sm text-slate-400">
+      <h1 className="text-xl font-semibold text-primary">You're offline</h1>
+      <p className="max-w-sm text-sm text-secondary">
         The app shell is cached and works without a connection, but live data needs the network.
         Reconnect and try again.
       </p>

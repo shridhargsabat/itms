@@ -37,6 +37,21 @@ pub struct AssetListParams {
     pub status: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+/// Whitelisted ORDER BY columns (never interpolate user input directly).
+fn asset_sort(col: &str) -> &'static str {
+    match col {
+        "name" => "a.name",
+        "tag" => "a.asset_tag",
+        "category" => "a.category",
+        "status" => "a.status",
+        "serial_number" => "a.serial_number",
+        "updated_at" => "a.updated_at",
+        _ => "a.created_at",
+    }
 }
 
 /// GET /api/v1/assets?search=&category=&status=
@@ -47,6 +62,8 @@ async fn list_assets(
     // Data query + count query share the SAME filter pushes (same bind order).
     let mut qb = QueryBuilder::new(ASSET_SELECT);
     let mut cqb = QueryBuilder::new("SELECT COUNT(*) FROM assets a");
+    qb.push(" WHERE ");
+    cqb.push(" WHERE ");
     let mut any = false;
 
     if let Some(search) = params.search.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
@@ -90,11 +107,16 @@ async fn list_assets(
         any = true;
     }
     if !any {
-        qb.push(" WHERE 1 = 1");
-        cqb.push(" WHERE 1 = 1");
+        qb.push("1 = 1");
+        cqb.push("1 = 1");
     }
 
-    qb.push(" ORDER BY a.created_at DESC");
+    qb.push(" ORDER BY ").push(asset_sort(params.sort.as_deref().unwrap_or("created_at")));
+    if params.order.as_deref() == Some("asc") {
+        qb.push(" ASC");
+    } else {
+        qb.push(" DESC");
+    }
     if let Some(limit) = params.limit {
         qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
         if let Some(offset) = params.offset {

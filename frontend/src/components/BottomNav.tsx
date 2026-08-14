@@ -23,7 +23,7 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const user = getCachedUser();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-900 lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-edge bg-surface lg:hidden">
       <div className="flex h-14 items-stretch">
         {NAV_ITEMS.filter((i) => !i.admin || user?.role === 'ADMIN').map(({ to, label, icon: Icon, end }) => (
           <NavLink
@@ -33,7 +33,7 @@ export default function BottomNav() {
             className={({ isActive }) =>
               cn(
                 'flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1',
-                isActive ? 'text-indigo-400' : 'text-slate-500',
+                isActive ? 'text-accent' : 'text-muted',
               )
             }
           >

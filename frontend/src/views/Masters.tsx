@@ -30,9 +30,9 @@ const TABS: { id: MasterFamily | 'users'; label: string }[] = [
 const ROLES = ['ADMIN', 'AGENT', 'EMPLOYEE'];
 
 const ROLE_STYLE: Record<string, string> = {
-  ADMIN: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+  ADMIN: 'bg-accent/10 text-accent border-indigo-500/30',
   AGENT: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  EMPLOYEE: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+  EMPLOYEE: 'bg-elevated/10 text-secondary border-edge2/30',
 };
 
 export default function Masters() {
@@ -42,9 +42,9 @@ export default function Masters() {
 
   if (me?.role !== 'ADMIN') {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-800 p-12 text-center">
-        <ShieldAlert className="h-8 w-8 text-slate-600" />
-        <p className="text-sm text-slate-400">Only administrators can manage users and master data.</p>
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-edge p-12 text-center">
+        <ShieldAlert className="h-8 w-8 text-muted" />
+        <p className="text-sm text-secondary">Only administrators can manage users and master data.</p>
       </div>
     );
   }
@@ -52,8 +52,8 @@ export default function Masters() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold text-slate-100">Masters</h1>
-        <p className="mt-0.5 text-sm text-slate-400">Users and lookup data powering every dropdown.</p>
+        <h1 className="text-xl font-semibold text-primary">Masters</h1>
+        <p className="mt-0.5 text-sm text-secondary">Users and lookup data powering every dropdown.</p>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -65,8 +65,8 @@ export default function Masters() {
             className={cn(
               'flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-3.5 text-sm font-medium transition-colors',
               tab === t.id
-                ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-300'
-                : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200',
+                ? 'border-indigo-500/50 bg-accent/10 text-accent'
+                : 'border-edge bg-surface/60 text-secondary hover:border-edge2 hover:text-primary',
             )}
           >
             {t.id === 'users' ? <Users className="h-4 w-4" /> : <Database className="h-4 w-4" />}
@@ -101,9 +101,11 @@ function UsersTab() {
   const search = params.get('search') ?? '';
   const role = params.get('role') ?? '';
   const department = params.get('department') ?? '';
+  const sort = params.get('sort') ?? null;
+  const order = (params.get('order') as 'asc' | 'desc' | null) ?? null;
 
   const users = useQuery({
-    queryKey: ['users', { search, role, department }, page, pageSize],
+    queryKey: ['users', { search, role, department }, page, pageSize, sort, order],
     queryFn: () =>
       listUsers({
         search: search || undefined,
@@ -111,11 +113,13 @@ function UsersTab() {
         department: department || undefined,
         limit: pageSize,
         offset: (page - 1) * pageSize,
+        sort: sort ?? undefined,
+        order: order ?? undefined,
       }),
   });
   useEffect(() => {
     setPage(1);
-  }, [search, role, department]);
+  }, [search, role, department, sort, order]);
   const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
   const departments = masters.data?.department ?? [];
 
@@ -151,29 +155,31 @@ function UsersTab() {
       {
         key: 'name',
         header: 'Name',
+        sortable: true,
         render: (u) => (
           <div className="min-w-0">
-            <p className="truncate font-medium text-slate-200">{u.name}</p>
-            <p className="truncate text-xs text-slate-500">{u.email}</p>
+            <p className="truncate font-medium text-primary">{u.name}</p>
+            <p className="truncate text-xs text-muted">{u.email}</p>
           </div>
         ),
       },
       {
         key: 'role',
         header: 'Role',
+        sortable: true,
         render: (u) => (
           <span className={cn('inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium', ROLE_STYLE[u.role] ?? ROLE_STYLE.EMPLOYEE)}>
             {u.role}
           </span>
         ),
       },
-      { key: 'department', header: 'Department', render: (u) => <span className="text-slate-400">{u.department}</span> },
+      { key: 'department', header: 'Department', sortable: true, render: (u) => <span className="text-secondary">{u.department}</span> },
       {
         key: 'active',
         header: 'Status',
         render: (u) => (
-          <span className={cn('inline-flex items-center gap-1.5 text-xs', u.active ? 'text-emerald-400' : 'text-slate-500')}>
-            <span className={cn('h-1.5 w-1.5 rounded-full', u.active ? 'bg-emerald-400' : 'bg-slate-600')} />
+          <span className={cn('inline-flex items-center gap-1.5 text-xs', u.active ? 'text-emerald-400' : 'text-muted')}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', u.active ? 'bg-emerald-400' : 'bg-elevated2')} />
             {u.active ? 'Active' : 'Disabled'}
           </span>
         ),
@@ -188,7 +194,7 @@ function UsersTab() {
               type="button"
               onClick={() => openEdit(u)}
               aria-label={`Edit ${u.name}`}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-indigo-300"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated hover:text-accent"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -200,8 +206,8 @@ function UsersTab() {
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
                 u.active
-                  ? 'text-slate-400 hover:bg-red-500/10 hover:text-red-400'
-                  : 'text-slate-500 hover:bg-emerald-500/10 hover:text-emerald-400',
+                  ? 'text-secondary hover:bg-red-500/10 hover:text-red-400'
+                  : 'text-muted hover:bg-emerald-500/10 hover:text-emerald-400',
                 u.email === 'admin@itms.local' && 'cursor-not-allowed opacity-30',
               )}
             >
@@ -249,8 +255,8 @@ function UsersTab() {
       </div>
 
       {users.isLoading ? (
-        <div className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40 py-16">
-          <LoaderCircle className="h-6 w-6 animate-spin text-slate-500" />
+        <div className="flex items-center justify-center rounded-xl border border-edge bg-surface/40 py-16">
+          <LoaderCircle className="h-6 w-6 animate-spin text-muted" />
         </div>
       ) : (
         <DataTable<UserRecord>
@@ -262,6 +268,18 @@ function UsersTab() {
           onPageSizeChange={(s) => {
             setPageSize(s);
             setPage(1);
+          }}
+          sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
+          onSortChange={(s) => {
+            const next = new URLSearchParams(params);
+            if (s) {
+              next.set('sort', s.key);
+              next.set('order', s.dir);
+            } else {
+              next.delete('sort');
+              next.delete('order');
+            }
+            setParams(next, { replace: true });
           }}
           columns={columns}
           emptyMessage="No users match the filters."
@@ -327,7 +345,7 @@ function UsersTab() {
             </div>
             {formError && <p className="text-xs text-red-400">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={() => setFormOpen(false)} className="h-10 rounded-lg border border-slate-700 px-4 text-sm text-slate-300 hover:bg-slate-800">
+              <button type="button" onClick={() => setFormOpen(false)} className="h-10 rounded-lg border border-edge2 px-4 text-sm text-secondary hover:bg-elevated">
                 Cancel
               </button>
               <button
@@ -385,9 +403,9 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
+      <div className="overflow-x-auto rounded-xl border border-edge">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="border-b border-slate-800 bg-slate-900/60 text-[11px] uppercase tracking-wide text-slate-500">
+          <thead className="border-b border-edge bg-surface/60 text-[11px] uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-3 font-medium">Label</th>
               <th className="px-4 py-3 font-medium">Code</th>
@@ -396,7 +414,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
               <th className="w-32 px-4 py-3 font-medium" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800 bg-slate-950">
+          <tbody className="divide-y divide-edge bg-base">
             {(options ?? []).map((o) => {
               const d = drafts[o.id] ?? { label: o.label, sort_order: o.sort_order };
               const dirty = d.label !== o.label || d.sort_order !== o.sort_order;
@@ -409,7 +427,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                       onChange={(e) => setDrafts((prev) => ({ ...prev, [o.id]: { ...d, label: e.target.value } }))}
                     />
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{o.code}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted">{o.code}</td>
                   <td className="px-4 py-2.5">
                     <input
                       className={cn(inputCls, 'h-9 w-16')}
@@ -424,7 +442,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                       onClick={() => saveMut.mutate({ id: o.id, body: { active: !o.active } })}
                       className={cn(
                         'relative h-6 w-11 rounded-full transition-colors',
-                        o.active ? 'bg-emerald-500/80' : 'bg-slate-700',
+                        o.active ? 'bg-emerald-500/80' : 'bg-elevated2',
                       )}
                       aria-label={o.active ? 'Deactivate' : 'Activate'}
                     >
@@ -442,7 +460,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                         type="button"
                         onClick={() => saveMut.mutate({ id: o.id, body: d })}
                         disabled={!dirty || saveMut.isPending}
-                        className="inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         <Save className="h-3.5 w-3.5" /> Save
                       </button>
@@ -465,7 +483,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                             window.setTimeout(() => setConfirmDelete((c) => (c === o.id ? null : c)), 3000);
                           }}
                           aria-label={`Delete ${o.label}`}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-500/10 hover:text-red-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -477,7 +495,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
             })}
             {!loading && (options ?? []).length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
                   No options yet — add the first one below.
                 </td>
               </tr>
@@ -486,7 +504,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
         </table>
       </div>
 
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-800 p-3">
+      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-edge p-3">
         <div>
           <label className={labelCls}>New label</label>
           <input className={cn(inputCls, 'w-48')} placeholder="e.g. Blocker" value={newRow.label} onChange={(e) => setNewRow({ ...newRow, label: e.target.value })} />

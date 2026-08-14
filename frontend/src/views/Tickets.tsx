@@ -112,7 +112,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800"
+          className="rounded-lg border border-edge2 px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated"
         >
           Cancel
         </button>
@@ -141,11 +141,15 @@ export default function Tickets() {
   const status = params.get('status') ?? '';
   const priority = params.get('priority') ?? '';
   const type = params.get('type') ?? '';
+  const sort = params.get('sort') ?? null;
+  const order = (params.get('order') as 'asc' | 'desc' | null) ?? null;
 
   const filters = {
     status: status || undefined,
     priority: priority || undefined,
     type: type || undefined,
+    sort: sort ?? undefined,
+    order: order ?? undefined,
   };
   const { data, isLoading } = useQuery({
     queryKey: ['tickets', filters, view === 'table' ? { page, pageSize } : 'all'],
@@ -160,7 +164,19 @@ export default function Tickets() {
   // any filter change or view switch resets to page 1
   useEffect(() => {
     setPage(1);
-  }, [status, priority, type, view]);
+  }, [status, priority, type, view, sort, order]);
+
+  const onSortChange = (s: { key: string; dir: 'asc' | 'desc' } | null) => {
+    const next = new URLSearchParams(params);
+    if (s) {
+      next.set('sort', s.key);
+      next.set('order', s.dir);
+    } else {
+      next.delete('sort');
+      next.delete('order');
+    }
+    setParams(next, { replace: true });
+  };
 
   const advance = useMutation({
     mutationFn: ({ id, st }: { id: string; st: TicketStatus }) => patchTicketStatus(id, st),
@@ -185,35 +201,36 @@ export default function Tickets() {
     {
       key: 'ticket_number',
       header: 'Ticket',
+      sortable: true,
       render: (t) => (
         <div>
-          <span className="font-mono text-xs text-indigo-400">{t.ticket_number}</span>
-          <p className="max-w-[220px] truncate font-medium text-slate-200">{t.title}</p>
+          <span className="font-mono text-xs text-accent">{t.ticket_number}</span>
+          <p className="max-w-[220px] truncate font-medium text-primary">{t.title}</p>
         </div>
       ),
     },
-    { key: 'priority', header: 'Priority', render: (t) => <PriorityBadge priority={t.priority} /> },
-    { key: 'status', header: 'Status', render: (t) => <StatusBadge status={t.status} /> },
+    { key: 'priority', header: 'Priority', sortable: true, render: (t) => <PriorityBadge priority={t.priority} /> },
+    { key: 'status', header: 'Status', sortable: true, render: (t) => <StatusBadge status={t.status} /> },
     {
       key: 'ticket_type',
       header: 'Type',
-      render: (t) => <span className="text-xs text-slate-400">{t.ticket_type.replace('_', ' ')}</span>,
+      render: (t) => <span className="text-xs text-secondary">{t.ticket_type.replace('_', ' ')}</span>,
     },
     {
       key: 'requester_name',
       header: 'Requester',
-      render: (t) => <span className="text-slate-300">{t.requester_name}</span>,
+      render: (t) => <span className="text-secondary">{t.requester_name}</span>,
     },
     {
       key: 'assignee_name',
       header: 'Assignee',
-      render: (t) => <span className="text-slate-300">{t.assignee_name ?? '—'}</span>,
+      render: (t) => <span className="text-secondary">{t.assignee_name ?? '—'}</span>,
     },
     {
       key: 'asset_tag',
       header: 'Asset',
       render: (t) => (
-        <span className="font-mono text-xs text-slate-400">{t.asset_tag ?? '—'}</span>
+        <span className="font-mono text-xs text-secondary">{t.asset_tag ?? '—'}</span>
       ),
     },
   ];
@@ -224,21 +241,21 @@ export default function Tickets() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">Tickets</h1>
-          <p className="mt-0.5 text-sm text-slate-400">
+          <h1 className="text-xl font-semibold text-primary">Tickets</h1>
+          <p className="mt-0.5 text-sm text-secondary">
             {view === 'table' ? data?.total ?? rows.length : rows.length} ticket
             {view === 'table' ? (data?.total ?? rows.length) === 1 ? '' : 's' : rows.length === 1 ? '' : 's'} matching filters
           </p>
         </div>
         <div className="w-full min-w-0 sm:w-auto">
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-            <div className="col-span-2 flex overflow-hidden rounded-lg border border-slate-700 sm:col-auto">
+            <div className="col-span-2 flex overflow-hidden rounded-lg border border-edge2 sm:col-auto">
               <button
                 type="button"
                 onClick={() => setView('table')}
                 className={cn(
                   'inline-flex h-10 flex-1 items-center justify-center gap-1.5 px-3 text-sm transition-colors sm:flex-none',
-                  view === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200',
+                  view === 'table' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
                 )}
               >
                 <Table className="h-4 w-4" /> Table
@@ -248,7 +265,7 @@ export default function Tickets() {
                 onClick={() => setView('kanban')}
                 className={cn(
                   'inline-flex h-10 flex-1 items-center justify-center gap-1.5 px-3 text-sm transition-colors sm:flex-none',
-                  view === 'kanban' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200',
+                  view === 'kanban' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
                 )}
               >
                 <Columns3 className="h-4 w-4" /> Kanban
@@ -303,6 +320,8 @@ export default function Tickets() {
                 setPageSize(s);
                 setPage(1);
               }}
+              sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
+              onSortChange={onSortChange}
               loading={isLoading}
               emptyMessage="No tickets match the current filters."
               minWidth="min-w-[760px]"
@@ -313,12 +332,12 @@ export default function Tickets() {
               {TICKET_STATUSES.map((st) => {
                 const items = rows.filter((t) => t.status === st);
                 return (
-                  <div key={st} className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                  <div key={st} className="rounded-xl border border-edge bg-surface/50 p-3">
                     <div className="mb-3 flex items-center justify-between px-1">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
                         {st.replace('_', ' ')}
                       </span>
-                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
+                      <span className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary">
                         {items.length}
                       </span>
                     </div>
@@ -329,25 +348,25 @@ export default function Tickets() {
                           type="button"
                           onClick={() => setSelectedId(t.id)}
                           className={cn(
-                            'animate-list-in w-full rounded-lg border border-slate-800 bg-slate-950 p-3 text-left transition-colors hover:border-slate-700',
+                            'animate-list-in w-full rounded-lg border border-edge bg-base p-3 text-left transition-colors hover:border-edge2',
                             selectedId === t.id && 'border-indigo-500/60',
                           )}
                           style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[10px] text-slate-500">
+                            <span className="font-mono text-[10px] text-muted">
                               {t.ticket_number}
                             </span>
                             <PriorityBadge priority={t.priority} />
                           </div>
-                          <p className="mt-1 text-sm font-medium text-slate-200">{t.title}</p>
-                          <p className="mt-1 truncate text-xs text-slate-500">
+                          <p className="mt-1 text-sm font-medium text-primary">{t.title}</p>
+                          <p className="mt-1 truncate text-xs text-muted">
                             {t.assignee_name ?? 'Unassigned'}
                           </p>
                         </button>
                       ))}
                       {items.length === 0 && (
-                        <p className="rounded-lg border border-dashed border-slate-800 p-3 text-center text-xs text-slate-600">
+                        <p className="rounded-lg border border-dashed border-edge p-3 text-center text-xs text-muted">
                           Empty
                         </p>
                       )}
@@ -360,52 +379,52 @@ export default function Tickets() {
         </div>
 
         {selected && (
-          <aside className="h-fit rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <aside className="h-fit rounded-xl border border-edge bg-surface/60 p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-indigo-400">{selected.ticket_number}</span>
+              <span className="font-mono text-xs text-accent">{selected.ticket_number}</span>
               <PriorityBadge priority={selected.priority} />
               <StatusBadge status={selected.status} />
             </div>
-            <h2 className="mt-2 text-lg font-semibold text-slate-100">{selected.title}</h2>
-            <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+            <h2 className="mt-2 text-lg font-semibold text-primary">{selected.title}</h2>
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted">
               {selected.ticket_type.replace('_', ' ')}
             </p>
 
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+            <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-secondary">
               {selected.description || 'No description provided.'}
             </p>
 
             <div className="mt-4 space-y-2 text-sm">
-              <div className="flex items-center gap-2 text-slate-300">
-                <User className="h-4 w-4 shrink-0 text-slate-500" />
+              <div className="flex items-center gap-2 text-secondary">
+                <User className="h-4 w-4 shrink-0 text-muted" />
                 <span className="truncate">
                   {selected.requester_name}
-                  <span className="ml-1 font-mono text-[10px] text-slate-500">
+                  <span className="ml-1 font-mono text-[10px] text-muted">
                     ({selected.requester_id})
                   </span>
                 </span>
               </div>
               {selected.asset_id && (
-                <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-                  <Link2 className="h-4 w-4 shrink-0 text-indigo-400" />
+                <div className="flex items-center gap-2 rounded-lg border border-edge bg-base px-3 py-2">
+                  <Link2 className="h-4 w-4 shrink-0 text-accent" />
                   <div className="min-w-0">
-                    <p className="truncate text-xs text-slate-200">
-                      <span className="font-mono text-indigo-400">{selected.asset_tag}</span>
+                    <p className="truncate text-xs text-primary">
+                      <span className="font-mono text-accent">{selected.asset_tag}</span>
                       {' · '}
                       {selected.asset_name}
                     </p>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                    <p className="text-[10px] uppercase tracking-wide text-muted">
                       linked asset
                     </p>
                   </div>
                 </div>
               )}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted">
                 Created {formatDate(selected.created_at)} · Updated {formatDate(selected.updated_at)}
               </p>
             </div>
 
-            <div className="mt-5 border-t border-slate-800 pt-4">
+            <div className="mt-5 border-t border-edge pt-4">
               {next ? (
                 <button
                   type="button"
@@ -418,7 +437,7 @@ export default function Tickets() {
                   {!advance.isPending && <ArrowRight className="h-4 w-4" />}
                 </button>
               ) : (
-                <p className="text-center text-xs text-slate-500">
+                <p className="text-center text-xs text-muted">
                   No further status transition.
                 </p>
               )}

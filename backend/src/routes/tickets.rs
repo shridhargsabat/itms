@@ -36,6 +36,22 @@ pub struct TicketListParams {
     pub ticket_type: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+/// Whitelisted ORDER BY columns. Priority sorts semantically
+/// (URGENT > HIGH > MEDIUM > LOW), not alphabetically.
+fn ticket_sort(col: &str) -> &'static str {
+    match col {
+        "ticket_number" => "t.ticket_number",
+        "title" => "t.title",
+        "status" => "t.status",
+        "ticket_type" => "t.ticket_type",
+        "updated_at" => "t.updated_at",
+        "priority" => "CASE t.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END",
+        _ => "t.created_at",
+    }
 }
 
 /// GET /api/v1/tickets?status=&priority=&type=
@@ -45,6 +61,8 @@ async fn list_tickets(
 ) -> Result<impl axum::response::IntoResponse, AppError> {
     let mut qb = QueryBuilder::new(TICKET_SELECT);
     let mut cqb = QueryBuilder::new("SELECT COUNT(*) FROM tickets t");
+    qb.push(" WHERE ");
+    cqb.push(" WHERE ");
     let mut any = false;
 
     if let Some(status) = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
@@ -76,11 +94,17 @@ async fn list_tickets(
         any = true;
     }
     if !any {
-        qb.push(" WHERE 1 = 1");
-        cqb.push(" WHERE 1 = 1");
+        qb.push("1 = 1");
+        cqb.push("1 = 1");
     }
 
-    qb.push(" ORDER BY t.created_at DESC");
+    qb.push(" ORDER BY ").push(ticket_sort(params.sort.as_deref().unwrap_or("created_at")));
+    if params.order.as_deref() == Some("asc") {
+        qb.push(" ASC");
+    } else {
+        qb.push(" DESC");
+    }
+    qb.push(", t.created_at DESC");
     if let Some(limit) = params.limit {
         qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
         if let Some(offset) = params.offset {

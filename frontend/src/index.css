@@ -1,12 +1,64 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: `.dark` on <html> = dark, absent = light.
+   Default: follow the device (theme.ts applies .dark from prefers-color-scheme). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic theme tokens — components use bg-base/bg-surface/bg-elevated/
+   text-primary/text-secondary/text-muted/border-edge/bg-input/accent so one
+   palette swap themes the whole app. Dark values = the original slate design. */
+@theme {
+  --color-base: var(--t-base);
+  --color-surface: var(--t-surface);
+  --color-elevated: var(--t-elevated);
+  --color-elevated2: var(--t-elevated2);
+  --color-input: var(--t-input);
+  --color-edge: var(--t-edge);
+  --color-edge2: var(--t-edge2);
+  --color-primary: var(--t-primary);
+  --color-secondary: var(--t-secondary);
+  --color-muted: var(--t-muted);
+  --color-accent: var(--t-accent);
+  --color-accent-strong: var(--t-accent-strong);
+}
+
+:root {
+  --t-base: #ffffff;
+  --t-surface: #f8fafc;
+  --t-elevated: #e2e8f0;
+  --t-elevated2: #cbd5e1;
+  --t-input: #ffffff;
+  --t-edge: #cbd5e1;
+  --t-edge2: #94a3b8;
+  --t-primary: #0f172a;
+  --t-secondary: #334155;
+  --t-muted: #64748b;
+  --t-accent: #4f46e5;
+  --t-accent-strong: #4338ca;
+}
+
+.dark {
+  --t-base: #020617;
+  --t-surface: #0f172a;
+  --t-elevated: #1e293b;
+  --t-elevated2: #334155;
+  --t-input: #0f172a;
+  --t-edge: #1e293b;
+  --t-edge2: #334155;
+  --t-primary: #f1f5f9;
+  --t-secondary: #94a3b8;
+  --t-muted: #64748b;
+  --t-accent: #818cf8;
+  --t-accent-strong: #6366f1;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    @apply bg-slate-950 text-slate-100 antialiased min-h-screen;
+    @apply bg-base text-primary antialiased min-h-screen;
     min-height: 100dvh; /* iOS URL-bar / Android keyboard: dvh beats vh */
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }

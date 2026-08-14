@@ -26,7 +26,7 @@ const METRIC_CARDS: {
   accent: string;
   to: string;
 }[] = [
-  { label: 'Total Assets', key: 'asset_count', icon: Boxes, accent: 'bg-indigo-500/10 text-indigo-400', to: '/assets' },
+  { label: 'Total Assets', key: 'asset_count', icon: Boxes, accent: 'bg-accent/10 text-accent', to: '/assets' },
   { label: 'Open Tickets', key: 'open_tickets', icon: Ticket, accent: 'bg-blue-500/10 text-blue-400', to: '/tickets?status=OPEN' },
   { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
   { label: 'In Stock', key: 'in_stock_count', icon: PackageCheck, accent: 'bg-emerald-500/10 text-emerald-400', to: '/assets?status=IN_STOCK' },
@@ -140,7 +140,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800"
+          className="rounded-lg border border-edge2 px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated"
         >
           Cancel
         </button>
@@ -244,7 +244,7 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800"
+          className="rounded-lg border border-edge2 px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated"
         >
           Cancel
         </button>
@@ -276,8 +276,8 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-slate-400">
+          <h1 className="text-xl font-semibold text-primary">Dashboard</h1>
+          <p className="mt-0.5 text-sm text-secondary">
             Inventory, tickets and recent activity at a glance.
           </p>
         </div>
@@ -292,7 +292,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setAssetOpen(true)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-slate-700 px-4 text-sm font-medium text-slate-200 transition-all duration-150 hover:bg-slate-800 active:scale-[0.97]"
+            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-edge2 px-4 text-sm font-medium text-primary transition-all duration-150 hover:bg-elevated active:scale-[0.97]"
           >
             <Plus className="h-4 w-4" /> Add Asset
           </button>
@@ -311,11 +311,11 @@ export default function Dashboard() {
           <Link
             key={key}
             to={to}
-            className="group animate-fade-up rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition-all duration-150 hover:border-slate-600/80 hover:bg-slate-900 active:scale-[0.98] sm:p-5"
+            className="group animate-fade-up rounded-xl border border-edge bg-surface/60 p-4 transition-all duration-150 hover:border-edge2/80 hover:bg-surface active:scale-[0.98] sm:p-5"
             style={{ animationDelay: `${i * 70}ms` }}
           >
             <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:text-xs">
+              <p className="truncate text-[11px] font-medium uppercase tracking-wide text-secondary lg:text-xs">
                 {label}
               </p>
               <span
@@ -328,35 +328,35 @@ export default function Dashboard() {
               </span>
             </div>
             {metrics.isLoading ? (
-              <div className="mt-3 h-8 w-16 animate-pulse rounded bg-slate-800" />
+              <div className="mt-3 h-8 w-16 animate-pulse rounded bg-elevated" />
             ) : (
               <div className="mt-2 flex items-baseline justify-between gap-2">
-                <p className="text-3xl font-semibold text-slate-100">
+                <p className="text-3xl font-semibold text-primary">
                   <CountUp value={metrics.data?.[key] ?? 0} />
                 </p>
-                <ChevronRight className="h-4 w-4 shrink-0 translate-x-[-4px] text-slate-600 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:text-slate-300 group-hover:opacity-100" />
+                <ChevronRight className="h-4 w-4 shrink-0 translate-x-[-4px] text-muted opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:text-secondary group-hover:opacity-100" />
               </div>
             )}
           </Link>
         ))}
       </div>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-        <div className="flex items-center gap-2 border-b border-slate-800 px-5 py-4">
-          <Activity className="h-4 w-4 text-slate-400" />
-          <h2 className="text-sm font-semibold text-slate-200">Recent Activity</h2>
-          <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-500">
+      <div className="rounded-xl border border-edge bg-surface/60">
+        <div className="flex items-center gap-2 border-b border-edge px-5 py-4">
+          <Activity className="h-4 w-4 text-secondary" />
+          <h2 className="text-sm font-semibold text-primary">Recent Activity</h2>
+          <span className="ml-auto flex items-center gap-1.5 text-xs text-muted">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
             auto-refresh 30s
           </span>
         </div>
-        <div className="divide-y divide-slate-800/60">
+        <div className="divide-y divide-edge/60">
           {audit.isLoading &&
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-5 py-3">
-                <div className="h-3 w-36 animate-pulse rounded bg-slate-800" />
-                <div className="h-3 w-24 animate-pulse rounded bg-slate-800" />
-                <div className="h-3 w-32 animate-pulse rounded bg-slate-800" />
+                <div className="h-3 w-36 animate-pulse rounded bg-elevated" />
+                <div className="h-3 w-24 animate-pulse rounded bg-elevated" />
+                <div className="h-3 w-32 animate-pulse rounded bg-elevated" />
               </div>
             ))}
           {(audit.data ?? []).map((e, i) => (
@@ -366,27 +366,27 @@ export default function Dashboard() {
               style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
             >
               <div className="flex min-w-0 items-center gap-3">
-                <span className="shrink-0 text-xs text-slate-500">{formatDate(e.created_at)}</span>
-                <span className="min-w-0 truncate text-slate-300">
+                <span className="shrink-0 text-xs text-muted">{formatDate(e.created_at)}</span>
+                <span className="min-w-0 truncate text-secondary">
                   {e.actor_name ?? 'system'}
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-3">
-                <span className="shrink-0 rounded bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-300">
+                <span className="shrink-0 rounded bg-elevated px-2 py-0.5 font-mono text-xs text-secondary">
                   {e.action}
                 </span>
-                <span className="min-w-0 truncate text-xs text-slate-500">
+                <span className="min-w-0 truncate text-xs text-muted">
                   {e.target_type} ·{' '}
-                  <span className="font-mono text-indigo-400">{e.target_id}</span>
+                  <span className="font-mono text-accent">{e.target_id}</span>
                 </span>
               </div>
             </div>
           ))}
           {!audit.isLoading && (audit.data ?? []).length === 0 && (
             <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
-              <Activity className="h-8 w-8 text-slate-700" />
-              <p className="text-sm text-slate-500">No audit entries yet.</p>
-              <p className="max-w-xs text-xs text-slate-600">
+              <Activity className="h-8 w-8 text-muted" />
+              <p className="text-sm text-muted">No audit entries yet.</p>
+              <p className="max-w-xs text-xs text-muted">
                 Asset updates and ticket changes will show up here automatically.
               </p>
             </div>

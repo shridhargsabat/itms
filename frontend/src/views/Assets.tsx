@@ -20,11 +20,15 @@ export default function Assets() {
   const search = params.get('search') ?? '';
   const category = params.get('category') ?? '';
   const status = params.get('status') ?? '';
+  const sort = params.get('sort') ?? null;
+  const order = (params.get('order') as 'asc' | 'desc' | null) ?? null;
 
   const filters = {
     search: search || undefined,
     category: category || undefined,
     status: status || undefined,
+    sort: sort ?? undefined,
+    order: order ?? undefined,
   };
   const { data, isLoading } = useQuery({
     queryKey: ['assets', filters, page, pageSize],
@@ -34,7 +38,7 @@ export default function Assets() {
   // any filter change resets to page 1
   useEffect(() => {
     setPage(1);
-  }, [search, category, status]);
+  }, [search, category, status, sort, order]);
 
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -46,34 +50,50 @@ export default function Assets() {
     setParams(next, { replace: true });
   };
 
+  const onSortChange = (s: { key: string; dir: 'asc' | 'desc' } | null) => {
+    const next = new URLSearchParams(params);
+    if (s) {
+      next.set('sort', s.key);
+      next.set('order', s.dir);
+    } else {
+      next.delete('sort');
+      next.delete('order');
+    }
+    setParams(next, { replace: true });
+  };
+
   const columns: Column<Asset>[] = [
     {
       key: 'asset_tag',
       header: 'Tag',
-      render: (a) => <span className="font-mono text-xs text-indigo-400">{a.asset_tag}</span>,
+      sortable: true,
+      sortKey: 'tag',
+      render: (a) => <span className="font-mono text-xs text-accent">{a.asset_tag}</span>,
     },
     {
       key: 'name',
       header: 'Name',
-      render: (a) => <span className="font-medium text-slate-200">{a.name}</span>,
+      sortable: true,
+      render: (a) => <span className="font-medium text-primary">{a.name}</span>,
     },
-    { key: 'category', header: 'Category' },
+    { key: 'category', header: 'Category', sortable: true },
     {
       key: 'status',
       header: 'Status',
+      sortable: true,
       render: (a) => <AssetStatusBadge status={a.status} />,
     },
     {
       key: 'serial_number',
       header: 'Serial',
       render: (a) => (
-        <span className="font-mono text-xs text-slate-400">{a.serial_number ?? '—'}</span>
+        <span className="font-mono text-xs text-secondary">{a.serial_number ?? '—'}</span>
       ),
     },
     {
       key: 'assigned_user_name',
       header: 'Assigned To',
-      render: (a) => <span className="text-slate-300">{a.assigned_user_name ?? '—'}</span>,
+      render: (a) => <span className="text-secondary">{a.assigned_user_name ?? '—'}</span>,
     },
   ];
 
@@ -81,14 +101,14 @@ export default function Assets() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">Assets</h1>
-          <p className="mt-0.5 text-sm text-slate-400">
+          <h1 className="text-xl font-semibold text-primary">Assets</h1>
+          <p className="mt-0.5 text-sm text-secondary">
             {data?.total ?? 0} asset{data?.total === 1 ? '' : 's'} in the registry
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               className={`${inputCls} w-56 pl-9`}
               placeholder="Search assets…"
@@ -128,6 +148,8 @@ export default function Assets() {
           setPageSize(s);
           setPage(1);
         }}
+        sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
+        onSortChange={onSortChange}
         loading={isLoading}
         emptyMessage="No assets match the current filters."
         onRowClick={(a) => setSelected(a)}

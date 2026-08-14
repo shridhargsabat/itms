@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Select from '@/components/Select';
 
@@ -8,6 +8,14 @@ export interface Column<T> {
   header: string;
   render?: (row: T) => ReactNode;
   className?: string;
+  /** Renders a clickable sort header; server sorts by sortKey (defaults to key). */
+  sortable?: boolean;
+  sortKey?: string;
+}
+
+export interface SortState {
+  key: string;
+  dir: 'asc' | 'desc';
 }
 
 interface DataTableProps<T> {
@@ -24,6 +32,9 @@ interface DataTableProps<T> {
   total?: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  /** Server-side sorting — rendered on sortable columns when provided. */
+  sort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
 }
 
 export default function DataTable<T extends { id: string }>({
@@ -38,13 +49,47 @@ export default function DataTable<T extends { id: string }>({
   total,
   onPageChange,
   onPageSizeChange,
+  sort,
+  onSortChange,
 }: DataTableProps<T>) {
+  const cycleSort = (c: Column<T>) => {
+    if (!onSortChange) return;
+    const key = c.sortKey ?? c.key;
+    if (sort?.key === key) {
+      if (sort.dir === 'asc') onSortChange({ key, dir: 'desc' });
+      else onSortChange(null);
+    } else {
+      onSortChange({ key, dir: 'asc' });
+    }
+  };
   const head = (
-    <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
+    <thead className="bg-surface text-xs uppercase tracking-wide text-secondary">
       <tr>
         {columns.map((c) => (
           <th key={c.key} className={cn('px-4 py-3 font-medium', c.className)}>
-            {c.header}
+            {c.sortable ? (
+              <button
+                type="button"
+                onClick={() => cycleSort(c)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded transition-colors hover:text-primary',
+                  sort?.key === (c.sortKey ?? c.key) && 'text-accent',
+                )}
+              >
+                {c.header}
+                {sort?.key === (c.sortKey ?? c.key) ? (
+                  sort.dir === 'asc' ? (
+                    <ArrowUp className="h-3 w-3" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3" />
+                  )
+                ) : (
+                  <ArrowUpDown className="h-3 w-3 opacity-40" />
+                )}
+              </button>
+            ) : (
+              c.header
+            )}
           </th>
         ))}
       </tr>
@@ -53,15 +98,15 @@ export default function DataTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
+      <div className="overflow-x-auto rounded-xl border border-edge">
         <table className={cn('w-full text-left text-sm', minWidth)}>
           {head}
-          <tbody className="divide-y divide-slate-800 bg-slate-950">
+          <tbody className="divide-y divide-edge bg-base">
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i}>
                 {columns.map((c) => (
                   <td key={c.key} className="px-4 py-3">
-                    <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-slate-800" />
+                    <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-elevated" />
                   </td>
                 ))}
               </tr>
@@ -79,10 +124,10 @@ export default function DataTable<T extends { id: string }>({
   const from = total !== undefined && total > 0 ? Math.min((page - 1) * pageSize + 1, total) : 0;
   const to = total !== undefined ? Math.min(page * pageSize, total) : rows.length;
   const navBtn =
-    'flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 text-slate-300 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
+    'flex h-8 w-8 items-center justify-center rounded-lg border border-edge2 text-secondary transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   const footer = paginated && (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-slate-800 bg-slate-900/70 px-3 py-2.5 text-xs text-slate-400">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-edge bg-surface/70 px-3 py-2.5 text-xs text-secondary">
       <span>
         {total !== undefined && total > 0 && rows.length > 0
           ? `Showing ${from}–${to} of ${total}`
@@ -127,7 +172,7 @@ export default function DataTable<T extends { id: string }>({
   if (rows.length === 0) {
     if (!paginated) {
       return (
-        <div className="rounded-xl border border-dashed border-slate-800 p-10 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-muted">
           {emptyMessage}
         </div>
       );
@@ -136,26 +181,26 @@ export default function DataTable<T extends { id: string }>({
     // both nav buttons disabled, and a stale page (rows gone, total > 0)
     // still offers Prev to navigate back.
     return (
-      <div className="rounded-xl border border-slate-800">
-        <div className="p-10 text-center text-sm text-slate-500">{emptyMessage}</div>
+      <div className="rounded-xl border border-edge">
+        <div className="p-10 text-center text-sm text-muted">{emptyMessage}</div>
         {footer}
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-800">
+    <div className="rounded-xl border border-edge">
       <div className="overflow-x-auto">
         <table className={cn('w-full text-left text-sm', minWidth)}>
           {head}
-          <tbody className="divide-y divide-slate-800 bg-slate-950">
+          <tbody className="divide-y divide-edge bg-base">
             {rows.map((row, i) => (
               <tr
                 key={row.id}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(
                   'animate-list-in transition-colors',
-                  onRowClick && 'cursor-pointer hover:bg-slate-900',
+                  onRowClick && 'cursor-pointer hover:bg-surface',
                 )}
                 style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
               >

@@ -121,13 +121,15 @@ async function apiFetchCount<T>(path: string): Promise<ListResult<T>> {
   return { items: (await res.json()) as T[], total };
 }
 
-export const listAssets = (params?: { search?: string; category?: string; status?: string; limit?: number; offset?: number }) => {
+export const listAssets = (params?: { search?: string; category?: string; status?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.category) q.set('category', params.category);
   if (params?.status) q.set('status', params.status);
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
+  if (params?.sort) q.set('sort', params.sort);
+  if (params?.order) q.set('order', params.order);
   const qs = q.toString();
   return apiFetchCount<Asset>(`/assets${qs ? `?${qs}` : ''}`);
 };
@@ -137,13 +139,15 @@ export const assignAsset = (assetId: string, userId: string | null) =>
   apiFetch<Asset>(`/assets/${assetId}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to_user_id: userId }) });
 
 // ---- tickets ----
-export const listTickets = (params?: { status?: string; priority?: string; type?: string; limit?: number; offset?: number }) => {
+export const listTickets = (params?: { status?: string; priority?: string; type?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.priority) q.set('priority', params.priority);
   if (params?.type) q.set('type', params.type);
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
+  if (params?.sort) q.set('sort', params.sort);
+  if (params?.order) q.set('order', params.order);
   const qs = q.toString();
   return apiFetchCount<Ticket>(`/tickets${qs ? `?${qs}` : ''}`);
 };
@@ -157,13 +161,15 @@ export const getTopology = () => apiFetch<Topology>('/cmdb/topology');
 export const getImpact = (assetId: string) => apiFetch<ImpactResult>(`/cmdb/impact/${assetId}`);
 
 // ---- users master ----
-export const listUsers = (params?: { search?: string; role?: string; department?: string; limit?: number; offset?: number }) => {
+export const listUsers = (params?: { search?: string; role?: string; department?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.role) q.set('role', params.role);
   if (params?.department) q.set('department', params.department);
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
+  if (params?.sort) q.set('sort', params.sort);
+  if (params?.order) q.set('order', params.order);
   const qs = q.toString();
   return apiFetchCount<UserRecord>(`/users${qs ? `?${qs}` : ''}`);
 };
