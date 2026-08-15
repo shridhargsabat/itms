@@ -1,3 +1,4 @@
+import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -7,7 +8,8 @@ import ScrollX from '@/components/ScrollX';
 export interface Column<T> {
   key: string;
   header: string;
-  render?: (row: T) => ReactNode;
+  /** meta.expanded tells the cell whether its row is expanded (for chevrons). */
+  render?: (row: T, meta?: { expanded: boolean }) => ReactNode;
   className?: string;
   /** Renders a clickable sort header; server sorts by sortKey (defaults to key). */
   sortable?: boolean;
@@ -36,6 +38,8 @@ interface DataTableProps<T> {
   /** Server-side sorting — rendered on sortable columns when provided. */
   sort?: SortState | null;
   onSortChange?: (sort: SortState | null) => void;
+  /** Optional accordion row rendered under a row when clicked (toggles per row). */
+  renderExpanded?: (row: T) => ReactNode;
 }
 
 export default function DataTable<T extends { id: string }>({
@@ -52,7 +56,9 @@ export default function DataTable<T extends { id: string }>({
   onPageSizeChange,
   sort,
   onSortChange,
+  renderExpanded,
 }: DataTableProps<T>) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const cycleSort = (c: Column<T>) => {
     if (!onSortChange) return;
     const key = c.sortKey ?? c.key;
@@ -195,23 +201,44 @@ export default function DataTable<T extends { id: string }>({
         <table className={cn('w-full text-left text-sm', minWidth)}>
           {head}
           <tbody className="divide-y divide-edge bg-base">
-            {rows.map((row, i) => (
-              <tr
-                key={row.id}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={cn(
-                  'animate-list-in transition-colors',
-                  onRowClick && 'cursor-pointer hover:bg-surface',
-                )}
-                style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
-              >
-                {columns.map((c) => (
-                  <td key={c.key} className={cn('px-4 py-3', c.className)}>
-                    {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? '')}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((row, i) => {
+              const expanded = expandedId === row.id;
+              const clickable = onRowClick !== undefined || renderExpanded !== undefined;
+              return (
+                <Fragment key={row.id}>
+                  <tr
+                    onClick={
+                      renderExpanded
+                        ? () => setExpandedId(expanded ? null : row.id)
+                        : onRowClick
+                          ? () => onRowClick(row)
+                          : undefined
+                    }
+                    aria-expanded={renderExpanded ? expanded : undefined}
+                    className={cn(
+                      'animate-list-in transition-colors',
+                      clickable && 'cursor-pointer hover:bg-surface',
+                    )}
+                    style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
+                  >
+                    {columns.map((c) => (
+                      <td key={c.key} className={cn('px-4 py-3', c.className)}>
+                        {c.render
+                          ? c.render(row, { expanded })
+                          : String((row as Record<string, unknown>)[c.key] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                  {expanded && renderExpanded && (
+                    <tr className="bg-surface/60">
+                      <td colSpan={columns.length} className="px-4 py-3">
+                        {renderExpanded(row)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </ScrollX>

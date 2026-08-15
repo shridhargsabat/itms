@@ -115,7 +115,13 @@ export const me = () => apiFetch<AuthUser>('/auth/me');
 
 // ---- dashboard ----
 export const getDashboardMetrics = () => apiFetch<DashboardMetrics>('/dashboard/metrics');
-export const getAuditLog = (limit = 50) => apiFetch<AuditLogEntry[]>(`/audit/log?limit=${limit}`);
+export const getAuditLog = (params?: { limit?: number; offset?: number }) => {
+  const q = new URLSearchParams();
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return apiFetchCount<AuditLogEntry>(`/audit/log${qs ? `?${qs}` : ''}`);
+};
 
 // ---- assets ----
 export interface ListResult<T> {

@@ -351,7 +351,7 @@ export default function Dashboard() {
   const metrics = useQuery({ queryKey: ['metrics'], queryFn: getDashboardMetrics });
   const audit = useQuery({
     queryKey: ['audit'],
-    queryFn: () => getAuditLog(10),
+    queryFn: () => getAuditLog({ limit: 10 }),
     refetchInterval: paused ? false : 30_000,
   });
 
@@ -457,7 +457,7 @@ export default function Dashboard() {
                 <div className="h-3 w-32 animate-pulse rounded bg-elevated" />
               </div>
             ))}
-          {(audit.data ?? []).map((e, i) => (
+          {(audit.data?.items ?? []).map((e, i) => (
             <div
               key={e.id}
               className="animate-list-in flex flex-col gap-1 px-5 py-3 text-sm sm:flex-row sm:items-center sm:gap-3"
@@ -488,7 +488,7 @@ export default function Dashboard() {
               </div>
             </div>
           ))}
-          {!audit.isLoading && (audit.data ?? []).length === 0 && (
+          {!audit.isLoading && (audit.data?.items ?? []).length === 0 && (
             <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
               <Activity className="h-8 w-8 text-muted" />
               <p className="text-sm text-muted">No audit entries yet.</p>
