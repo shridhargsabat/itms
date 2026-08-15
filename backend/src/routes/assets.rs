@@ -618,7 +618,17 @@ async fn export_assets(
         if any {
             qb.push(" AND ");
         }
-        qb.push("a.id = ANY(").push_bind(ids).push(")");
+        // NOTE: QueryBuilder::push_bind INLINES values into the SQL text —
+        // a Vec<Uuid> would become an unquoted `{...}` array literal
+        // ("trailing junk after numeric literal"). Bind each id separately.
+        qb.push("a.id IN (");
+        for (i, id) in ids.iter().enumerate() {
+            if i > 0 {
+                qb.push(", ");
+            }
+            qb.push_bind(*id);
+        }
+        qb.push(")");
     }
     qb.push(" ORDER BY ")
         .push(asset_sort(params.sort.as_deref().unwrap_or("created_at")));
