@@ -13,6 +13,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ScrollText,
+  ShieldCheck,
   Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ import { usePwaInstallable } from '@/lib/pwa';
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/assets', label: 'Assets', icon: Boxes },
+  { to: '/warranty', label: 'Warranty', icon: ShieldCheck },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/cmdb', label: 'CMDB', icon: Network },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },

@@ -9,6 +9,7 @@ import {
   PackageCheck,
   Play,
   Plus,
+  ShieldCheck,
   Ticket,
   TriangleAlert,
   X,
@@ -32,6 +33,7 @@ const METRIC_CARDS: {
   { label: 'Open Tickets', key: 'open_tickets', icon: Ticket, accent: 'bg-blue-500/10 text-blue-400', to: '/tickets?status=OPEN' },
   { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
   { label: 'In Stock', key: 'in_stock_count', icon: PackageCheck, accent: 'bg-emerald-500/10 text-emerald-400', to: '/assets?status=IN_STOCK' },
+  { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-400', to: '/warranty' },
 ];
 
 function CountUp({ value }: { value: number }) {

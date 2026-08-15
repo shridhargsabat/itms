@@ -90,6 +90,7 @@ export interface DashboardMetrics {
   open_tickets: number;
   high_priority_count: number;
   in_stock_count: number;
+  warranty_alerts_count: number;
 }
 
 export interface Asset {
@@ -104,7 +105,42 @@ export interface Asset {
   specs: Record<string, unknown>;
   purchase_date: string | null;
   warranty_expiry: string | null;
+  unit_cost: number | null;
+  expected_eol: string | null;
   created_at: string;
+  updated_at: string;
+  current_value?: number | null;
+}
+
+export interface LifecycleEvent {
+  id: string;
+  asset_id: string;
+  from_status: AssetStatus | null;
+  to_status: AssetStatus;
+  actor_id: string | null;
+  actor_name: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface WarrantyAlert {
+  id: string;
+  asset_tag: string;
+  name: string;
+  status: AssetStatus;
+  warranty_expiry: string | null;
+  days_left: number | null;
+}
+
+export interface UpdateAssetInput {
+  name?: string;
+  category?: string;
+  serial_number?: string;
+  status?: string;
+  purchase_date?: string | null;
+  warranty_expiry?: string | null;
+  unit_cost?: number | null;
+  expected_eol?: string | null;
 }
 
 export interface Ticket {

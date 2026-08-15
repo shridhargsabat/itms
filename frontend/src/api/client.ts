@@ -7,14 +7,17 @@ import type {
   CreateUserInput,
   DashboardMetrics,
   ImpactResult,
+  LifecycleEvent,
   LoginResponse,
   LookupOption,
   MasterFamily,
   MastersMap,
   Ticket,
   Topology,
+  UpdateAssetInput,
   UpdateUserInput,
   UserRecord,
+  WarrantyAlert,
 } from '@/api/types';
 
 const TOKEN_KEY = 'itms_token';
@@ -159,6 +162,11 @@ export const createAsset = (input: CreateAssetInput) =>
   apiFetch<Asset>('/assets', { method: 'POST', body: JSON.stringify(input) });
 export const assignAsset = (assetId: string, userId: string | null) =>
   apiFetch<Asset>(`/assets/${assetId}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to_user_id: userId }) });
+export const updateAsset = (assetId: string, input: UpdateAssetInput) =>
+  apiFetch<Asset>(`/assets/${assetId}`, { method: 'PATCH', body: JSON.stringify(input) });
+export const getAssetLifecycle = (assetId: string) =>
+  apiFetch<LifecycleEvent[]>(`/assets/${assetId}/lifecycle`);
+export const getWarrantyAlerts = () => apiFetch<WarrantyAlert[]>('/assets/alerts');
 
 // ---- bulk asset actions ----
 export interface BulkResult {

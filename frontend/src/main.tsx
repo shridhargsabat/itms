@@ -16,6 +16,7 @@ const AuditLog = lazy(() => import('@/views/AuditLog'));
 const Masters = lazy(() => import('@/views/Masters'));
 const Offline = lazy(() => import('@/views/Offline'));
 const Login = lazy(() => import('@/views/Login'));
+const WarrantyView = lazy(() => import('@/views/Warranty'));
 import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
 import { ApiError, clearSession, getCachedUser, getToken, me } from '@/api/client';
 
@@ -90,6 +91,7 @@ createRoot(document.getElementById('root')!).render(
               >
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/assets" element={<Assets />} />
+                <Route path="/warranty" element={<WarrantyView />} />
                 <Route path="/tickets" element={<Tickets />} />
                 <Route path="/cmdb" element={<CMDB />} />
                 <Route path="/audit" element={<AuditLog />} />
