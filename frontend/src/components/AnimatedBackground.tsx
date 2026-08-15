@@ -5,7 +5,7 @@
  */
 export default function AnimatedBackground() {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden bg-base">
+    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden bg-transparent">
       {/* aurora blobs */}
       <div className="absolute inset-0">
         <div className="animate-aurora absolute -left-32 -top-40 h-[480px] w-[480px] rounded-full bg-accent/25 blur-[110px]" />

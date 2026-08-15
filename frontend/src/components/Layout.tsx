@@ -236,7 +236,7 @@ export default function Layout() {
 
       <main
         className={cn(
-          'min-h-screen transition-all duration-300',
+          'relative z-[1] min-h-screen transition-all duration-300',
           'ml-0 pb-24 lg:pb-8', // pb clears the mobile bottom nav (56px + safe area)
           collapsed ? 'lg:ml-16' : 'lg:ml-60',
         )}
