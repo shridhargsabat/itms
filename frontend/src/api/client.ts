@@ -2,8 +2,10 @@ import type {
   Asset,
   AuditLogEntry,
   AuthUser,
+  CatalogItem,
   CreateAssetInput,
   CreateOnboardingInput,
+  CreateRequestInput,
   CreateTicketInput,
   CreateTaskInput,
   CreateUserInput,
@@ -15,6 +17,7 @@ import type {
   OnboardingDetail,
   OnboardingEvent,
   OnboardingTask,
+  ServiceRequest,
   UpdateTaskInput,
   MasterFamily,
   MastersMap,
@@ -348,3 +351,36 @@ export const updateOnboardingTask = (taskId: string, input: UpdateTaskInput) =>
 
 export const deleteOnboardingTask = (taskId: string) =>
   apiFetch<void>(`/onboarding/tasks/${taskId}`, { method: 'DELETE' });
+
+// ── Service catalog + requests (P0-3) ───────────────────────────────────────
+
+export const getCatalog = () => apiFetch<CatalogItem[]>('/requests/catalog');
+
+export const getRequests = (params?: {
+  mine?: boolean;
+  pending?: boolean;
+  status?: string;
+  assignee?: string;
+  search?: string;
+}) => {
+  const q = new URLSearchParams();
+  if (params?.mine) q.set('mine', 'true');
+  if (params?.pending) q.set('pending', 'true');
+  if (params?.status) q.set('status', params.status);
+  if (params?.assignee) q.set('assignee', params.assignee);
+  if (params?.search) q.set('search', params.search);
+  const qs = q.toString();
+  return apiFetch<ServiceRequest[]>(`/requests${qs ? `?${qs}` : ''}`);
+};
+
+export const createRequest = (input: CreateRequestInput) =>
+  apiFetch<ServiceRequest>('/requests', { method: 'POST', body: JSON.stringify(input) });
+
+export const updateRequest = (id: string, input: { status?: string; priority?: string; subject?: string }) =>
+  apiFetch<ServiceRequest>(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+
+export const approveRequest = (id: string) =>
+  apiFetch<ServiceRequest>(`/requests/${id}/approve`, { method: 'POST' });
+
+export const rejectRequest = (id: string) =>
+  apiFetch<ServiceRequest>(`/requests/${id}/reject`, { method: 'POST' });

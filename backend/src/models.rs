@@ -118,6 +118,8 @@ pub struct DashboardMetrics {
     pub warranty_alerts_count: i64,
     /// Open onboarding/offboarding events with at least one overdue task.
     pub onboarding_overdue: i64,
+    /// Open service requests (SUBMITTED/APPROVED/IN_PROGRESS).
+    pub open_requests: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -344,4 +346,96 @@ pub struct UpdateTaskRequest {
     #[serde(default, deserialize_with = "double_option")]
     pub note: Option<Option<String>>,
     pub status: Option<String>,
+}
+
+// ── Service catalog + requests (P0-3, issue #51) ────────────────────────────
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct CatalogItem {
+    pub id: Uuid,
+    pub code: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub category: String,
+    pub approval_required: bool,
+    pub form_fields: Value,
+    pub active: bool,
+    pub sort_order: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct ServiceRequest {
+    pub id: Uuid,
+    pub request_number: String,
+    pub catalog_item_id: Uuid,
+    pub requester_id: Uuid,
+    pub subject: String,
+    pub details: Value,
+    pub priority: String,
+    pub status: String,
+    pub assignee_id: Option<Uuid>,
+    pub approved_by: Option<Uuid>,
+    pub approved_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    /// joined display fields (list queries only)
+    #[sqlx(default)]
+    pub requester_name: Option<String>,
+    #[sqlx(default)]
+    pub assignee_name: Option<String>,
+    #[sqlx(default)]
+    pub catalog_name: Option<String>,
+    #[sqlx(default)]
+    pub catalog_code: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateCatalogRequest {
+    pub code: String,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub approval_required: bool,
+    #[serde(default)]
+    pub form_fields: Value,
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default)]
+    pub sort_order: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateCatalogRequest {
+    pub name: Option<String>,
+    pub description: Option<Option<String>>,
+    pub category: Option<String>,
+    pub approval_required: Option<bool>,
+    pub form_fields: Option<Value>,
+    pub active: Option<bool>,
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateRequestInput {
+    pub catalog_item_id: Uuid,
+    pub subject: String,
+    pub details: Option<Value>,
+    #[serde(default = "default_priority")]
+    pub priority: String,
+}
+
+fn default_priority() -> String {
+    "MEDIUM".to_string()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateRequestInput {
+    pub status: Option<String>,
+    pub assignee_id: Option<Option<Uuid>>,
+    pub priority: Option<String>,
+    pub subject: Option<String>,
 }
