@@ -153,6 +153,75 @@ export const createAsset = (input: CreateAssetInput) =>
 export const assignAsset = (assetId: string, userId: string | null) =>
   apiFetch<Asset>(`/assets/${assetId}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to_user_id: userId }) });
 
+// ---- CSV import / export ----
+export interface ImportFailure {
+  row: number;
+  error: string;
+  data: Record<string, string>;
+}
+
+export interface ImportResult {
+  imported: number;
+  failed: ImportFailure[];
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** POST raw CSV text; backend validates per row and returns partial success. */
+export const importAssetsCsv = (csvText: string) =>
+  apiFetch<ImportResult>('/assets/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/csv' },
+    body: csvText,
+  });
+
+/** Download the filtered asset registry as assets.csv (mirrors listAssets filters). */
+export const exportAssetsCsv = async (params?: {
+  search?: string;
+  category?: string;
+  status?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
+}) => {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.category) q.set('category', params.category);
+  if (params?.status) q.set('status', params.status);
+  if (params?.sort) q.set('sort', params.sort);
+  if (params?.order) q.set('order', params.order);
+  const qs = q.toString();
+  const res = await apiFetchRaw(`/assets/export${qs ? `?${qs}` : ''}`);
+  downloadBlob(await res.blob(), 'assets.csv');
+};
+
+/** Download the filtered ticket list as tickets.csv (mirrors listTickets filters). */
+export const exportTicketsCsv = async (params?: {
+  status?: string;
+  priority?: string;
+  type?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
+}) => {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.priority) q.set('priority', params.priority);
+  if (params?.type) q.set('type', params.type);
+  if (params?.sort) q.set('sort', params.sort);
+  if (params?.order) q.set('order', params.order);
+  const qs = q.toString();
+  const res = await apiFetchRaw(`/tickets/export${qs ? `?${qs}` : ''}`);
+  downloadBlob(await res.blob(), 'tickets.csv');
+};
+
 // ---- tickets ----
 export const listTickets = (params?: { status?: string; priority?: string; type?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
   const q = new URLSearchParams();

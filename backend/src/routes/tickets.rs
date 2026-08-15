@@ -1,5 +1,5 @@
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
 use axum::routing::{get, patch};
 use axum::{Json, Router};
 use serde::Deserialize;
@@ -26,6 +26,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_tickets).post(create_ticket))
         .route("/{id}/status", patch(update_ticket_status))
+        .route("/export", get(export_tickets))
 }
 
 #[derive(Debug, Deserialize)]
@@ -261,5 +262,105 @@ async fn insert_ticket_with_number_retry(
     Err(AppError::new(
         StatusCode::INTERNAL_SERVER_ERROR,
         "could not allocate a unique ticket number",
+    ))
+}
+
+fn csv_err(e: csv::Error) -> AppError {
+    AppError::new(StatusCode::BAD_REQUEST, format!("csv error: {e}"))
+}
+
+/// GET /api/v1/tickets/export?status=&priority=&type= — CSV download of the
+/// filtered ticket list (mirrors list_tickets filters; capped at 10k rows).
+async fn export_tickets(
+    State(state): State<AppState>,
+    Query(params): Query<TicketListParams>,
+) -> Result<impl axum::response::IntoResponse, AppError> {
+    let mut qb = QueryBuilder::new(TICKET_SELECT);
+    qb.push(" WHERE ");
+    let mut any = false;
+    if let Some(status) = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        any = true;
+        qb.push("t.status = ").push_bind(status);
+    }
+    if let Some(priority) = params.priority.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if any {
+            qb.push(" AND ");
+        }
+        qb.push("t.priority = ").push_bind(priority);
+        any = true;
+    }
+    if let Some(ticket_type) = params
+        .ticket_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if any {
+            qb.push(" AND ");
+        }
+        qb.push("t.ticket_type = ").push_bind(ticket_type);
+        any = true;
+    }
+    if !any {
+        qb.push("1 = 1");
+    }
+    qb.push(" ORDER BY ")
+        .push(ticket_sort(params.sort.as_deref().unwrap_or("created_at")));
+    if params.order.as_deref() == Some("asc") {
+        qb.push(" ASC");
+    } else {
+        qb.push(" DESC");
+    }
+    qb.push(", t.created_at DESC");
+    qb.push(" LIMIT 10000");
+
+    let tickets = qb.build_query_as::<Ticket>().fetch_all(&state.pool).await?;
+
+    let mut wtr = csv::Writer::from_writer(Vec::new());
+    wtr.write_record([
+        "ticket_number",
+        "title",
+        "description",
+        "ticket_type",
+        "priority",
+        "status",
+        "requester",
+        "assignee",
+        "asset_tag",
+        "asset_name",
+        "created_at",
+        "updated_at",
+    ])
+    .map_err(csv_err)?;
+    for t in &tickets {
+        wtr.write_record(vec![
+            t.ticket_number.clone(),
+            t.title.clone(),
+            t.description.clone(),
+            t.ticket_type.clone(),
+            t.priority.clone(),
+            t.status.clone(),
+            t.requester_name.clone().unwrap_or_default(),
+            t.assignee_name.clone().unwrap_or_default(),
+            t.asset_tag.clone().unwrap_or_default(),
+            t.asset_name.clone().unwrap_or_default(),
+            t.created_at.to_rfc3339(),
+            t.updated_at.to_rfc3339(),
+        ])
+        .map_err(csv_err)?;
+    }
+    let body = wtr
+        .into_inner()
+        .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, format!("csv write error: {}", e.into_error())))?;
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"tickets.csv\"",
+            ),
+        ],
+        body,
     ))
 }
