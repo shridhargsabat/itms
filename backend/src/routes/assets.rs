@@ -357,18 +357,37 @@ async fn update_asset(
     // (Some(None)) = clear the field. COALESCE cannot express "clear", so the
     // SET list is built from what the request actually contains; binds follow
     // placeholder order ($1..$n for SET, then WHERE id = $n+1).
+    // Two flavors: `col` for plain Option fields, `colopt` for Option<Option>
+    // (where Some(None) = explicit clear → SET NULL, None = absent → skip).
     let mut q = String::from("UPDATE assets SET ");
     let mut n: usize = 1;
     let mut first = true;
     macro_rules! col {
         ($sql:expr, $v:expr) => {{
-            if !first {
-                q.push_str(", ");
+            let v = $v;
+            if v.is_some() {
+                if !first {
+                    q.push_str(", ");
+                }
+                first = false;
+                q.push_str(&format!("{} = ${}", $sql, n));
+                n += 1;
             }
-            first = false;
-            q.push_str(&format!("{} = ${}", $sql, n));
-            n += 1;
-            $v
+            v
+        }};
+    }
+    macro_rules! colopt {
+        ($sql:expr, $v:expr) => {{
+            let v = $v;
+            if v.is_some() {
+                if !first {
+                    q.push_str(", ");
+                }
+                first = false;
+                q.push_str(&format!("{} = ${}", $sql, n));
+                n += 1;
+            }
+            v.flatten()
         }};
     }
     let name_b = col!("name", body.name);
@@ -376,10 +395,10 @@ async fn update_asset(
     let serial_b = col!("serial_number", body.serial_number);
     let status_b = col!("status", new_status.clone());
     let specs_b = col!("specs", body.specs);
-    let purchase_b = col!("purchase_date", body.purchase_date.flatten());
-    let warranty_b = col!("warranty_expiry", body.warranty_expiry.flatten());
-    let cost_b = col!("unit_cost", body.unit_cost.flatten());
-    let eol_b = col!("expected_eol", body.expected_eol.flatten());
+    let purchase_b = colopt!("purchase_date", body.purchase_date);
+    let warranty_b = colopt!("warranty_expiry", body.warranty_expiry);
+    let cost_b = colopt!("unit_cost", body.unit_cost);
+    let eol_b = colopt!("expected_eol", body.expected_eol);
     q.push_str(", updated_at = NOW()");
     q.push_str(&format!(" WHERE id = ${n} {ASSET_RETURNING}"));
 
