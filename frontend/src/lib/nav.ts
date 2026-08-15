@@ -29,11 +29,11 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/assets', label: 'Assets', icon: Boxes },
+  { to: '/tickets', label: 'Tickets', icon: Ticket },
+  { to: '/licenses', label: 'Licenses', icon: BadgeCheck, admin: true },
   { to: '/warranty', label: 'Warranty', icon: ShieldCheck },
   { to: '/onboarding', label: 'Join/Leave', icon: UserRoundCheck },
   { to: '/requests', label: 'Requests', icon: ClipboardList },
-  { to: '/tickets', label: 'Tickets', icon: Ticket },
-  { to: '/licenses', label: 'Licenses', icon: BadgeCheck, admin: true },
   { to: '/cmdb', label: 'CMDB', icon: Network },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/masters', label: 'Masters', icon: Database, admin: true },
