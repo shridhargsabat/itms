@@ -16,6 +16,22 @@ pub fn router() -> Router<AppState> {
 pub struct AuditLogParams {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+/// Whitelisted ORDER BY columns (never interpolate user input directly).
+/// `actor_name` maps to the joined users table; unknown columns fall back to
+/// the default so a bad `sort` value can never 500 or inject SQL.
+fn audit_sort(col: &str) -> &'static str {
+    match col {
+        "created_at" => "al.created_at",
+        "actor_name" => "u.name",
+        "action" => "al.action",
+        "target_type" => "al.target_type",
+        "target_id" => "al.target_id",
+        _ => "al.created_at",
+    }
 }
 
 /// GET /api/v1/audit/log?limit=20&offset=40 — most recent audit entries, newest
@@ -32,18 +48,28 @@ async fn audit_log(
         .fetch_one(&state.pool)
         .await?;
 
-    let entries = sqlx::query_as::<_, AuditLogEntry>(
+    // Only whitelisted fragments are interpolated (audit_sort / validated
+    // direction) — user input can never reach the SQL string directly.
+    let order_sql = if params.order.as_deref() == Some("asc") {
+        "ASC"
+    } else {
+        "DESC"
+    };
+    let sort_sql = audit_sort(params.sort.as_deref().unwrap_or("created_at"));
+    let sql = format!(
         "SELECT al.id, al.actor_id, al.action, al.target_type, al.target_id, al.diff, \
                 al.created_at, u.name AS actor_name \
          FROM audit_logs al \
          LEFT JOIN users u ON u.id = al.actor_id \
-         ORDER BY al.created_at DESC \
-         LIMIT $1 OFFSET $2",
-    )
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&state.pool)
-    .await?;
+         ORDER BY {sort_sql} {order_sql} \
+         LIMIT $1 OFFSET $2"
+    );
+
+    let entries = sqlx::query_as::<_, AuditLogEntry>(&sql)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&state.pool)
+        .await?;
 
     Ok(([("x-total-count", total.to_string())], Json(entries)))
 }
