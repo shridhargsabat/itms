@@ -33,7 +33,10 @@ async fn metrics(
                 WHERE e.status = 'OPEN' AND t.status = 'PENDING'
                   AND t.due_date IS NOT NULL AND t.due_date < CURRENT_DATE)                     AS onboarding_overdue,
             (SELECT COUNT(*) FROM service_requests
-                WHERE status IN ('SUBMITTED', 'APPROVED', 'IN_PROGRESS'))                       AS open_requests
+                WHERE status IN ('SUBMITTED', 'APPROVED', 'IN_PROGRESS'))                       AS open_requests,
+            (SELECT COUNT(*) FROM licenses
+                WHERE active = TRUE AND expiry_date IS NOT NULL
+                  AND expiry_date <= CURRENT_DATE + 90)                                         AS license_alerts
         "#,
     )
     .fetch_one(&state.pool)

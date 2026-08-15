@@ -4,6 +4,7 @@ import type {
   AuthUser,
   CatalogItem,
   CreateAssetInput,
+  CreateLicenseInput,
   CreateOnboardingInput,
   CreateRequestInput,
   CreateTicketInput,
@@ -11,6 +12,9 @@ import type {
   CreateUserInput,
   DashboardMetrics,
   ImpactResult,
+  License,
+  LicenseAlerts,
+  LicenseAllocation,
   LifecycleEvent,
   LoginResponse,
   LookupOption,
@@ -384,3 +388,35 @@ export const approveRequest = (id: string) =>
 
 export const rejectRequest = (id: string) =>
   apiFetch<ServiceRequest>(`/requests/${id}/reject`, { method: 'POST' });
+
+// ── License register (P0-2) ─────────────────────────────────────────────────
+
+export const getLicenses = (params?: { search?: string; scope?: string; limit?: number }) => {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.scope) q.set('scope', params.scope);
+  if (params?.limit) q.set('limit', String(params.limit));
+  const qs = q.toString();
+  return apiFetch<License[]>(`/licenses${qs ? `?${qs}` : ''}`);
+};
+
+export const getLicenseAlerts = (scope?: 'all' | 'expired' | 'expiring') =>
+  apiFetch<LicenseAlerts>(`/licenses/alerts${scope && scope !== 'all' ? `?scope=${scope}` : ''}`);
+
+export const getLicenseDetail = (id: string) =>
+  apiFetch<{ license: License; allocations: LicenseAllocation[] }>(`/licenses/${id}`);
+
+export const createLicense = (input: CreateLicenseInput) =>
+  apiFetch<License>('/licenses', { method: 'POST', body: JSON.stringify(input) });
+
+export const updateLicense = (id: string, input: Partial<CreateLicenseInput & { active?: boolean }>) =>
+  apiFetch<License>(`/licenses/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+
+export const deleteLicense = (id: string) =>
+  apiFetch<void>(`/licenses/${id}`, { method: 'DELETE' });
+
+export const assignSeat = (id: string, userId: string) =>
+  apiFetch<LicenseAllocation>(`/licenses/${id}/assign`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+
+export const revokeSeat = (id: string, userId: string) =>
+  apiFetch<LicenseAllocation>(`/licenses/${id}/revoke`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });

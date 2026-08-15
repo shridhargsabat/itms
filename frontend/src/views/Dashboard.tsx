@@ -9,6 +9,7 @@ import {
   PackageCheck,
   Play,
   Plus,
+  BadgeCheck,
   ClipboardList,
   ShieldCheck,
   Ticket,
@@ -24,13 +25,16 @@ import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 
-const METRIC_CARDS: {
+type MetricCard = {
   label: string;
   key: keyof DashboardMetrics;
   icon: LucideIcon;
   accent: string;
   to: string;
-}[] = [
+  admin?: boolean;
+};
+
+const METRIC_CARDS: MetricCard[] = [
   { label: 'Total Assets', key: 'asset_count', icon: Boxes, accent: 'bg-accent/10 text-accent', to: '/assets' },
   { label: 'Open Tickets', key: 'open_tickets', icon: Ticket, accent: 'bg-blue-500/10 text-blue-400', to: '/tickets?status=OPEN' },
   { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
@@ -38,6 +42,7 @@ const METRIC_CARDS: {
   { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-400', to: '/warranty' },
   { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-400', to: '/onboarding' },
   { label: 'Open Requests', key: 'open_requests', icon: ClipboardList, accent: 'bg-blue-500/10 text-blue-400', to: '/requests' },
+  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-400', to: '/licenses', admin: true },
 ];
 
 function CountUp({ value }: { value: number }) {
@@ -404,7 +409,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {METRIC_CARDS.map(({ label, key, icon: Icon, accent, to }, i) => (
+        {METRIC_CARDS.filter((c) => !c.admin || isAdmin).map(({ label, key, icon: Icon, accent, to }, i) => (
           <Link
             key={key}
             to={to}

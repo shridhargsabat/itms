@@ -93,6 +93,7 @@ export interface DashboardMetrics {
   warranty_alerts_count: number;
   onboarding_overdue: number;
   open_requests: number;
+  license_alerts: number;
 }
 
 export interface Asset {
@@ -350,4 +351,56 @@ export interface CreateRequestInput {
   subject: string;
   details?: Record<string, unknown>;
   priority?: RequestPriority;
+}
+
+// ── License register (P0-2, issue #38) ──────────────────────────────────────
+
+export type LicenseType = 'SUBSCRIPTION' | 'PERPETUAL' | 'OPEN_SOURCE';
+
+export interface License {
+  id: string;
+  name: string;
+  vendor: string | null;
+  license_type: LicenseType;
+  seats_total: number;
+  seats_used: number;
+  cost_per_seat: number | null;
+  cost_total: number | null;
+  currency: string;
+  expiry_date: string | null;
+  renewal_cost: number | null;
+  notes: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LicenseAllocation {
+  id: string;
+  license_id: string;
+  user_id: string;
+  assigned_at: string;
+  revoked_at: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+}
+
+export interface LicenseAlerts {
+  expired: License[];
+  expiring_30: License[];
+  expiring_60: License[];
+  expiring_90: License[];
+}
+
+export interface CreateLicenseInput {
+  name: string;
+  vendor?: string | null;
+  license_type?: LicenseType;
+  seats_total?: number;
+  cost_per_seat?: number | null;
+  cost_total?: number | null;
+  currency?: string;
+  expiry_date?: string | null;
+  renewal_cost?: number | null;
+  notes?: string | null;
 }

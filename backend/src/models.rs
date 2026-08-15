@@ -120,6 +120,8 @@ pub struct DashboardMetrics {
     pub onboarding_overdue: i64,
     /// Open service requests (SUBMITTED/APPROVED/IN_PROGRESS).
     pub open_requests: i64,
+    /// Active licenses expiring within 90 days or already expired.
+    pub license_alerts: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -438,4 +440,87 @@ pub struct UpdateRequestInput {
     pub assignee_id: Option<Option<Uuid>>,
     pub priority: Option<String>,
     pub subject: Option<String>,
+}
+
+// ── License register (P0-2, issue #38) ──────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct License {
+    pub id: Uuid,
+    pub name: String,
+    pub vendor: Option<String>,
+    pub license_type: String,
+    pub seats_total: i32,
+    pub seats_used: i64,
+    pub cost_per_seat: Option<f64>,
+    pub cost_total: Option<f64>,
+    pub currency: String,
+    pub expiry_date: Option<NaiveDate>,
+    pub renewal_cost: Option<f64>,
+    pub notes: Option<String>,
+    pub active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct LicenseAllocation {
+    pub id: Uuid,
+    pub license_id: Uuid,
+    pub user_id: Uuid,
+    pub assigned_at: DateTime<Utc>,
+    pub revoked_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub user_name: Option<String>,
+    #[sqlx(default)]
+    pub user_email: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateLicenseRequest {
+    pub name: String,
+    pub vendor: Option<String>,
+    #[serde(default = "default_license_type")]
+    pub license_type: String,
+    #[serde(default = "default_one")]
+    pub seats_total: i32,
+    pub cost_per_seat: Option<f64>,
+    pub cost_total: Option<f64>,
+    #[serde(default)]
+    pub currency: String,
+    pub expiry_date: Option<NaiveDate>,
+    pub renewal_cost: Option<f64>,
+    pub notes: Option<String>,
+}
+
+fn default_one() -> i32 { 1 }
+
+fn default_license_type() -> String {
+    "SUBSCRIPTION".to_string()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateLicenseRequest {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub vendor: Option<Option<String>>,
+    pub license_type: Option<String>,
+    pub seats_total: Option<i32>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub cost_per_seat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub cost_total: Option<Option<f64>>,
+    pub currency: Option<String>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub expiry_date: Option<Option<NaiveDate>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub renewal_cost: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
+    pub active: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AssignSeatRequest {
+    pub user_id: Uuid,
 }
