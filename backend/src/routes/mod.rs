@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod comments;
 pub mod audit;
 pub mod auth;
 pub mod cmdb;
@@ -28,7 +29,9 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .route("/auth/me", get(auth::me))
         .nest("/dashboard", dashboard::router())
         .nest("/assets", assets::router())
+        .nest("/tickets", comments::router())
         .nest("/tickets", tickets::router())
+        .route("/attachments/{attachment_id}/download", get(comments::download_attachment))
         .nest("/cmdb", cmdb::router())
         .nest("/audit", audit::router())
         // Users + masters: reads open to all authenticated users, mutations
