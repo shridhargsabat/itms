@@ -149,10 +149,26 @@ pub struct UpdateAssetRequest {
     pub serial_number: Option<String>,
     pub status: Option<String>,
     pub specs: Option<Value>,
+    #[serde(default, deserialize_with = "double_option")]
     pub purchase_date: Option<Option<NaiveDate>>,
+    #[serde(default, deserialize_with = "double_option")]
     pub warranty_expiry: Option<Option<NaiveDate>>,
+    #[serde(default, deserialize_with = "double_option")]
     pub unit_cost: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "double_option")]
     pub expected_eol: Option<Option<NaiveDate>>,
+}
+
+/// serde does NOT distinguish `"field": null` (→ None, same as absent) in
+/// Option<Option<T>> — JSON null collapses into the outer None, so explicit
+/// "clear this field" becomes indistinguishable from "leave unchanged".
+/// This wrapper forces null → Some(None); absent → None (via #[serde(default)]).
+fn double_option<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    Ok(Some(Option::<T>::deserialize(d)?))
 }
 
 /// Row from asset_lifecycle_events (+ actor name).
