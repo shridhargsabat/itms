@@ -228,7 +228,7 @@ export default function Layout() {
       </aside>
 
       {showIosTip && (
-        <div className="animate-fade-in fixed right-4 top-[calc(3.75rem+env(safe-area-inset-top))] z-[60] max-w-[260px] rounded-lg border border-edge2 bg-elevated px-3 py-2 text-xs text-primary shadow-2xl">
+        <div className="animate-fade-in fixed right-4 top-[calc(2.8125rem+env(safe-area-inset-top))] z-[60] max-w-[260px] rounded-lg border border-edge2 bg-elevated px-3 py-2 text-xs text-primary shadow-2xl">
           Tap <b className="text-white">Share</b> → <b className="text-white">Add to Home Screen</b>{' '}
           to install ITMS like an app
         </div>

@@ -358,7 +358,7 @@ export default function Dashboard() {
       {/* Sticky actions row: the + New Ticket / + Add Asset buttons must stay
           visible while scrolling (phones resumed mid-page reported them as
           'missing' when they were scrolled above the fold). */}
-      <div className="sticky top-[calc(3.75rem+env(safe-area-inset-top))] z-30 flex flex-wrap items-center justify-between gap-3 border-b border-edge/60 bg-base/85 py-2 backdrop-blur-lg lg:top-0">
+      <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 flex flex-wrap items-center justify-between gap-3 border-b border-edge2/70 bg-base/95 py-2 backdrop-blur-lg lg:top-0">
         <div>
           <h1 className="text-xl font-semibold text-primary">Dashboard</h1>
           <p className="mt-0.5 text-sm text-secondary">
