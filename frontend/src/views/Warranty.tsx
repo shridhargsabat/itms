@@ -14,6 +14,9 @@ function bucket(a: WarrantyAlert): 'expired' | '30' | '60' | '90' {
   return '90';
 }
 
+const alertsCount = (expired: WarrantyAlert[], expiring: WarrantyAlert[]) =>
+  expired.length + expiring.length;
+
 const BUCKET_META = {
   expired: { label: 'Expired', icon: PackageX, cls: 'text-red-400', bar: 'bg-red-500/80' },
   '30': { label: 'Expiring ≤ 30 days', icon: AlertTriangle, cls: 'text-red-400', bar: 'bg-red-500/60' },
@@ -23,11 +26,19 @@ const BUCKET_META = {
 
 export default function WarrantyView() {
   const nav = useNavigate();
-  const alerts = useQuery({ queryKey: ['alerts'], queryFn: getWarrantyAlerts });
+  const expired = useQuery({ queryKey: ['alerts', 'expired'], queryFn: () => getWarrantyAlerts('expired') });
+  const expiring = useQuery({ queryKey: ['alerts', 'expiring'], queryFn: () => getWarrantyAlerts('expiring') });
 
-  const data = alerts.data ?? [];
+  const loading = expired.isLoading || expiring.isLoading;
+  const expiredData = expired.data ?? [];
+  const expiringData = expiring.data ?? [];
+  // Expiring bucket is based on days_left; expired list = scope=expired.
   const grouped = (['expired', '30', '60', '90'] as const)
-    .map((k) => ({ key: k, meta: BUCKET_META[k], items: data.filter((a) => bucket(a) === k) }))
+    .map((k) => ({
+      key: k,
+      meta: BUCKET_META[k],
+      items: k === 'expired' ? expiredData : expiringData.filter((a) => bucket(a) === k),
+    }))
     .filter((g) => g.items.length > 0);
 
   return (
@@ -36,7 +47,7 @@ export default function WarrantyView() {
         <div>
           <h1 className="text-xl font-semibold text-primary">Warranty Alerts</h1>
           <p className="mt-0.5 text-sm text-secondary">
-            {data.length} asset{data.length === 1 ? '' : 's'} with a warranty expiring in the next 90 days (or already expired).
+            {expiredData.length + expiringData.length} asset{alertsCount(expiredData, expiringData) === 1 ? '' : 's'} with a warranty expiring in the next 90 days (or already expired).
           </p>
         </div>
         <div className="flex gap-2">
@@ -50,7 +61,7 @@ export default function WarrantyView() {
         </div>
       </div>
 
-      {alerts.isLoading ? (
+      {loading ? (
         <p className="py-10 text-center text-sm text-muted">Loading warranty alerts…</p>
       ) : grouped.length === 0 ? (
         <div className="rounded-xl border border-dashed border-edge py-14 text-center">

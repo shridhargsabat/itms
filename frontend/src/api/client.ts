@@ -166,7 +166,8 @@ export const updateAsset = (assetId: string, input: UpdateAssetInput) =>
   apiFetch<Asset>(`/assets/${assetId}`, { method: 'PATCH', body: JSON.stringify(input) });
 export const getAssetLifecycle = (assetId: string) =>
   apiFetch<LifecycleEvent[]>(`/assets/${assetId}/lifecycle`);
-export const getWarrantyAlerts = () => apiFetch<WarrantyAlert[]>('/assets/alerts');
+export const getWarrantyAlerts = (scope?: 'all' | 'expired' | 'expiring') =>
+  apiFetch<WarrantyAlert[]>(`/assets/alerts${scope ? `?scope=${scope}` : ''}`);
 
 // ---- bulk asset actions ----
 export interface BulkResult {
