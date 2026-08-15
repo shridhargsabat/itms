@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::db::AppState;
 use crate::models::{CreateTicketRequest, Ticket, UpdateTicketStatusRequest};
 
-use super::AppError;
+use super::{notifications::notify, AppError};
 
 /// Shared joined SELECT for enriched ticket rows.
 const TICKET_SELECT: &str = "SELECT t.id, t.ticket_number, t.title, t.description, \
@@ -150,6 +150,20 @@ async fn create_ticket(
     .execute(&state.pool)
     .await?;
 
+    // P1-2: notify the assignee when a ticket is created pre-assigned
+    if let Some(aid) = ticket.assignee_id {
+        notify(
+            &state.pool,
+            aid,
+            "TICKET_ASSIGNED",
+            "New ticket assigned to you",
+            &format!("{} · {} — {}", ticket.ticket_number, ticket.title, ticket.priority),
+            "ticket",
+            ticket.id,
+        )
+        .await;
+    }
+
     Ok((StatusCode::CREATED, Json(ticket)))
 }
 
@@ -194,6 +208,39 @@ async fn update_ticket_status(
     .bind(json!({ "from": old_status, "to": body.status }))
     .execute(&state.pool)
     .await?;
+
+    // P1-2: status change → notify requester + assignee
+    let requester = updated.requester_id;
+    notify(
+        &state.pool,
+        requester,
+        "TICKET_STATUS",
+        &format!("{} → {}", updated.ticket_number, body.status.replace('_', " ")),
+        &format!(
+            "Status of {} changed from {} to {}",
+            updated.title, old_status.replace('_', " "), body.status.replace('_', " ")
+        ),
+        "ticket",
+        ticket_id,
+    )
+    .await;
+    if let Some(assignee) = updated.assignee_id {
+        if assignee != requester {
+            notify(
+                &state.pool,
+                assignee,
+                "TICKET_STATUS",
+                &format!("{} → {}", updated.ticket_number, body.status.replace('_', " ")),
+                &format!(
+                    "Status of {} changed from {} to {}",
+                    updated.title, old_status.replace('_', " "), body.status.replace('_', " ")
+                ),
+                "ticket",
+                ticket_id,
+            )
+            .await;
+        }
+    }
 
     Ok(Json(updated))
 }

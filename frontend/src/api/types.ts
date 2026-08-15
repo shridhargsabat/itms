@@ -443,3 +443,17 @@ export interface TicketTimeline {
   changes: TicketTimelineEntry[];
   attachments: TicketAttachment[];
 }
+
+// ── Notifications (P1-2, issue #43) ─────────────────────────────────────────
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  kind: string;
+  title: string;
+  body: string;
+  ref_type: string | null;
+  ref_id: string | null;
+  read_at: string | null;
+  created_at: string;
+}

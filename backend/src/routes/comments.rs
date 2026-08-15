@@ -20,7 +20,7 @@ use crate::{
     db::AppState,
     models::{CreateCommentRequest, TicketAttachment, TicketComment},
 };
-use super::AppError;
+use super::{notifications::notify, AppError};
 
 const MAX_ATTACHMENT_BYTES: i64 = 10 * 1024 * 1024; // 10 MB
 
@@ -123,6 +123,32 @@ async fn create_comment(
         json!({"subject": subject, "comment": comment.id.to_string(), "mentions": body.mentions.len()}),
     )
     .await?;
+
+    // P1-2: notify requester + assignee + prior commenters (skip the author)
+    let participants: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT DISTINCT user_id FROM (
+            SELECT requester_id AS user_id FROM tickets WHERE id = $1
+            UNION SELECT assignee_id FROM tickets WHERE id = $1 AND assignee_id IS NOT NULL
+            UNION SELECT author_id FROM ticket_comments WHERE ticket_id = $1
+         ) p WHERE user_id IS NOT NULL AND user_id <> $2",
+    )
+    .bind(ticket_id)
+    .bind(actor_id)
+    .fetch_all(pool)
+    .await?;
+    for uid in participants {
+        notify(
+            pool,
+            uid,
+            "TICKET_COMMENT",
+            &format!("New comment on {}", subject),
+            body_text,
+            "ticket",
+            ticket_id,
+        )
+        .await;
+    }
+
     Ok((StatusCode::CREATED, Json(comment)))
 }
 

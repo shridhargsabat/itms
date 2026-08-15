@@ -561,3 +561,18 @@ pub struct CreateCommentRequest {
     #[serde(default)]
     pub mentions: Vec<Uuid>,
 }
+
+// ── Notifications (P1-2, issue #43) ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct Notification {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub kind: String,
+    pub title: String,
+    pub body: String,
+    pub ref_type: Option<String>,
+    pub ref_id: Option<Uuid>,
+    pub read_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
