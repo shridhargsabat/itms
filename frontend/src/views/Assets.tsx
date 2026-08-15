@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Download, FileUp, LoaderCircle, Search, TriangleAlert } from 'lucide-react';
-import { exportAssetsCsv, importAssetsCsv, listAssets } from '@/api/client';
+import { CheckCircle2, Download, FileUp, LoaderCircle, Search, Tags, Trash2, TriangleAlert, UserCog, X } from 'lucide-react';
+import {
+  bulkAssignAssets,
+  bulkDeleteAssets,
+  bulkUpdateAssetStatus,
+  exportAssetsCsv,
+  importAssetsCsv,
+  listAssets,
+  listUsers,
+} from '@/api/client';
 import type { ImportResult } from '@/api/client';
 import { ASSET_CATEGORIES, ASSET_STATUSES } from '@/api/types';
 import type { Asset } from '@/api/types';
@@ -12,6 +20,8 @@ import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import { inputCls } from '@/lib/utils';
+
+type BulkAction = 'status' | 'assign' | 'delete' | null;
 
 export default function Assets() {
   const qc = useQueryClient();
@@ -23,6 +33,47 @@ export default function Assets() {
   const [file, setFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<BulkAction>(null);
+  const [bulkStatus, setBulkStatus] = useState('IN_STOCK');
+  const [bulkUserId, setBulkUserId] = useState('');
+
+  const { data: usersData } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => listUsers({ limit: 1000 }),
+    enabled: bulkAction === 'assign',
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['assets'] });
+    qc.invalidateQueries({ queryKey: ['metrics'] });
+    qc.invalidateQueries({ queryKey: ['cmdb'] });
+  };
+
+  const bulkStatusMutation = useMutation({
+    mutationFn: ({ ids, status }: { ids: string[]; status: string }) => bulkUpdateAssetStatus(ids, status),
+    onSuccess: () => {
+      setBulkAction(null);
+      setSelectedIds(new Set());
+      refresh();
+    },
+  });
+  const bulkAssignMutation = useMutation({
+    mutationFn: ({ ids, userId }: { ids: string[]; userId: string | null }) => bulkAssignAssets(ids, userId),
+    onSuccess: () => {
+      setBulkAction(null);
+      setSelectedIds(new Set());
+      refresh();
+    },
+  });
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => bulkDeleteAssets(ids),
+    onSuccess: () => {
+      setBulkAction(null);
+      setSelectedIds(new Set());
+      refresh();
+    },
+  });
 
   const importMutation = useMutation({
     mutationFn: (csvText: string) => importAssetsCsv(csvText),
@@ -99,9 +150,10 @@ export default function Assets() {
     queryFn: () => listAssets({ ...filters, limit: pageSize, offset: (page - 1) * pageSize }),
   });
 
-  // any filter change resets to page 1
+  // any filter change resets to page 1 + clears row selection
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [search, category, status, sort, order]);
 
   const update = (key: string, value: string) => {
@@ -219,6 +271,58 @@ export default function Assets() {
         </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-5 flex flex-wrap items-center gap-2 border-b border-edge2 bg-surface/95 px-6 py-2.5 backdrop-blur lg:mx-0 lg:mt-0 lg:rounded-t-xl lg:border lg:px-4">
+          <span className="text-sm font-medium text-primary">
+            {selectedIds.size} selected
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setBulkStatus('IN_STOCK');
+                setBulkAction('status');
+              }}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-2.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            >
+              <Tags className="h-3.5 w-3.5" /> Status…
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBulkUserId('');
+                setBulkAction('assign');
+              }}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-2.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            >
+              <UserCog className="h-3.5 w-3.5" /> Assign…
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkAction('delete')}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete…
+            </button>
+            <button
+              type="button"
+              onClick={() => exportAssetsCsv({ ids: [...selectedIds] })}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-2.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            >
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              aria-label="Clear selection"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         rows={data?.items ?? []}
@@ -235,6 +339,8 @@ export default function Assets() {
         loading={isLoading}
         emptyMessage="No assets match the current filters."
         onRowClick={(a) => setSelected(a)}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
       />
 
       <AssetSpecModal asset={selected} onClose={() => setSelected(null)} />
@@ -332,6 +438,113 @@ export default function Assets() {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {bulkAction === 'status' && (
+        <Modal title={`Set status for ${selectedIds.size} asset${selectedIds.size === 1 ? '' : 's'}`} onClose={() => setBulkAction(null)}>
+          <div className="space-y-4">
+            <Select
+              className="w-full"
+              value={bulkStatus}
+              onChange={setBulkStatus}
+              options={ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))}
+            />
+            <button
+              type="button"
+              onClick={() => bulkStatusMutation.mutate({ ids: [...selectedIds], status: bulkStatus })}
+              disabled={bulkStatusMutation.isPending}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+            >
+              {bulkStatusMutation.isPending ? (
+                <><LoaderCircle className="h-4 w-4 animate-spin" /> Updating…</>
+              ) : (
+                <>Update status</>
+              )}
+            </button>
+            {bulkStatusMutation.isError && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {(bulkStatusMutation.error as Error).message}
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {bulkAction === 'assign' && (
+        <Modal title={`Assign ${selectedIds.size} asset${selectedIds.size === 1 ? '' : 's'}`} onClose={() => setBulkAction(null)}>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Select
+                className="min-w-0 flex-1"
+                value={bulkUserId}
+                onChange={setBulkUserId}
+                placeholder="Select user…"
+                options={(usersData?.items ?? []).map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))}
+              />
+              <button
+                type="button"
+                onClick={() => bulkAssignMutation.mutate({ ids: [...selectedIds], userId: null })}
+                disabled={bulkAssignMutation.isPending}
+                className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              >
+                Unassign
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => bulkAssignMutation.mutate({ ids: [...selectedIds], userId: bulkUserId || null })}
+              disabled={bulkAssignMutation.isPending || !bulkUserId}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+            >
+              {bulkAssignMutation.isPending ? (
+                <><LoaderCircle className="h-4 w-4 animate-spin" /> Assigning…</>
+              ) : (
+                <>Assign to user</>
+              )}
+            </button>
+            {bulkAssignMutation.isError && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {(bulkAssignMutation.error as Error).message}
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {bulkAction === 'delete' && (
+        <Modal title={`Delete ${selectedIds.size} asset${selectedIds.size === 1 ? '' : 's'}?`} onClose={() => setBulkAction(null)}>
+          <div className="space-y-4">
+            <p className="text-sm text-secondary">
+              This permanently removes {selectedIds.size} asset{selectedIds.size === 1 ? '' : 's'} from the registry. Tickets keep their history (asset link cleared); CMDB relationships are removed. This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setBulkAction(null)}
+                className="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-edge2 bg-surface px-4 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => bulkDeleteMutation.mutate([...selectedIds])}
+                disabled={bulkDeleteMutation.isPending}
+                className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+              >
+                {bulkDeleteMutation.isPending ? (
+                  <><LoaderCircle className="h-4 w-4 animate-spin" /> Deleting…</>
+                ) : (
+                  <><Trash2 className="h-4 w-4" /> Delete</>
+                )}
+              </button>
+            </div>
+            {bulkDeleteMutation.isError && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {(bulkDeleteMutation.error as Error).message}
+              </p>
             )}
           </div>
         </Modal>

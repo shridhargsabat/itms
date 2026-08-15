@@ -153,6 +153,17 @@ export const createAsset = (input: CreateAssetInput) =>
 export const assignAsset = (assetId: string, userId: string | null) =>
   apiFetch<Asset>(`/assets/${assetId}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to_user_id: userId }) });
 
+// ---- bulk asset actions ----
+export interface BulkResult {
+  updated: number;
+}
+export const bulkUpdateAssetStatus = (ids: string[], status: string) =>
+  apiFetch<BulkResult>('/assets/bulk/status', { method: 'PATCH', body: JSON.stringify({ ids, status }) });
+export const bulkAssignAssets = (ids: string[], assignedToUserId: string | null) =>
+  apiFetch<BulkResult>('/assets/bulk/assign', { method: 'PATCH', body: JSON.stringify({ ids, assigned_to_user_id: assignedToUserId }) });
+export const bulkDeleteAssets = (ids: string[]) =>
+  apiFetch<BulkResult>('/assets/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) });
+
 // ---- CSV import / export ----
 export interface ImportFailure {
   row: number;
@@ -184,13 +195,14 @@ export const importAssetsCsv = (csvText: string) =>
     body: csvText,
   });
 
-/** Download the filtered asset registry as assets.csv (mirrors listAssets filters). */
+/** Export the filtered asset registry as assets.csv — pass ids to export a selection. */
 export const exportAssetsCsv = async (params?: {
   search?: string;
   category?: string;
   status?: string;
   sort?: string;
   order?: 'asc' | 'desc';
+  ids?: string[];
 }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
@@ -198,6 +210,7 @@ export const exportAssetsCsv = async (params?: {
   if (params?.status) q.set('status', params.status);
   if (params?.sort) q.set('sort', params.sort);
   if (params?.order) q.set('order', params.order);
+  if (params?.ids?.length) q.set('ids', params.ids.join(','));
   const qs = q.toString();
   const res = await apiFetchRaw(`/assets/export${qs ? `?${qs}` : ''}`);
   downloadBlob(await res.blob(), 'assets.csv');
