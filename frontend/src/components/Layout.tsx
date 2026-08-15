@@ -4,40 +4,19 @@ import AnimatedBackground from '@/components/AnimatedBackground';
 import ThemeToggle from '@/components/ThemeToggle';
 import { applyTheme, watchSystemTheme } from '@/lib/theme';
 import {
-  Boxes,
-  Database,
   Download,
-  LayoutDashboard,
   LogOut,
   Network,
   PanelLeftClose,
   PanelLeftOpen,
-  BadgeCheck,
-  ClipboardList,
-  ScrollText,
-  ShieldCheck,
-  Ticket,
-  UserRoundCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { visibleNav } from '@/lib/nav';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateToast from '@/components/UpdateToast';
 import BottomNav from '@/components/BottomNav';
 import { clearSession, getCachedUser, logout } from '@/api/client';
 import { usePwaInstallable } from '@/lib/pwa';
-
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/assets', label: 'Assets', icon: Boxes },
-  { to: '/warranty', label: 'Warranty', icon: ShieldCheck },
-  { to: '/onboarding', label: 'Join/Leave', icon: UserRoundCheck },
-  { to: '/requests', label: 'Requests', icon: ClipboardList },
-  { to: '/licenses', label: 'Licenses', icon: BadgeCheck, admin: true },
-  { to: '/tickets', label: 'Tickets', icon: Ticket },
-  { to: '/cmdb', label: 'CMDB', icon: Network },
-  { to: '/audit', label: 'Audit Log', icon: ScrollText },
-  { to: '/masters', label: 'Masters', icon: Database, admin: true },
-];
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -160,7 +139,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 space-y-1 p-2">
-          {NAV_ITEMS.filter((i) => !i.admin || user?.role === 'ADMIN').map(({ to, label, icon: Icon, end }) => (
+          {visibleNav(user).map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
