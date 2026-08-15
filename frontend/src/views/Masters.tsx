@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Database, LoaderCircle, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
 import Modal from '@/components/Modal';
+import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import DataTable, { type Column } from '@/components/DataTable';
 import { getCachedUser } from '@/api/client';
@@ -56,7 +57,8 @@ export default function Masters() {
         <p className="mt-0.5 text-sm text-secondary">Users and lookup data powering every dropdown.</p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <ScrollX className="pb-1">
+        <div className="flex gap-2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -73,7 +75,8 @@ export default function Masters() {
             {t.label}
           </button>
         ))}
-      </div>
+        </div>
+      </ScrollX>
 
       {tab === 'users' ? (
         <UsersTab />
@@ -173,10 +176,17 @@ function UsersTab() {
           </span>
         ),
       },
-      { key: 'department', header: 'Department', sortable: true, render: (u) => <span className="text-secondary">{u.department}</span> },
+      {
+        key: 'department',
+        header: 'Department',
+        sortable: true,
+        className: 'hidden sm:table-cell',
+        render: (u) => <span className="text-secondary">{u.department}</span>,
+      },
       {
         key: 'active',
         header: 'Status',
+        className: 'hidden sm:table-cell',
         render: (u) => (
           <span className={cn('inline-flex items-center gap-1.5 text-xs', u.active ? 'text-emerald-400' : 'text-muted')}>
             <span className={cn('h-1.5 w-1.5 rounded-full', u.active ? 'bg-emerald-400' : 'bg-elevated2')} />
@@ -264,6 +274,7 @@ function UsersTab() {
           total={users.data?.total}
           page={page}
           pageSize={pageSize}
+          minWidth="min-w-[340px] sm:min-w-[640px]"
           onPageChange={setPage}
           onPageSizeChange={(s) => {
             setPageSize(s);
@@ -403,7 +414,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border border-edge">
+      <ScrollX className="rounded-xl border border-edge">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b border-edge bg-surface/60 text-[11px] uppercase tracking-wide text-muted">
             <tr>
@@ -502,7 +513,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
             )}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
 
       <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-edge p-3">
         <div>

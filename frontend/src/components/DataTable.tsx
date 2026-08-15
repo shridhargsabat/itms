@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Select from '@/components/Select';
+import ScrollX from '@/components/ScrollX';
 
 export interface Column<T> {
   key: string;
@@ -98,7 +99,7 @@ export default function DataTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <div className="overflow-x-auto rounded-xl border border-edge">
+      <ScrollX className="rounded-xl border border-edge">
         <table className={cn('w-full text-left text-sm', minWidth)}>
           {head}
           <tbody className="divide-y divide-edge bg-base">
@@ -113,7 +114,7 @@ export default function DataTable<T extends { id: string }>({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
     );
   }
 
@@ -127,7 +128,7 @@ export default function DataTable<T extends { id: string }>({
     'flex h-8 w-8 items-center justify-center rounded-lg border border-edge2 text-secondary transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   const footer = paginated && (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-edge bg-surface/70 px-3 py-2.5 text-xs text-secondary">
+    <div className="sticky bottom-[3.5rem] z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-edge bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur lg:bottom-0">
       <span>
         {total !== undefined && total > 0 && rows.length > 0
           ? `Showing ${from}–${to} of ${total}`
@@ -190,7 +191,7 @@ export default function DataTable<T extends { id: string }>({
 
   return (
     <div className="rounded-xl border border-edge">
-      <div className="overflow-x-auto">
+      <ScrollX>
         <table className={cn('w-full text-left text-sm', minWidth)}>
           {head}
           <tbody className="divide-y divide-edge bg-base">
@@ -213,7 +214,7 @@ export default function DataTable<T extends { id: string }>({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       {footer}
     </div>
   );

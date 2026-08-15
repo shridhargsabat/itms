@@ -7,6 +7,7 @@ import { PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
 import type { CreateTicketInput, Ticket, TicketStatus } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import Modal from '@/components/Modal';
+import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
@@ -44,7 +45,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <div>
-        <label className={labelCls}>Title</label>
+        <label className={labelCls}>Title *</label>
         <input
           required
           className={inputCls}
@@ -307,7 +308,7 @@ export default function Tickets() {
       </div>
 
       <div className={cn('grid gap-4', selected && 'lg:grid-cols-[1fr_360px]')}>
-        <div>
+        <div className="min-w-0">
           {view === 'table' ? (
             <DataTable
               columns={columns}
@@ -328,58 +329,60 @@ export default function Tickets() {
               onRowClick={(t) => setSelectedId(t.id)}
             />
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {TICKET_STATUSES.map((st) => {
-                const items = rows.filter((t) => t.status === st);
-                return (
-                  <div key={st} className="rounded-xl border border-edge bg-surface/50 p-3">
-                    <div className="mb-3 flex items-center justify-between px-1">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
-                        {st.replace('_', ' ')}
-                      </span>
-                      <span className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary">
-                        {items.length}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {items.map((t, i) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setSelectedId(t.id)}
-                          className={cn(
-                            'animate-list-in w-full rounded-lg border border-edge bg-base p-3 text-left transition-colors hover:border-edge2',
-                            selectedId === t.id && 'border-indigo-500/60',
-                          )}
-                          style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[10px] text-muted">
-                              {t.ticket_number}
-                            </span>
-                            <PriorityBadge priority={t.priority} />
-                          </div>
-                          <p className="mt-1 text-sm font-medium text-primary">{t.title}</p>
-                          <p className="mt-1 truncate text-xs text-muted">
-                            {t.assignee_name ?? 'Unassigned'}
+            <ScrollX innerClassName="pb-2">
+              <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4">
+                {TICKET_STATUSES.map((st) => {
+                  const items = rows.filter((t) => t.status === st);
+                  return (
+                    <div key={st} className="min-w-[240px] snap-start rounded-xl border border-edge bg-surface/50 p-3 md:min-w-0">
+                      <div className="mb-3 flex items-center justify-between px-1">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                          {st.replace('_', ' ')}
+                        </span>
+                        <span className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary">
+                          {items.length}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {items.map((t, i) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setSelectedId(t.id)}
+                            className={cn(
+                              'animate-list-in w-full rounded-lg border border-edge bg-base p-3 text-left transition-colors hover:border-edge2',
+                              selectedId === t.id && 'border-indigo-500/60',
+                            )}
+                            style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono text-[10px] text-muted">
+                                {t.ticket_number}
+                              </span>
+                              <PriorityBadge priority={t.priority} />
+                            </div>
+                            <p className="mt-1 text-sm font-medium text-primary">{t.title}</p>
+                            <p className="mt-1 truncate text-xs text-muted">
+                              {t.assignee_name ?? 'Unassigned'}
+                            </p>
+                          </button>
+                        ))}
+                        {items.length === 0 && (
+                          <p className="rounded-lg border border-dashed border-edge p-3 text-center text-xs text-muted">
+                            Empty
                           </p>
-                        </button>
-                      ))}
-                      {items.length === 0 && (
-                        <p className="rounded-lg border border-dashed border-edge p-3 text-center text-xs text-muted">
-                          Empty
-                        </p>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </ScrollX>
           )}
         </div>
 
         {selected && (
-          <aside className="h-fit rounded-xl border border-edge bg-surface/60 p-5">
+          <aside className="h-fit min-w-0 rounded-xl border border-edge bg-surface/60 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs text-accent">{selected.ticket_number}</span>
               <PriorityBadge priority={selected.priority} />

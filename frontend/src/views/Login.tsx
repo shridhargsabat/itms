@@ -110,7 +110,7 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="mt-5 flex items-center gap-3 text-[11px] text-muted">
+            <div className="mt-8 flex items-center gap-3 text-[11px] text-muted">
               <span className="h-px flex-1 bg-elevated" />
               demo
               <span className="h-px flex-1 bg-elevated" />
@@ -118,7 +118,7 @@ export default function Login() {
             <button
               onClick={demoLogin}
               disabled={mutation.isPending}
-              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-edge2 text-sm font-medium text-primary transition-all hover:border-indigo-500/50 hover:bg-elevated/60 active:scale-[0.97] disabled:opacity-60"
+              className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-edge2 text-sm font-medium text-primary transition-all hover:border-indigo-500/50 hover:bg-elevated/60 active:scale-[0.97] disabled:opacity-60"
             >
               Use demo account
             </button>

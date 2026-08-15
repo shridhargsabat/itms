@@ -174,7 +174,21 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="border-t border-edge p-2">
+        {!collapsed && user && (
+          <div className="flex items-center gap-3 border-t border-edge px-4 py-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+              {(user.name ?? user.email ?? '?').slice(0, 2).toUpperCase()}
+            </span>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-medium text-primary">{user.name ?? user.email}</p>
+              <p className="truncate text-[11px] text-muted">
+                {user.role ?? ''} · build {__BUILD_SHA__}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="p-2">
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}

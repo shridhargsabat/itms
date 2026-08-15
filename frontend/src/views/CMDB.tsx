@@ -81,7 +81,7 @@ export default function CMDB() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-        <div className="rounded-xl border border-edge bg-surface/60 p-3">
+        <div className="min-w-0 rounded-xl border border-edge bg-surface/60 p-3">
           <div className="mb-2 flex items-center gap-2 px-2 py-1">
             <Network className="h-4 w-4 text-secondary" />
             <h2 className="text-xs font-semibold uppercase tracking-wide text-secondary">
@@ -120,7 +120,7 @@ export default function CMDB() {
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {impact.isLoading && (
             <div className="flex h-40 items-center justify-center rounded-xl border border-edge bg-surface/60 text-muted">
               <LoaderCircle className="h-5 w-5 animate-spin" />

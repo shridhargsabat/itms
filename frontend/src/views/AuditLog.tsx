@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { getAuditLog } from '@/api/client';
+import ScrollX from '@/components/ScrollX';
 import { formatDate } from '@/lib/utils';
 
 export default function AuditLog() {
@@ -22,7 +23,7 @@ export default function AuditLog() {
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-edge">
+      <ScrollX className="rounded-xl border border-edge">
         {isLoading ? (
           <div className="space-y-2 p-5">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -59,7 +60,10 @@ export default function AuditLog() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="rounded bg-elevated px-2 py-0.5 font-mono text-xs text-secondary">
+                        <span
+                          title={e.action}
+                          className="max-w-[180px] truncate rounded bg-elevated px-2 py-0.5 font-mono text-xs text-secondary"
+                        >
                           {e.action}
                         </span>
                       </td>
@@ -97,7 +101,7 @@ export default function AuditLog() {
             </tbody>
           </table>
         )}
-      </div>
+      </ScrollX>
     </div>
   );
 }

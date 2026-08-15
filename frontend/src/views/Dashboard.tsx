@@ -7,6 +7,7 @@ import {
   ChevronRight,
   LoaderCircle,
   PackageCheck,
+  Play,
   Plus,
   Ticket,
   TriangleAlert,
@@ -84,7 +85,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <div>
-        <label className={labelCls}>Title</label>
+        <label className={labelCls}>Title *</label>
         <input
           required
           className={inputCls}
@@ -203,7 +204,7 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className={labelCls} htmlFor="asset-name">Name</label>
+          <label className={labelCls} htmlFor="asset-name">Name *</label>
           <input
             id="asset-name"
             required
@@ -345,12 +346,13 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
 export default function Dashboard() {
   const [newOpen, setNewOpen] = useState(false);
   const [assetOpen, setAssetOpen] = useState(false);
+  const [paused, setPaused] = useState(false);
 
   const metrics = useQuery({ queryKey: ['metrics'], queryFn: getDashboardMetrics });
   const audit = useQuery({
     queryKey: ['audit'],
     queryFn: () => getAuditLog(10),
-    refetchInterval: 30_000,
+    refetchInterval: paused ? false : 30_000,
   });
 
   return (
@@ -429,10 +431,22 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 border-b border-edge px-5 py-4">
           <Activity className="h-4 w-4 text-secondary" />
           <h2 className="text-sm font-semibold text-primary">Recent Activity</h2>
-          <span className="ml-auto flex items-center gap-1.5 text-xs text-muted">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-            auto-refresh 30s
-          </span>
+          <button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            title={paused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-edge px-2 py-0.5 text-xs text-muted transition-colors hover:border-edge2 hover:text-primary"
+          >
+            {paused ? (
+              <Play className="h-3 w-3" />
+            ) : (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                auto-refresh 30s
+              </>
+            )}
+            {paused && <span className="text-amber-400">paused</span>}
+          </button>
         </div>
         <div className="divide-y divide-edge/60">
           {audit.isLoading &&
@@ -456,12 +470,20 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-3">
-                <span className="shrink-0 rounded bg-elevated px-2 py-0.5 font-mono text-xs text-secondary">
+                <span
+                  title={e.action}
+                  className={cn(
+                    'shrink-0 rounded px-2 py-0.5 font-mono text-xs',
+                    e.action.includes('DELETE') || e.action.includes('DISABLE')
+                      ? 'bg-red-500/15 text-red-400'
+                      : 'bg-elevated text-secondary',
+                  )}
+                >
                   {e.action}
                 </span>
                 <span className="min-w-0 truncate text-xs text-muted">
                   {e.target_type} ·{' '}
-                  <span className="font-mono text-accent">{e.target_id}</span>
+                  <span className="font-mono text-accent" title={e.target_id}>{e.target_id}</span>
                 </span>
               </div>
             </div>
