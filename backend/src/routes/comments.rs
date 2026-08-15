@@ -380,7 +380,7 @@ async fn ticket_timeline(
     .fetch_all(pool)
     .await?;
     // who-changed-what: audit entries for this ticket (TICKET_* actions)
-    let changes: Vec<serde_json::Value> = sqlx::query_as::<_, (String, String, chrono::DateTime<chrono::Utc>, serde_json::Value)>(
+    let changes: Vec<serde_json::Value> = sqlx::query_as::<_, (Option<String>, String, chrono::DateTime<chrono::Utc>, serde_json::Value)>(
         "SELECT u.name, al.action, al.created_at, COALESCE(al.diff, '{}'::jsonb) \
          FROM audit_logs al LEFT JOIN users u ON u.id = al.actor_id \
          WHERE al.target_type = 'ticket' AND al.target_id = $1 AND al.action LIKE 'TICKET_%' \
@@ -393,7 +393,7 @@ async fn ticket_timeline(
     .map(|(name, action, at, details)| {
         json!({
             "kind": "change",
-            "actor": name,
+            "actor": name.unwrap_or_else(|| "System".to_string()),
             "action": action,
             "at": at,
             "details": details,
