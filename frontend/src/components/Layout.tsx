@@ -15,6 +15,7 @@ import { visibleNav } from '@/lib/nav';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateToast from '@/components/UpdateToast';
 import BottomNav from '@/components/BottomNav';
+import NotificationsBell from '@/components/NotificationsBell';
 import { clearSession, getCachedUser, logout } from '@/api/client';
 import { usePwaInstallable } from '@/lib/pwa';
 
@@ -97,6 +98,7 @@ export default function Layout() {
           <span className="block truncate text-xs text-secondary">{user?.name ?? user?.email ?? ''}</span>
           <span className="block text-[9px] text-muted">build {__BUILD_SHA__}</span>
         </div>
+        <NotificationsBell />
         <button
           type="button"
           onClick={handleInstall}
@@ -135,6 +137,9 @@ export default function Layout() {
             <span className="truncate text-sm font-semibold tracking-wide text-primary">
               ITMS
             </span>
+          )}
+          {!collapsed && (
+            <NotificationsBell className="ml-auto" />
           )}
         </div>
 

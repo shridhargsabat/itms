@@ -2,6 +2,7 @@ import type {
   Asset,
   AuditLogEntry,
   AuthUser,
+  Notification,
   TicketAttachment,
   TicketComment,
   TicketTimeline,
@@ -467,3 +468,17 @@ export const downloadTicketAttachment = async (attachmentId: string) => {
   if (!res.ok) throw new Error(`download failed: ${res.status}`);
   return res.blob();
 };
+
+// ── Notifications (P1-2) ────────────────────────────────────────────────────
+
+export const getNotifications = (limit = 50) =>
+  apiFetch<Notification[]>(`/notifications?limit=${limit}`);
+
+export const getUnreadCount = () =>
+  apiFetch<{ unread: number }>('/notifications/unread-count');
+
+export const markNotificationRead = (id: string) =>
+  apiFetch<void>(`/notifications/${id}/read`, { method: 'GET' });
+
+export const markAllNotificationsRead = () =>
+  apiFetch<void>('/notifications/read-all', { method: 'GET' });

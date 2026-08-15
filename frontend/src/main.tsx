@@ -18,6 +18,7 @@ const Offline = lazy(() => import('@/views/Offline'));
 const Login = lazy(() => import('@/views/Login'));
 const WarrantyView = lazy(() => import('@/views/Warranty'));
 const Onboarding = lazy(() => import('@/views/Onboarding'));
+const Notifications = lazy(() => import('@/views/Notifications'));
 const Requests = lazy(() => import('@/views/Requests'));
 const Licenses = lazy(() => import('@/views/Licenses'));
 import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
@@ -96,6 +97,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/assets" element={<Assets />} />
                 <Route path="/warranty" element={<WarrantyView />} />
                 <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/notifications" element={<Notifications />} />
                 <Route path="/requests" element={<Requests />} />
                 <Route path="/licenses" element={<Licenses />} />
                 <Route path="/tickets" element={<Tickets />} />

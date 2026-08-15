@@ -5,6 +5,7 @@ pub mod auth;
 pub mod cmdb;
 pub mod dashboard;
 pub mod masters;
+pub mod notifications;
 pub mod onboarding;
 pub mod licenses;
 pub mod requests;
@@ -39,6 +40,7 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/users", users::router())
         .nest("/masters", masters::router())
         .nest("/onboarding", onboarding::router())
+        .nest("/notifications", notifications::router())
         .nest("/requests", requests::router())
         .nest("/licenses", licenses::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));

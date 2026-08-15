@@ -23,7 +23,7 @@ use crate::{
         UpdateCatalogRequest, UpdateRequestInput,
     },
 };
-use super::AppError;
+use super::{notifications::notify, AppError};
 
 pub fn router() -> Router<AppState> {
     // Catalog: reads for all, mutations ADMIN-only.
@@ -355,6 +355,20 @@ async fn create_request(
     )
     .await?;
 
+    // P1-2: notify the auto-routed agent
+    if let Some(aid) = agent {
+        notify(
+            pool,
+            aid,
+            "REQUEST_ASSIGNED",
+            &format!("New request: {}", subject),
+            &format!("{} · {} · {} (assigned to you)", request_number, catalog.0, priority),
+            "service_request",
+            req.id,
+        )
+        .await;
+    }
+
     let mut r = req;
     r.catalog_name = Some(catalog.0);
     if let Some(agent_id) = agent {
@@ -511,6 +525,19 @@ async fn approve_request(
         json!({"number": exists.0}),
     )
     .await?;
+
+    // P1-2: notify requester
+    notify(
+        pool,
+        req.requester_id,
+        "REQUEST_APPROVED",
+        &format!("Request approved: {}", req.subject),
+        &format!("{} was approved by {}.", req.request_number, req.approved_by.map(|_| "an agent").unwrap_or("an agent")),
+        "service_request",
+        req.id,
+    )
+    .await;
+
     Ok(Json(req))
 }
 
@@ -564,6 +591,19 @@ async fn reject_request(
         json!({"number": number.0}),
     )
     .await?;
+
+    // P1-2: notify requester
+    notify(
+        pool,
+        req.requester_id,
+        "REQUEST_REJECTED",
+        &format!("Request rejected: {}", req.subject),
+        &format!("{} was rejected.", req.request_number),
+        "service_request",
+        req.id,
+    )
+    .await;
+
     Ok(Json(req))
 }
 
