@@ -5,9 +5,9 @@ import { getCachedUser } from '@/api/client';
 import { cn } from '@/lib/utils';
 
 /**
- * Mobile-only bottom navigation — SAPL-style: primary tabs + a "More" sheet
+ * Mobile-only bottom navigation — SAPL-style: 4 primary tabs + a "More" sheet
  * with every remaining section, so ALL nav destinations are reachable at
- * 375px (the bar itself caps at 7 cells; anything beyond the first 6 tabs
+ * 375px (the bar itself caps at 7 cells; anything beyond the first 4 tabs
  * lives in the sheet). Desktop keeps the sidebar (this is hidden on lg+).
  *
  * The bar deliberately has NO env(safe-area-inset-bottom) padding — the
@@ -27,8 +27,8 @@ export default function BottomNav() {
   const links = visibleNav(user);
   if (links.length === 0) return null; // signed out / public page
 
-  const primary = links.slice(0, 6);
-  const rest = links.slice(6);
+  const primary = links.slice(0, 4);
+  const rest = links.slice(4);
 
   const cell = (active: boolean) =>
     'flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition-colors ' +
