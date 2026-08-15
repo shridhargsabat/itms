@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn, inputCls } from '@/lib/utils';
@@ -93,6 +93,18 @@ export default function Select({
     };
   }, [open]);
 
+  // Measure + place SYNCHRONOUSLY after the menu is committed to the DOM.
+  // (A rAF here races React's commit — the menu ref can still be null when
+  // it fires, the height silently falls back to the 224px guess, and a
+  // flipped menu lands ~70px above its trigger: "the dropdown shows at the
+  // field above". useLayoutEffect runs after the commit, before paint, so
+  // the measurement is always real and the placement is exact.)
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (menuRef.current) menuHeight.current = menuRef.current.offsetHeight;
+    placeMenu();
+  }, [open]);
+
   const toggle = () => {
     if (open) {
       close();
@@ -102,12 +114,6 @@ export default function Select({
     if (!el) return;
     el.scrollIntoView({ block: 'nearest' });
     setOpen(true);
-    // Measure the rendered menu height, then place it precisely below the
-    // trigger (or above when it wouldn't fit) — no guessed heights.
-    requestAnimationFrame(() => {
-      if (menuRef.current) menuHeight.current = menuRef.current.offsetHeight;
-      placeMenu();
-    });
   };
 
   const selected = options.find((o) => o.value === value);
@@ -131,20 +137,22 @@ export default function Select({
           )}
         />
       </button>
-      {open && menu &&
+      {open &&
         createPortal(
           <div
             ref={menuRef}
             style={{
               position: 'fixed',
-              top: menu.top,
-              left: menu.left,
+              // Provisional 0,0 while the layout effect measures + places
+              // (before first paint — never visible).
+              top: menu?.top ?? 0,
+              left: menu?.left ?? 0,
               // Menu is at least as wide as the trigger, grows to fit its
               // longest option (max-content), capped so it never overflows
               // the viewport on narrow screens.
-              minWidth: menu.width,
+              minWidth: menu?.width ?? 0,
               width: 'max-content',
-              maxWidth: menu.maxWidth,
+              maxWidth: menu?.maxWidth ?? 0,
             }}
             role="listbox"
             className="animate-menu-in z-[70] max-h-64 overflow-auto rounded-lg border border-edge2 bg-elevated/95 p-1 shadow-2xl backdrop-blur"
