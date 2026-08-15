@@ -32,7 +32,9 @@ const ASSET_SELECT: &str = "SELECT a.id, a.asset_tag, a.name, a.category, a.seri
 const ASSET_RETURNING: &str = "RETURNING id, asset_tag, name, category, serial_number, status, \
      assigned_to_user_id, specs, purchase_date, warranty_expiry, unit_cost, expected_eol, \
      created_at, updated_at, NULL::text AS assigned_user_name, \
-     NULL::float8 AS current_value";
+     ROUND((unit_cost * LEAST(1.0, GREATEST(0.0, \
+        (CURRENT_DATE - COALESCE(purchase_date, expected_eol))::float8 / 1095.0)))::numeric, 2)::float8 \
+        AS current_value";
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -351,32 +353,49 @@ async fn update_asset(
         }
     }
 
-    let updated: Asset = sqlx::query_as::<_, Asset>(&format!(
-        "UPDATE assets SET \
-            name = COALESCE($2, name), \
-            category = COALESCE($3, category), \
-            serial_number = COALESCE($4, serial_number), \
-            status = COALESCE($5, status), \
-            specs = COALESCE($6, specs), \
-            purchase_date = COALESCE($7, purchase_date), \
-            warranty_expiry = COALESCE($8, warranty_expiry), \
-            unit_cost = COALESCE($9, unit_cost), \
-            expected_eol = COALESCE($10, expected_eol), \
-            updated_at = NOW() \
-         WHERE id = $1 {ASSET_RETURNING}"
-    ))
-    .bind(asset_id)
-    .bind(body.name)
-    .bind(body.category)
-    .bind(body.serial_number)
-    .bind(&new_status)
-    .bind(body.specs)
-    .bind(body.purchase_date.flatten())
-    .bind(body.warranty_expiry.flatten())
-    .bind(body.unit_cost.flatten())
-    .bind(body.expected_eol.flatten())
-    .fetch_one(&state.pool)
-    .await?;
+    // Dynamic SET clause: absent (None) = leave unchanged, explicit null
+    // (Some(None)) = clear the field. COALESCE cannot express "clear", so the
+    // SET list is built from what the request actually contains; binds follow
+    // placeholder order ($1..$n for SET, then WHERE id = $n+1).
+    let mut q = String::from("UPDATE assets SET ");
+    let mut n: usize = 1;
+    let mut first = true;
+    macro_rules! col {
+        ($sql:expr, $v:expr) => {{
+            if !first {
+                q.push_str(", ");
+            }
+            first = false;
+            q.push_str(&format!("{} = ${}", $sql, n));
+            n += 1;
+            $v
+        }};
+    }
+    let name_b = col!("name", body.name);
+    let category_b = col!("category", body.category);
+    let serial_b = col!("serial_number", body.serial_number);
+    let status_b = col!("status", new_status.clone());
+    let specs_b = col!("specs", body.specs);
+    let purchase_b = col!("purchase_date", body.purchase_date.flatten());
+    let warranty_b = col!("warranty_expiry", body.warranty_expiry.flatten());
+    let cost_b = col!("unit_cost", body.unit_cost.flatten());
+    let eol_b = col!("expected_eol", body.expected_eol.flatten());
+    q.push_str(", updated_at = NOW()");
+    q.push_str(&format!(" WHERE id = ${n} {ASSET_RETURNING}"));
+
+    let mut qb = sqlx::query_as::<_, Asset>(&q);
+    qb = qb
+        .bind(name_b)
+        .bind(category_b)
+        .bind(serial_b)
+        .bind(status_b)
+        .bind(specs_b)
+        .bind(purchase_b)
+        .bind(warranty_b)
+        .bind(cost_b)
+        .bind(eol_b)
+        .bind(asset_id);
+    let updated: Asset = qb.fetch_one(&state.pool).await?;
 
     // Lifecycle event for the status change (if any).
     if let Some(to) = &new_status {
