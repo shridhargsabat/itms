@@ -197,7 +197,7 @@ function UsersTab() {
       {
         key: 'id',
         header: '',
-        className: 'w-28',
+        className: 'sticky right-0 w-28 border-l border-edge bg-inherit',
         render: (u) => (
           <div className="flex items-center gap-1">
             <button
