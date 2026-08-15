@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowRight, Columns3, Link2, LoaderCircle, Plus, Table, User } from 'lucide-react';
-import { createTicket, listTickets, patchTicketStatus } from '@/api/client';
+import { ArrowRight, Columns3, Download, Link2, LoaderCircle, Plus, Table, User } from 'lucide-react';
+import { createTicket, exportTicketsCsv, listTickets, patchTicketStatus } from '@/api/client';
 import { PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
 import type { CreateTicketInput, Ticket, TicketStatus } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
@@ -250,6 +250,21 @@ export default function Tickets() {
         </div>
         <div className="w-full min-w-0 sm:w-auto">
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                exportTicketsCsv({
+                  status: status || undefined,
+                  priority: priority || undefined,
+                  type: type || undefined,
+                  sort: sort ?? undefined,
+                  order: order ?? undefined,
+                })
+              }
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary sm:flex-none"
+            >
+              <Download className="h-4 w-4" /> Export
+            </button>
             <div className="col-span-2 flex overflow-hidden rounded-lg border border-edge2 sm:col-auto">
               <button
                 type="button"
