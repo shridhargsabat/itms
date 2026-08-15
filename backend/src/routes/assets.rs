@@ -394,6 +394,11 @@ async fn update_asset(
     colopt!("warranty_expiry", body.warranty_expiry, "::date");
     colopt!("unit_cost", body.unit_cost, "::float8");
     colopt!("expected_eol", body.expected_eol, "::date");
+    // Nothing to update → no-op: return the asset unchanged (no invalid
+    // `SET , updated_at` query).
+    if binds.is_empty() {
+        return Ok(Json(current));
+    }
     q.push_str(", updated_at = NOW()");
     q.push_str(&format!(" WHERE id = ${} {ASSET_RETURNING}", binds.len() + 1));
 
