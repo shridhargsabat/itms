@@ -455,23 +455,44 @@ async fn asset_lifecycle(
     Ok(Json(events))
 }
 
-/// GET /api/v1/assets/alerts — warranty expiring within 90 days or already
-/// expired (excludes RETIRED). days_left < 0 = expired.
+/// GET /api/v1/assets/alerts?scope=all|expired|expiring — warranty expiring
+/// within 90 days or already expired (excludes RETIRED). days_left < 0 =
+/// expired. Scope lets the UI fetch buckets separately so thousands of
+/// expired warranties cannot drown the expiring-soon list.
 async fn warranty_alerts(
     State(state): State<AppState>,
+    Query(params): Query<AlertParams>,
 ) -> Result<Json<Vec<WarrantyAlert>>, AppError> {
-    let alerts = sqlx::query_as::<_, WarrantyAlert>(
+    let scope = params.scope.as_deref().unwrap_or("all");
+    let mut q = String::from(
         "SELECT id, asset_tag, name, status, warranty_expiry, \
                 (warranty_expiry - CURRENT_DATE)::bigint AS days_left \
          FROM assets \
          WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL \
-           AND warranty_expiry <= CURRENT_DATE + 90 \
-         ORDER BY warranty_expiry ASC \
-         LIMIT 500",
-    )
-    .fetch_all(&state.pool)
-    .await?;
+           AND warranty_expiry <= CURRENT_DATE + 90",
+    );
+    match scope {
+        "expired" => q.push_str(" AND warranty_expiry < CURRENT_DATE"),
+        "expiring" => q.push_str(" AND warranty_expiry >= CURRENT_DATE"),
+        "all" => {}
+        _ => {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "scope must be one of: all, expired, expiring",
+            ));
+        }
+    }
+    q.push_str(" ORDER BY warranty_expiry ASC LIMIT 500");
+
+    let alerts = sqlx::query_as::<_, WarrantyAlert>(&q)
+        .fetch_all(&state.pool)
+        .await?;
     Ok(Json(alerts))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AlertParams {
+    pub scope: Option<String>,
 }
 
 /// Asset tag generation: `SELECT count(*) FROM assets` + 1 → `AST-{:04}`,
