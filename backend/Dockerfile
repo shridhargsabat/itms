@@ -7,11 +7,14 @@ COPY src ./src
 COPY migrations ./migrations
 # BuildKit cache mounts persist the crate registry + target dir ACROSS builds.
 # Without them every source change re-downloads ALL crates (~10 min); with
-# them only changed crates recompile (seconds). Requires DOCKER_BUILDKIT=1
-# (compose default) — classic builder (no BuildKit) silently ignores the mounts
-# and falls back to the slow path, so always build with BuildKit.
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
+# them only changed crates recompile (seconds). Explicit cache IDs keep this
+# build isolated from other sessions' builds — a shared mount path (default
+# cache key = target path) gets corrupted when two builds write it
+# concurrently (cargo sees fresh fingerprints but the final binaries are
+# missing → "COPY .../release/server: not found"). Requires DOCKER_BUILDKIT=1
+# (compose default) — classic builder silently ignores the mounts.
+RUN --mount=type=cache,id=itms-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=itms-cargo-target,target=/app/target \
     cargo build --release --bin server --bin seed
 
 FROM debian:bookworm-slim
