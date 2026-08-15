@@ -37,17 +37,26 @@ const ASSET_RETURNING: &str = "RETURNING id, asset_tag, name, category, serial_n
         AS current_value";
 
 pub fn router() -> Router<AppState> {
+    // Reads: any authenticated user (assignee dropdowns, lists, exports).
     Router::new()
-        .route("/", get(list_assets).post(create_asset))
+        .route("/", get(list_assets))
         .route("/alerts", get(warranty_alerts))
-        .route("/{id}", patch(update_asset))
         .route("/{id}/lifecycle", get(asset_lifecycle))
-        .route("/{id}/assign", patch(assign_asset))
-        .route("/import", post(import_assets).layer(DefaultBodyLimit::max(10 * 1024 * 1024)))
         .route("/export", get(export_assets))
-        .route("/bulk/status", patch(bulk_update_status))
-        .route("/bulk/assign", patch(bulk_assign))
-        .route("/bulk", delete(bulk_delete))
+        // Mutations: ADMIN-only (security audit H1 — was open to every
+        // authenticated role incl. EMPLOYEE; mass-delete/import/financial
+        // fields must stay admin-gated). Same pattern as users/masters.
+        .merge(
+            Router::new()
+                .route("/", post(create_asset))
+                .route("/{id}", patch(update_asset))
+                .route("/{id}/assign", patch(assign_asset))
+                .route("/import", post(import_assets).layer(DefaultBodyLimit::max(10 * 1024 * 1024)))
+                .route("/bulk/status", patch(bulk_update_status))
+                .route("/bulk/assign", patch(bulk_assign))
+                .route("/bulk", delete(bulk_delete))
+                .route_layer(axum::middleware::from_fn(crate::routes::auth::require_admin)),
+        )
 }
 
 #[derive(Debug, Deserialize)]
