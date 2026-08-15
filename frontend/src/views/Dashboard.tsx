@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Ticket,
   TriangleAlert,
+  UserRoundCheck,
   X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -34,6 +35,7 @@ const METRIC_CARDS: {
   { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
   { label: 'In Stock', key: 'in_stock_count', icon: PackageCheck, accent: 'bg-emerald-500/10 text-emerald-400', to: '/assets?status=IN_STOCK' },
   { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-400', to: '/warranty' },
+  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-400', to: '/onboarding' },
 ];
 
 function CountUp({ value }: { value: number }) {
