@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -40,6 +40,9 @@ interface DataTableProps<T> {
   onSortChange?: (sort: SortState | null) => void;
   /** Optional accordion row rendered under a row when clicked (toggles per row). */
   renderExpanded?: (row: T) => ReactNode;
+  /** Row multi-select (bulk actions). Selection is controlled by the parent. */
+  selectedIds?: Set<string>;
+  onSelectionChange?: (ids: Set<string>) => void;
 }
 
 export default function DataTable<T extends { id: string }>({
@@ -57,8 +60,14 @@ export default function DataTable<T extends { id: string }>({
   sort,
   onSortChange,
   renderExpanded,
+  selectedIds,
+  onSelectionChange,
 }: DataTableProps<T>) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const selectable = selectedIds !== undefined && onSelectionChange !== undefined;
+  const headCheckboxRef = useRef<HTMLInputElement>(null);
+  const allPageSelected = selectable && rows.length > 0 && rows.every((r) => selectedIds!.has(r.id));
+  const somePageSelected = selectable && rows.some((r) => selectedIds!.has(r.id));
   const cycleSort = (c: Column<T>) => {
     if (!onSortChange) return;
     const key = c.sortKey ?? c.key;
@@ -69,9 +78,41 @@ export default function DataTable<T extends { id: string }>({
       onSortChange({ key, dir: 'asc' });
     }
   };
+  const toggleAll = () => {
+    if (!selectable) return;
+    const next = new Set(selectedIds!);
+    if (allPageSelected) {
+      rows.forEach((r) => next.delete(r.id));
+    } else {
+      rows.forEach((r) => next.add(r.id));
+    }
+    onSelectionChange!(next);
+  };
+  const toggleRow = (id: string) => {
+    if (!selectable) return;
+    const next = new Set(selectedIds!);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onSelectionChange!(next);
+  };
   const head = (
     <thead className="bg-surface text-xs uppercase tracking-wide text-secondary">
       <tr>
+        {selectable && (
+          <th className="w-10 px-3 py-3">
+            <input
+              type="checkbox"
+              aria-label="Select all on page"
+              checked={allPageSelected}
+              ref={(el) => {
+                headCheckboxRef.current = el;
+                if (el) el.indeterminate = somePageSelected && !allPageSelected;
+              }}
+              onChange={toggleAll}
+              className="h-4 w-4 cursor-pointer rounded border-edge2 accent-accent"
+            />
+          </th>
+        )}
         {columns.map((c) => (
           <th key={c.key} className={cn('px-4 py-3 font-medium', c.className)}>
             {c.sortable ? (
@@ -221,6 +262,23 @@ export default function DataTable<T extends { id: string }>({
                     )}
                     style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                   >
+                    {selectable && (
+                      <td
+                        className="px-3 py-3"
+                        onClick={(e) => {
+                          // checkbox click must not open the row detail
+                          e.stopPropagation();
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${String((row as Record<string, unknown>).asset_tag ?? row.id)}`}
+                          checked={selectedIds!.has(row.id)}
+                          onChange={() => toggleRow(row.id)}
+                          className="h-4 w-4 cursor-pointer rounded border-edge2 accent-accent"
+                        />
+                      </td>
+                    )}
                     {columns.map((c) => (
                       <td key={c.key} className={cn('px-4 py-3', c.className)}>
                         {c.render
@@ -231,7 +289,7 @@ export default function DataTable<T extends { id: string }>({
                   </tr>
                   {expanded && renderExpanded && (
                     <tr className="bg-surface/60">
-                      <td colSpan={columns.length} className="px-4 py-3">
+                      <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-4 py-3">
                         {renderExpanded(row)}
                       </td>
                     </tr>

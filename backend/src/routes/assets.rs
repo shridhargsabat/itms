@@ -1,7 +1,7 @@
 use axum::body::Bytes;
 use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::{header, StatusCode};
-use axum::routing::{get, patch, post};
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,9 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/assign", patch(assign_asset))
         .route("/import", post(import_assets).layer(DefaultBodyLimit::max(10 * 1024 * 1024)))
         .route("/export", get(export_assets))
+        .route("/bulk/status", patch(bulk_update_status))
+        .route("/bulk/assign", patch(bulk_assign))
+        .route("/bulk", delete(bulk_delete))
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +47,9 @@ pub struct AssetListParams {
     pub offset: Option<i64>,
     pub sort: Option<String>,
     pub order: Option<String>,
+    /// Comma-separated asset UUIDs — used by export to emit a selection.
+    #[serde(default)]
+    pub ids: Option<String>,
 }
 
 /// Whitelisted ORDER BY columns (never interpolate user input directly).
@@ -591,6 +597,29 @@ async fn export_assets(
     if !any {
         qb.push("1 = 1");
     }
+    // Export a specific selection: ids=a,b,c (bulk export from the UI).
+    if let Some(ids_csv) = params.ids.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let ids: Vec<Uuid> = ids_csv
+            .split(',')
+            .filter_map(|p| p.trim().parse::<Uuid>().ok())
+            .collect();
+        if ids.is_empty() {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "ids must be a comma-separated list of valid UUIDs",
+            ));
+        }
+        if ids.len() > BULK_MAX_IDS {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                format!("too many ids (max {BULK_MAX_IDS})"),
+            ));
+        }
+        if any {
+            qb.push(" AND ");
+        }
+        qb.push("a.id = ANY(").push_bind(ids).push(")");
+    }
     qb.push(" ORDER BY ")
         .push(asset_sort(params.sort.as_deref().unwrap_or("created_at")));
     if params.order.as_deref() == Some("asc") {
@@ -645,4 +674,152 @@ async fn export_assets(
         ],
         body,
     ))
+}
+
+// ---------------------------------------------------------------------------
+// Bulk operations (multi-select: status, assign, delete, export-by-ids)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct BulkIds {
+    pub ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BulkStatusRequest {
+    pub ids: Vec<Uuid>,
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BulkAssignRequest {
+    pub ids: Vec<Uuid>,
+    pub assigned_to_user_id: Option<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkResult {
+    pub updated: i64,
+}
+
+const BULK_MAX_IDS: usize = 500;
+
+fn validate_bulk_ids(ids: &[Uuid]) -> Result<(), AppError> {
+    if ids.is_empty() {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "ids must not be empty",
+        ));
+    }
+    if ids.len() > BULK_MAX_IDS {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("too many ids (max {BULK_MAX_IDS})"),
+        ));
+    }
+    Ok(())
+}
+
+/// PATCH /api/v1/assets/bulk/status — {ids, status} → update all matching rows.
+async fn bulk_update_status(
+    State(state): State<AppState>,
+    Json(body): Json<BulkStatusRequest>,
+) -> Result<Json<BulkResult>, AppError> {
+    validate_bulk_ids(&body.ids)?;
+    let status = body.status.trim().to_uppercase();
+    const KNOWN_STATUSES: [&str; 4] = ["IN_STOCK", "ASSIGNED", "MAINTENANCE", "RETIRED"];
+    if !KNOWN_STATUSES.contains(&status.as_str()) {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("invalid status '{status}'"),
+        ));
+    }
+
+    let result = sqlx::query(
+        "UPDATE assets SET status = $2, updated_at = NOW() WHERE id = ANY($1)",
+    )
+    .bind(&body.ids)
+    .bind(&status)
+    .execute(&state.pool)
+    .await?;
+    let updated = result.rows_affected() as i64;
+
+    sqlx::query(
+        "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
+         VALUES (NULL, 'ASSET_BULK_STATUS', 'asset', $1, $2)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(json!({ "count": updated, "status": status }))
+    .execute(&state.pool)
+    .await?;
+
+    Ok(Json(BulkResult { updated }))
+}
+
+/// PATCH /api/v1/assets/bulk/assign — {ids, assigned_to_user_id|null} → (un)assign all.
+async fn bulk_assign(
+    State(state): State<AppState>,
+    Json(body): Json<BulkAssignRequest>,
+) -> Result<Json<BulkResult>, AppError> {
+    validate_bulk_ids(&body.ids)?;
+
+    // Guard against a dangling FK reference (would otherwise 500).
+    if let Some(user_id) = body.assigned_to_user_id {
+        let user_exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
+            .bind(user_id)
+            .fetch_one(&state.pool)
+            .await?;
+        if !user_exists {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "assigned_to_user_id does not reference an existing user",
+            ));
+        }
+    }
+
+    let result = sqlx::query(
+        "UPDATE assets SET assigned_to_user_id = $2, updated_at = NOW() WHERE id = ANY($1)",
+    )
+    .bind(&body.ids)
+    .bind(body.assigned_to_user_id)
+    .execute(&state.pool)
+    .await?;
+    let updated = result.rows_affected() as i64;
+
+    sqlx::query(
+        "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
+         VALUES (NULL, 'ASSET_BULK_ASSIGN', 'asset', $1, $2)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(json!({ "count": updated, "assigned_to_user_id": body.assigned_to_user_id }))
+    .execute(&state.pool)
+    .await?;
+
+    Ok(Json(BulkResult { updated }))
+}
+
+/// DELETE /api/v1/assets/bulk — {ids} → delete all matching assets.
+/// FK safety: ci_relationships CASCADEs, tickets.asset_id SET NULLs.
+async fn bulk_delete(
+    State(state): State<AppState>,
+    Json(body): Json<BulkIds>,
+) -> Result<Json<BulkResult>, AppError> {
+    validate_bulk_ids(&body.ids)?;
+
+    let result = sqlx::query("DELETE FROM assets WHERE id = ANY($1)")
+        .bind(&body.ids)
+        .execute(&state.pool)
+        .await?;
+    let deleted = result.rows_affected() as i64;
+
+    sqlx::query(
+        "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
+         VALUES (NULL, 'ASSET_BULK_DELETE', 'asset', $1, $2)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(json!({ "count": deleted }))
+    .execute(&state.pool)
+    .await?;
+
+    Ok(Json(BulkResult { updated: deleted }))
 }
