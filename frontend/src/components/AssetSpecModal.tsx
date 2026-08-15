@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, History, IndianRupee, LoaderCircle, Pencil, User, X } from 'lucide-react';
-import { assignAsset, getAssetLifecycle, updateAsset } from '@/api/client';
+import { assignAsset, getAssetLifecycle, getCachedUser, updateAsset } from '@/api/client';
 import type { Asset, AssetStatus, LifecycleEvent, UpdateAssetInput } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import Select from '@/components/Select';
@@ -36,6 +36,8 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
   const [userId, setUserId] = useState('');
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<UpdateAssetInput>({});
+  // Admin-only mutations (backend gated since PR #96) — hide the controls for other roles.
+  const isAdmin = getCachedUser()?.role === 'ADMIN';
 
   const assign = useMutation({
     mutationFn: ({ id, uid }: { id: string; uid: string | null }) => assignAsset(id, uid),
@@ -103,7 +105,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
             <p className="text-xs uppercase tracking-wide text-muted">{asset.category}</p>
           </div>
           <div className="flex items-center gap-1">
-            {!editing && (
+            {!editing && isAdmin && (
               <button
                 type="button"
                 onClick={openEdit}
@@ -330,7 +332,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
           )}
         </div>
 
-        {!editing && (
+        {!editing && isAdmin && (
           <div className="border-t border-edge px-5 py-4">
             <p className={labelCls}>Assign / Unassign</p>
             <form

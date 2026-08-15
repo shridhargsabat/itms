@@ -7,6 +7,7 @@ import {
   bulkDeleteAssets,
   bulkUpdateAssetStatus,
   exportAssetsCsv,
+  getCachedUser,
   importAssetsCsv,
   listAssets,
   listUsers,
@@ -37,6 +38,8 @@ export default function Assets() {
   const [bulkAction, setBulkAction] = useState<BulkAction>(null);
   const [bulkStatus, setBulkStatus] = useState('IN_STOCK');
   const [bulkUserId, setBulkUserId] = useState('');
+  // Admin-only mutations (backend gated since PR #96) — hide the controls for other roles.
+  const isAdmin = getCachedUser()?.role === 'ADMIN';
 
   const { data: usersData } = useQuery({
     queryKey: ['users'],
@@ -223,17 +226,19 @@ export default function Assets() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setImportOpen(true);
-              setFile(null);
-              setImportResult(null);
-            }}
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
-          >
-            <FileUp className="h-4 w-4" /> Import
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                setImportOpen(true);
+                setFile(null);
+                setImportResult(null);
+              }}
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            >
+              <FileUp className="h-4 w-4" /> Import
+            </button>
+          )}
           <button
             type="button"
             onClick={onExport}
@@ -339,8 +344,8 @@ export default function Assets() {
         loading={isLoading}
         emptyMessage="No assets match the current filters."
         onRowClick={(a) => setSelected(a)}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
+        selectedIds={isAdmin ? selectedIds : undefined}
+        onSelectionChange={isAdmin ? setSelectedIds : undefined}
       />
 
       <AssetSpecModal asset={selected} onClose={() => setSelected(null)} />

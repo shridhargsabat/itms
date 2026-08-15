@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { createAsset, createTicket, getAuditLog, getDashboardMetrics } from '@/api/client';
+import { createAsset, createTicket, getAuditLog, getDashboardMetrics, getCachedUser } from '@/api/client';
 import { ASSET_CATEGORIES, ASSET_STATUSES, PRIORITIES, TICKET_TYPES } from '@/api/types';
 import type { CreateAssetInput, CreateTicketInput, DashboardMetrics } from '@/api/types';
 import Modal from '@/components/Modal';
@@ -359,6 +359,9 @@ export default function Dashboard() {
     refetchInterval: paused ? false : 30_000,
   });
 
+  // Admin-only mutations (backend gated since PR #96) — hide the controls for other roles.
+  const isAdmin = getCachedUser()?.role === 'ADMIN';
+
   return (
     <div className="space-y-6">
       {/* Sticky actions row: the + New Ticket / + Add Asset buttons must stay
@@ -379,13 +382,15 @@ export default function Dashboard() {
           >
             <Plus className="h-4 w-4" /> New Ticket
           </button>
-          <button
-            type="button"
-            onClick={() => setAssetOpen(true)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-edge2 px-4 text-sm font-medium text-primary transition-all duration-150 hover:bg-elevated active:scale-[0.97]"
-          >
-            <Plus className="h-4 w-4" /> Add Asset
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setAssetOpen(true)}
+              className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-edge2 px-4 text-sm font-medium text-primary transition-all duration-150 hover:bg-elevated active:scale-[0.97]"
+            >
+              <Plus className="h-4 w-4" /> Add Asset
+            </button>
+          )}
         </div>
       </div>
 
