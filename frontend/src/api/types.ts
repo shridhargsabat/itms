@@ -92,6 +92,7 @@ export interface DashboardMetrics {
   in_stock_count: number;
   warranty_alerts_count: number;
   onboarding_overdue: number;
+  open_requests: number;
 }
 
 export interface Asset {
@@ -295,4 +296,58 @@ export interface UpdateTaskInput {
   asset_id?: string | null;
   note?: string | null;
   status?: OnboardingTaskStatus;
+}
+
+// ── Service catalog + requests (P0-3, issue #51) ────────────────────────────
+
+export interface CatalogFormField {
+  key: string;
+  label: string;
+  type: 'text' | 'textarea' | 'select' | 'date';
+  required?: boolean;
+  options?: string[];
+}
+
+export interface CatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  category: string;
+  approval_required: boolean;
+  form_fields: CatalogFormField[];
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type RequestStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type RequestPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface ServiceRequest {
+  id: string;
+  request_number: string;
+  catalog_item_id: string;
+  requester_id: string;
+  subject: string;
+  details: Record<string, unknown>;
+  priority: RequestPriority;
+  status: RequestStatus;
+  assignee_id: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  requester_name?: string | null;
+  assignee_name?: string | null;
+  catalog_name?: string | null;
+  catalog_code?: string | null;
+}
+
+export interface CreateRequestInput {
+  catalog_item_id: string;
+  subject: string;
+  details?: Record<string, unknown>;
+  priority?: RequestPriority;
 }

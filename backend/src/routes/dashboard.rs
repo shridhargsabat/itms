@@ -31,7 +31,9 @@ async fn metrics(
             (SELECT COUNT(*) FROM onboarding_tasks t
                 JOIN onboarding_events e ON e.id = t.event_id
                 WHERE e.status = 'OPEN' AND t.status = 'PENDING'
-                  AND t.due_date IS NOT NULL AND t.due_date < CURRENT_DATE)                     AS onboarding_overdue
+                  AND t.due_date IS NOT NULL AND t.due_date < CURRENT_DATE)                     AS onboarding_overdue,
+            (SELECT COUNT(*) FROM service_requests
+                WHERE status IN ('SUBMITTED', 'APPROVED', 'IN_PROGRESS'))                       AS open_requests
         "#,
     )
     .fetch_one(&state.pool)
