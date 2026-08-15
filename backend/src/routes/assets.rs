@@ -355,65 +355,53 @@ async fn update_asset(
 
     // Dynamic SET clause: absent (None) = leave unchanged, explicit null
     // (Some(None)) = clear the field. COALESCE cannot express "clear", so the
-    // SET list is built from what the request actually contains; binds follow
-    // placeholder order ($1..$n for SET, then WHERE id = $n+1).
-    // Two flavors: `col` for plain Option fields, `colopt` for Option<Option>
-    // (where Some(None) = explicit clear → SET NULL, None = absent → skip).
+    // SET list is built from what the request actually contains. All binds are
+    // Option<String> with explicit SQL casts (::date, ::float8, ::jsonb) so
+    // one type flows through the whole macro; binds are collected in the SAME
+    // order as the SET columns, then WHERE id = $n+1.
     let mut q = String::from("UPDATE assets SET ");
-    let mut n: usize = 1;
-    let mut first = true;
+    let mut binds: Vec<Option<String>> = Vec::new();
     macro_rules! col {
-        ($sql:expr, $v:expr) => {{
-            let v = $v;
+        ($sql:expr, $v:expr, $cast:expr) => {{
+            let v: Option<String> = $v;
             if v.is_some() {
-                if !first {
+                if !binds.is_empty() {
                     q.push_str(", ");
                 }
-                first = false;
-                q.push_str(&format!("{} = ${}", $sql, n));
-                n += 1;
+                q.push_str(&format!("{} = ${}{}", $sql, binds.len() + 1, $cast));
+                binds.push(v);
             }
-            v
         }};
     }
     macro_rules! colopt {
-        ($sql:expr, $v:expr) => {{
+        ($sql:expr, $v:expr, $cast:expr) => {{
             let v = $v;
             if v.is_some() {
-                if !first {
+                if !binds.is_empty() {
                     q.push_str(", ");
                 }
-                first = false;
-                q.push_str(&format!("{} = ${}", $sql, n));
-                n += 1;
+                q.push_str(&format!("{} = ${}{}", $sql, binds.len() + 1, $cast));
+                binds.push(v.flatten().map(|x| x.to_string()));
             }
-            v.flatten()
         }};
     }
-    let name_b = col!("name", body.name);
-    let category_b = col!("category", body.category);
-    let serial_b = col!("serial_number", body.serial_number);
-    let status_b = col!("status", new_status.clone());
-    let specs_b = col!("specs", body.specs);
-    let purchase_b = colopt!("purchase_date", body.purchase_date);
-    let warranty_b = colopt!("warranty_expiry", body.warranty_expiry);
-    let cost_b = colopt!("unit_cost", body.unit_cost);
-    let eol_b = colopt!("expected_eol", body.expected_eol);
+    col!("name", body.name, "");
+    col!("category", body.category, "");
+    col!("serial_number", body.serial_number, "");
+    col!("status", new_status.clone(), "");
+    col!("specs", body.specs.map(|s| s.to_string()), "::jsonb");
+    colopt!("purchase_date", body.purchase_date, "::date");
+    colopt!("warranty_expiry", body.warranty_expiry, "::date");
+    colopt!("unit_cost", body.unit_cost, "::float8");
+    colopt!("expected_eol", body.expected_eol, "::date");
     q.push_str(", updated_at = NOW()");
-    q.push_str(&format!(" WHERE id = ${n} {ASSET_RETURNING}"));
+    q.push_str(&format!(" WHERE id = ${} {ASSET_RETURNING}", binds.len() + 1));
 
     let mut qb = sqlx::query_as::<_, Asset>(&q);
-    qb = qb
-        .bind(name_b)
-        .bind(category_b)
-        .bind(serial_b)
-        .bind(status_b)
-        .bind(specs_b)
-        .bind(purchase_b)
-        .bind(warranty_b)
-        .bind(cost_b)
-        .bind(eol_b)
-        .bind(asset_id);
+    for b in binds {
+        qb = qb.bind(b);
+    }
+    qb = qb.bind(asset_id);
     let updated: Asset = qb.fetch_one(&state.pool).await?;
 
     // Lifecycle event for the status change (if any).
