@@ -27,7 +27,11 @@ async fn metrics(
             (SELECT COUNT(*) FROM assets WHERE status = 'IN_STOCK')                              AS in_stock_count,
             (SELECT COUNT(*) FROM assets
                 WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL
-                  AND warranty_expiry <= CURRENT_DATE + 90)                                       AS warranty_alerts_count
+                  AND warranty_expiry <= CURRENT_DATE + 90)                                       AS warranty_alerts_count,
+            (SELECT COUNT(*) FROM onboarding_tasks t
+                JOIN onboarding_events e ON e.id = t.event_id
+                WHERE e.status = 'OPEN' AND t.status = 'PENDING'
+                  AND t.due_date IS NOT NULL AND t.due_date < CURRENT_DATE)                     AS onboarding_overdue
         "#,
     )
     .fetch_one(&state.pool)

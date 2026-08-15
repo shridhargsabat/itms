@@ -15,6 +15,7 @@ import {
   ScrollText,
   ShieldCheck,
   Ticket,
+  UserRoundCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import OfflineBanner from '@/components/OfflineBanner';
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/assets', label: 'Assets', icon: Boxes },
   { to: '/warranty', label: 'Warranty', icon: ShieldCheck },
+  { to: '/onboarding', label: 'Join/Leave', icon: UserRoundCheck },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/cmdb', label: 'CMDB', icon: Network },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },

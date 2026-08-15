@@ -44,8 +44,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(cors)
         .layer(TraceLayer::new_for_http());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
-    tracing::info!("ITMS backend listening on http://0.0.0.0:8080");
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    tracing::info!("ITMS backend listening on http://0.0.0.0:{port}");
     axum::serve(listener, app.with_state(state)).await?;
 
     Ok(())

@@ -116,6 +116,8 @@ pub struct DashboardMetrics {
     /// Assets whose warranty expires within 90 days or has already expired
     /// (excludes RETIRED — same filter as the Warranty view).
     pub warranty_alerts_count: i64,
+    /// Open onboarding/offboarding events with at least one overdue task.
+    pub onboarding_overdue: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -253,4 +255,93 @@ pub struct ImpactResponse {
     pub root_asset_id: Uuid,
     pub impact_count: i64,
     pub impacted: Vec<ImpactedAsset>,
+}
+
+// ── Onboarding / offboarding (P0-1, issue #50) ──────────────────────────────
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct OnboardingEvent {
+    pub id: Uuid,
+    pub event_type: String,
+    pub person_name: String,
+    pub person_email: String,
+    pub start_date: Option<NaiveDate>,
+    pub notes: Option<String>,
+    pub status: String,
+    pub created_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    /// task progress columns (list queries only)
+    #[sqlx(default)]
+    pub total_tasks: i64,
+    #[sqlx(default)]
+    pub done_tasks: i64,
+    #[sqlx(default)]
+    pub overdue_tasks: i64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct OnboardingTask {
+    pub id: Uuid,
+    pub event_id: Uuid,
+    pub title: String,
+    pub category: String,
+    pub due_date: Option<NaiveDate>,
+    pub status: String,
+    pub asset_id: Option<Uuid>,
+    pub note: Option<String>,
+    pub completed_by: Option<Uuid>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    /// joined for display (list queries only)
+    #[sqlx(default)]
+    pub asset_tag: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateOnboardingRequest {
+    pub event_type: String,
+    pub person_name: String,
+    pub person_email: String,
+    pub start_date: Option<NaiveDate>,
+    pub notes: Option<String>,
+    /// optional custom task list; when omitted, the standard checklist for
+    /// the event type is generated server-side
+    #[serde(default)]
+    pub tasks: Option<Vec<CreateTaskInput>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateTaskInput {
+    pub title: String,
+    #[serde(default)]
+    pub category: String,
+    pub due_date: Option<NaiveDate>,
+    pub asset_id: Option<Uuid>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateOnboardingRequest {
+    pub person_name: Option<String>,
+    pub person_email: Option<String>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub start_date: Option<Option<NaiveDate>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateTaskRequest {
+    pub title: Option<String>,
+    pub category: Option<String>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub due_date: Option<Option<NaiveDate>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub asset_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub note: Option<Option<String>>,
+    pub status: Option<String>,
 }

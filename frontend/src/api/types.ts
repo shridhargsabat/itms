@@ -91,6 +91,7 @@ export interface DashboardMetrics {
   high_priority_count: number;
   in_stock_count: number;
   warranty_alerts_count: number;
+  onboarding_overdue: number;
 }
 
 export interface Asset {
@@ -225,4 +226,73 @@ export interface CreateTicketInput {
   priority: Priority;
   requester_id?: string;
   asset_id?: string;
+}
+
+// ── Onboarding / offboarding (P0-1, issue #50) ──────────────────────────────
+
+export type OnboardingEventType = 'ONBOARDING' | 'OFFBOARDING';
+export type OnboardingStatus = 'OPEN' | 'CLOSED';
+export type OnboardingTaskCategory = 'ASSET' | 'LICENSE' | 'ACCESS' | 'RETURN' | 'DATA_WIPE' | 'OTHER';
+export type OnboardingTaskStatus = 'PENDING' | 'DONE';
+
+export interface OnboardingEvent {
+  id: string;
+  event_type: OnboardingEventType;
+  person_name: string;
+  person_email: string;
+  start_date: string | null;
+  notes: string | null;
+  status: OnboardingStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  total_tasks: number;
+  done_tasks: number;
+  overdue_tasks: number;
+}
+
+export interface OnboardingTask {
+  id: string;
+  event_id: string;
+  title: string;
+  category: OnboardingTaskCategory;
+  due_date: string | null;
+  status: OnboardingTaskStatus;
+  asset_id: string | null;
+  asset_tag: string | null;
+  note: string | null;
+  completed_by: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface OnboardingDetail {
+  event: OnboardingEvent;
+  tasks: OnboardingTask[];
+}
+
+export interface CreateTaskInput {
+  title: string;
+  category?: OnboardingTaskCategory;
+  due_date?: string | null;
+  asset_id?: string | null;
+  note?: string | null;
+}
+
+export interface CreateOnboardingInput {
+  event_type: OnboardingEventType;
+  person_name: string;
+  person_email: string;
+  start_date?: string | null;
+  notes?: string | null;
+  tasks?: CreateTaskInput[];
+}
+
+export interface UpdateTaskInput {
+  title?: string;
+  category?: OnboardingTaskCategory;
+  due_date?: string | null;
+  asset_id?: string | null;
+  note?: string | null;
+  status?: OnboardingTaskStatus;
 }

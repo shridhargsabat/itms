@@ -4,6 +4,7 @@ pub mod auth;
 pub mod cmdb;
 pub mod dashboard;
 pub mod masters;
+pub mod onboarding;
 pub mod tickets;
 pub mod users;
 
@@ -32,6 +33,7 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         // ADMIN-only — the per-route split lives inside each module.
         .nest("/users", users::router())
         .nest("/masters", masters::router())
+        .nest("/onboarding", onboarding::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
 
     Router::new()

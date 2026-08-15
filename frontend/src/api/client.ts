@@ -3,13 +3,19 @@ import type {
   AuditLogEntry,
   AuthUser,
   CreateAssetInput,
+  CreateOnboardingInput,
   CreateTicketInput,
+  CreateTaskInput,
   CreateUserInput,
   DashboardMetrics,
   ImpactResult,
   LifecycleEvent,
   LoginResponse,
   LookupOption,
+  OnboardingDetail,
+  OnboardingEvent,
+  OnboardingTask,
+  UpdateTaskInput,
   MasterFamily,
   MastersMap,
   Ticket,
@@ -305,3 +311,40 @@ export const updateMasterOption = (
 ) => apiFetch<LookupOption>(`/masters/${optionId}`, { method: 'PATCH', body: JSON.stringify(input) });
 export const deleteMasterOption = (optionId: string) =>
   apiFetch<void>(`/masters/${optionId}`, { method: 'DELETE' });
+
+// ── Onboarding / offboarding (P0-1) ─────────────────────────────────────────
+
+export const getOnboardingEvents = (params?: {
+  type?: 'ONBOARDING' | 'OFFBOARDING';
+  status?: 'OPEN' | 'CLOSED';
+  search?: string;
+}) => {
+  const q = new URLSearchParams();
+  if (params?.type) q.set('type', params.type);
+  if (params?.status) q.set('status', params.status);
+  if (params?.search) q.set('search', params.search);
+  const qs = q.toString();
+  return apiFetch<OnboardingEvent[]>(`/onboarding${qs ? `?${qs}` : ''}`);
+};
+
+export const getOnboardingDetail = (id: string) => apiFetch<OnboardingDetail>(`/onboarding/${id}`);
+
+export const createOnboardingEvent = (input: CreateOnboardingInput) =>
+  apiFetch<OnboardingEvent>('/onboarding', { method: 'POST', body: JSON.stringify(input) });
+
+export const updateOnboardingEvent = (
+  id: string,
+  input: { person_name?: string; person_email?: string; start_date?: string | null; notes?: string | null; status?: string },
+) => apiFetch<OnboardingEvent>(`/onboarding/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+
+export const deleteOnboardingEvent = (id: string) =>
+  apiFetch<void>(`/onboarding/${id}`, { method: 'DELETE' });
+
+export const addOnboardingTask = (eventId: string, input: CreateTaskInput) =>
+  apiFetch<OnboardingTask>(`/onboarding/${eventId}/tasks`, { method: 'POST', body: JSON.stringify(input) });
+
+export const updateOnboardingTask = (taskId: string, input: UpdateTaskInput) =>
+  apiFetch<{ task: OnboardingTask }>(`/onboarding/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(input) });
+
+export const deleteOnboardingTask = (taskId: string) =>
+  apiFetch<void>(`/onboarding/tasks/${taskId}`, { method: 'DELETE' });

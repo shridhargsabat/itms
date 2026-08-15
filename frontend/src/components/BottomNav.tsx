@@ -4,9 +4,9 @@ import {
   Database,
   LayoutDashboard,
   Network,
-  ScrollText,
   ShieldCheck,
   Ticket,
+  UserRoundCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCachedUser } from '@/api/client';
@@ -15,10 +15,11 @@ const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/assets', label: 'Assets', icon: Boxes },
   { to: '/warranty', label: 'Warranty', icon: ShieldCheck },
+  { to: '/onboarding', label: 'Join/Leave', icon: UserRoundCheck },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/cmdb', label: 'CMDB', icon: Network },
-  { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/masters', label: 'Masters', icon: Database, admin: true },
+  // Audit Log intentionally desktop-only (sidebar) — 8 items overflow 375px.
 ];
 
 /** SAPL-style compact glassy bottom nav — mobile only (desktop keeps the sidebar). */
