@@ -11,25 +11,35 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::db::AppState;
-use crate::models::{Asset, AssignAssetRequest, CreateAssetRequest};
+use crate::models::{
+    Asset, AssignAssetRequest, CreateAssetRequest, LifecycleEvent, UpdateAssetRequest,
+    WarrantyAlert,
+};
 
 use super::AppError;
 
 /// Shared joined SELECT so every handler returns the same enriched shape.
 const ASSET_SELECT: &str = "SELECT a.id, a.asset_tag, a.name, a.category, a.serial_number, \
      a.status, a.assigned_to_user_id, a.specs, a.purchase_date, a.warranty_expiry, \
-     a.created_at, a.updated_at, u.name AS assigned_user_name \
+     a.unit_cost, a.expected_eol, a.created_at, a.updated_at, u.name AS assigned_user_name, \
+     ROUND((a.unit_cost * LEAST(1.0, GREATEST(0.0, \
+        (CURRENT_DATE - COALESCE(a.purchase_date, a.expected_eol))::float8 / 1095.0)))::numeric, 2)::float8 \
+        AS current_value \
      FROM assets a LEFT JOIN users u ON u.id = a.assigned_to_user_id";
 
 /// RETURNING clause mirroring ASSET_SELECT's columns (assigned_user_name is
 /// always NULL on a freshly inserted/updated row here).
 const ASSET_RETURNING: &str = "RETURNING id, asset_tag, name, category, serial_number, status, \
-     assigned_to_user_id, specs, purchase_date, warranty_expiry, created_at, updated_at, \
-     NULL::text AS assigned_user_name";
+     assigned_to_user_id, specs, purchase_date, warranty_expiry, unit_cost, expected_eol, \
+     created_at, updated_at, NULL::text AS assigned_user_name, \
+     NULL::float8 AS current_value";
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_assets).post(create_asset))
+        .route("/alerts", get(warranty_alerts))
+        .route("/{id}", patch(update_asset))
+        .route("/{id}/lifecycle", get(asset_lifecycle))
         .route("/{id}/assign", patch(assign_asset))
         .route("/import", post(import_assets).layer(DefaultBodyLimit::max(10 * 1024 * 1024)))
         .route("/export", get(export_assets))
@@ -201,14 +211,38 @@ async fn assign_asset(
         }
     }
 
+    // Auto-transition lifecycle status: assignment moves the asset to
+    // ASSIGNED (from stock/repair), unassignment returns it to IN_STOCK
+    // (RETIRED assets stay retired — assignment is a no-op there).
+    let target_status = match (current.status.as_str(), body.assigned_to_user_id.is_some()) {
+        ("RETIRED", _) => "RETIRED".to_string(),
+        (_, true) => "ASSIGNED".to_string(),
+        (_, false) => "IN_STOCK".to_string(),
+    };
+    if !can_transition(&current.status, &target_status) {
+        return Err(transition_error(&current.status, &target_status));
+    }
+
     let updated: Asset = sqlx::query_as::<_, Asset>(&format!(
-        "UPDATE assets SET assigned_to_user_id = $2, updated_at = NOW() \
+        "UPDATE assets SET assigned_to_user_id = $2, status = $3, updated_at = NOW() \
          WHERE id = $1 {ASSET_RETURNING}"
     ))
     .bind(asset_id)
     .bind(body.assigned_to_user_id)
+    .bind(&target_status)
     .fetch_one(&state.pool)
     .await?;
+
+    if target_status != current.status {
+        log_lifecycle_event(
+            &state.pool,
+            asset_id,
+            Some(&current.status),
+            &target_status,
+            Some("assignment changed"),
+        )
+        .await?;
+    }
 
     sqlx::query(
         "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
@@ -223,6 +257,195 @@ async fn assign_asset(
     .await?;
 
     Ok(Json(updated))
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle state machine (issue #36)
+// ---------------------------------------------------------------------------
+
+/// Allowed lifecycle transitions (Snipe-IT-inspired; RETIRED is reversible to
+/// IN_STOCK for correction/re-activation).
+fn can_transition(from: &str, to: &str) -> bool {
+    if from == to {
+        return true;
+    }
+    matches!(
+        (from, to),
+        ("IN_STOCK", "ASSIGNED")
+            | ("IN_STOCK", "MAINTENANCE")
+            | ("IN_STOCK", "RETIRED")
+            | ("ASSIGNED", "IN_STOCK")
+            | ("ASSIGNED", "MAINTENANCE")
+            | ("ASSIGNED", "RETIRED")
+            | ("MAINTENANCE", "IN_STOCK")
+            | ("MAINTENANCE", "ASSIGNED")
+            | ("MAINTENANCE", "RETIRED")
+            | ("RETIRED", "IN_STOCK")
+    )
+}
+
+fn transition_error(from: &str, to: &str) -> AppError {
+    AppError::new(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        format!("invalid lifecycle transition {from} → {to}"),
+    )
+}
+
+/// Record a lifecycle event (fire-and-forget: never blocks the update).
+async fn log_lifecycle_event(
+    pool: &PgPool,
+    asset_id: Uuid,
+    from_status: Option<&str>,
+    to_status: &str,
+    note: Option<&str>,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO asset_lifecycle_events (asset_id, from_status, to_status, actor_id, note) \
+         VALUES ($1, $2, $3, NULL, $4)",
+    )
+    .bind(asset_id)
+    .bind(from_status)
+    .bind(to_status)
+    .bind(note)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// PATCH /api/v1/assets/{id} — partial update (name, category, serial,
+/// status w/ transition validation, specs, dates, cost). Each field is
+/// optional; `null` for dates/cost clears the value. Status changes are
+/// recorded in the lifecycle history.
+async fn update_asset(
+    State(state): State<AppState>,
+    Path(asset_id): Path<Uuid>,
+    Json(body): Json<UpdateAssetRequest>,
+) -> Result<Json<Asset>, AppError> {
+    let current: Option<Asset> = sqlx::query_as::<_, Asset>(&format!("{ASSET_SELECT} WHERE a.id = $1"))
+        .bind(asset_id)
+        .fetch_optional(&state.pool)
+        .await?;
+    let Some(current) = current else {
+        return Err(AppError::not_found("asset not found"));
+    };
+
+    if let Some(cat) = body.category.as_deref() {
+        let valid: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM lookup_options WHERE family = 'asset_category' AND code = $1 AND active)",
+        )
+        .bind(cat)
+        .fetch_one(&state.pool)
+        .await?;
+        if !valid {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                format!("invalid category '{cat}'"),
+            ));
+        }
+    }
+
+    let new_status = body.status.as_deref().map(str::trim).map(str::to_uppercase);
+    if let Some(status) = &new_status {
+        if !can_transition(&current.status, status) {
+            return Err(transition_error(&current.status, status));
+        }
+    }
+
+    let updated: Asset = sqlx::query_as::<_, Asset>(&format!(
+        "UPDATE assets SET \
+            name = COALESCE($2, name), \
+            category = COALESCE($3, category), \
+            serial_number = COALESCE($4, serial_number), \
+            status = COALESCE($5, status), \
+            specs = COALESCE($6, specs), \
+            purchase_date = COALESCE($7, purchase_date), \
+            warranty_expiry = COALESCE($8, warranty_expiry), \
+            unit_cost = COALESCE($9, unit_cost), \
+            expected_eol = COALESCE($10, expected_eol), \
+            updated_at = NOW() \
+         WHERE id = $1 {ASSET_RETURNING}"
+    ))
+    .bind(asset_id)
+    .bind(body.name)
+    .bind(body.category)
+    .bind(body.serial_number)
+    .bind(&new_status)
+    .bind(body.specs)
+    .bind(body.purchase_date.flatten())
+    .bind(body.warranty_expiry.flatten())
+    .bind(body.unit_cost.flatten())
+    .bind(body.expected_eol.flatten())
+    .fetch_one(&state.pool)
+    .await?;
+
+    // Lifecycle event for the status change (if any).
+    if let Some(to) = &new_status {
+        if to != &current.status {
+            log_lifecycle_event(&state.pool, asset_id, Some(&current.status), to, None).await?;
+        }
+    }
+
+    sqlx::query(
+        "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
+         VALUES (NULL, 'ASSET_UPDATE', 'asset', $1, $2)",
+    )
+    .bind(asset_id)
+    .bind(json!({
+        "old": {
+            "name": current.name, "category": current.category,
+            "serial_number": current.serial_number, "status": current.status,
+            "purchase_date": current.purchase_date, "warranty_expiry": current.warranty_expiry,
+            "unit_cost": current.unit_cost, "expected_eol": current.expected_eol,
+        },
+        "new": {
+            "name": updated.name, "category": updated.category,
+            "serial_number": updated.serial_number, "status": updated.status,
+            "purchase_date": updated.purchase_date, "warranty_expiry": updated.warranty_expiry,
+            "unit_cost": updated.unit_cost, "expected_eol": updated.expected_eol,
+        }
+    }))
+    .execute(&state.pool)
+    .await?;
+
+    Ok(Json(updated))
+}
+
+/// GET /api/v1/assets/{id}/lifecycle — status transition history (newest first).
+async fn asset_lifecycle(
+    State(state): State<AppState>,
+    Path(asset_id): Path<Uuid>,
+) -> Result<Json<Vec<LifecycleEvent>>, AppError> {
+    let events = sqlx::query_as::<_, LifecycleEvent>(
+        "SELECT e.id, e.asset_id, e.from_status, e.to_status, e.actor_id, e.note, e.created_at, \
+                u.name AS actor_name \
+         FROM asset_lifecycle_events e \
+         LEFT JOIN users u ON u.id = e.actor_id \
+         WHERE e.asset_id = $1 \
+         ORDER BY e.created_at DESC",
+    )
+    .bind(asset_id)
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(events))
+}
+
+/// GET /api/v1/assets/alerts — warranty expiring within 90 days or already
+/// expired (excludes RETIRED). days_left < 0 = expired.
+async fn warranty_alerts(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<WarrantyAlert>>, AppError> {
+    let alerts = sqlx::query_as::<_, WarrantyAlert>(
+        "SELECT id, asset_tag, name, status, warranty_expiry, \
+                (warranty_expiry - CURRENT_DATE)::bigint AS days_left \
+         FROM assets \
+         WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL \
+           AND warranty_expiry <= CURRENT_DATE + 90 \
+         ORDER BY warranty_expiry ASC \
+         LIMIT 500",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(alerts))
 }
 
 /// Asset tag generation: `SELECT count(*) FROM assets` + 1 → `AST-{:04}`,
@@ -241,8 +464,8 @@ async fn insert_asset_with_tag_retry(
         let asset_tag = format!("AST-{:04}", count + 1);
 
         let result = sqlx::query_as::<_, Asset>(&format!(
-            "INSERT INTO assets (asset_tag, name, category, serial_number, status, specs, purchase_date, warranty_expiry) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) {ASSET_RETURNING}"
+            "INSERT INTO assets (asset_tag, name, category, serial_number, status, specs, purchase_date, warranty_expiry, unit_cost, expected_eol) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) {ASSET_RETURNING}"
         ))
         .bind(&asset_tag)
         .bind(&body.name)
@@ -252,6 +475,8 @@ async fn insert_asset_with_tag_retry(
         .bind(&specs)
         .bind(body.purchase_date)
         .bind(body.warranty_expiry)
+        .bind(body.unit_cost)
+        .bind(body.expected_eol)
         .fetch_one(pool)
         .await;
 
@@ -407,7 +632,19 @@ async fn import_assets(
         };
         let (purchase_date, e1) = parse_date(get("purchase_date"), "purchase_date");
         let (warranty_expiry, e2) = parse_date(get("warranty_expiry"), "warranty_expiry");
-        errs.extend(e1.into_iter().chain(e2));
+        let (expected_eol, e3) = parse_date(get("expected_eol"), "expected_eol");
+        errs.extend(e1.into_iter().chain(e2).chain(e3));
+
+        let unit_cost: Option<f64> = match get("unit_cost") {
+            None => None,
+            Some(c) => match c.parse::<f64>() {
+                Ok(v) if v >= 0.0 => Some(v),
+                _ => {
+                    errs.push(format!("invalid unit_cost '{c}'"));
+                    None
+                }
+            },
+        };
 
         let specs: Value = match get("specs") {
             None => json!({}),
@@ -463,6 +700,8 @@ async fn import_assets(
             &specs,
             purchase_date,
             warranty_expiry,
+            unit_cost,
+            expected_eol,
             custom_tag,
         )
         .await
@@ -503,6 +742,8 @@ async fn insert_imported_asset(
     specs: &Value,
     purchase_date: Option<NaiveDate>,
     warranty_expiry: Option<NaiveDate>,
+    unit_cost: Option<f64>,
+    expected_eol: Option<NaiveDate>,
     custom_tag: Option<String>,
 ) -> Result<Asset, InsertError> {
     for attempt in 0..3 {
@@ -518,8 +759,8 @@ async fn insert_imported_asset(
         };
         let result = sqlx::query_as::<_, Asset>(&format!(
             "INSERT INTO assets (asset_tag, name, category, serial_number, status, \
-             assigned_to_user_id, specs, purchase_date, warranty_expiry) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) {ASSET_RETURNING}"
+             assigned_to_user_id, specs, purchase_date, warranty_expiry, unit_cost, expected_eol) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) {ASSET_RETURNING}"
         ))
         .bind(&asset_tag)
         .bind(name)
@@ -530,6 +771,8 @@ async fn insert_imported_asset(
         .bind(specs)
         .bind(purchase_date)
         .bind(warranty_expiry)
+        .bind(unit_cost)
+        .bind(expected_eol)
         .fetch_one(pool)
         .await;
 
@@ -657,6 +900,9 @@ async fn export_assets(
         "assigned_to",
         "purchase_date",
         "warranty_expiry",
+        "unit_cost",
+        "expected_eol",
+        "current_value",
         "specs",
         "created_at",
     ])
@@ -671,6 +917,13 @@ async fn export_assets(
             a.assigned_user_name.clone().unwrap_or_default(),
             a.purchase_date.map(|d| d.to_string()).unwrap_or_default(),
             a.warranty_expiry.map(|d| d.to_string()).unwrap_or_default(),
+            a.unit_cost
+                .map(|c| format!("{c:.2}"))
+                .unwrap_or_default(),
+            a.expected_eol.map(|d| d.to_string()).unwrap_or_default(),
+            a.current_value
+                .map(|c| format!("{c:.2}"))
+                .unwrap_or_default(),
             a.specs.to_string(),
             a.created_at.to_rfc3339(),
         ])
@@ -751,6 +1004,32 @@ async fn bulk_update_status(
         ));
     }
 
+    // Per-asset lifecycle validation: reject the batch if ANY asset cannot
+    // make the requested transition (no partial surprises).
+    let current_statuses: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT status FROM assets WHERE id = ANY($1)",
+    )
+    .bind(&body.ids)
+    .fetch_all(&state.pool)
+    .await?;
+    for from in &current_statuses {
+        if !can_transition(from, &status) {
+            return Err(transition_error(from, &status));
+        }
+    }
+
+    // Lifecycle history for every changed asset — MUST run BEFORE the UPDATE
+    // (from_status reads the pre-change value).
+    sqlx::query(
+        "INSERT INTO asset_lifecycle_events (asset_id, from_status, to_status, actor_id, note) \
+         SELECT id, status, $2, NULL, 'bulk status change' FROM assets WHERE id = ANY($1) \
+           AND status <> $2",
+    )
+    .bind(&body.ids)
+    .bind(&status)
+    .execute(&state.pool)
+    .await?;
+
     let result = sqlx::query(
         "UPDATE assets SET status = $2, updated_at = NOW() WHERE id = ANY($1)",
     )
@@ -793,11 +1072,42 @@ async fn bulk_assign(
         }
     }
 
+    // Auto-transition lifecycle status with the assignment (assign →
+    // ASSIGNED, unassign → IN_STOCK), rejecting any asset that can't make
+    // the move (e.g. RETIRED). Per-asset events BEFORE the UPDATE.
+    let target = if body.assigned_to_user_id.is_some() {
+        "ASSIGNED"
+    } else {
+        "IN_STOCK"
+    };
+    let current_statuses: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT status FROM assets WHERE id = ANY($1)",
+    )
+    .bind(&body.ids)
+    .fetch_all(&state.pool)
+    .await?;
+    for from in &current_statuses {
+        if !can_transition(from, target) {
+            return Err(transition_error(from, target));
+        }
+    }
+    sqlx::query(
+        "INSERT INTO asset_lifecycle_events (asset_id, from_status, to_status, actor_id, note) \
+         SELECT id, status, $2, NULL, 'bulk assignment' FROM assets WHERE id = ANY($1) \
+           AND status <> $2",
+    )
+    .bind(&body.ids)
+    .bind(target)
+    .execute(&state.pool)
+    .await?;
+
     let result = sqlx::query(
-        "UPDATE assets SET assigned_to_user_id = $2, updated_at = NOW() WHERE id = ANY($1)",
+        "UPDATE assets SET assigned_to_user_id = $2, status = $3, updated_at = NOW() \
+         WHERE id = ANY($1)",
     )
     .bind(&body.ids)
     .bind(body.assigned_to_user_id)
+    .bind(target)
     .execute(&state.pool)
     .await?;
     let updated = result.rows_affected() as i64;

@@ -46,11 +46,17 @@ pub struct Asset {
     pub specs: Value,
     pub purchase_date: Option<NaiveDate>,
     pub warranty_expiry: Option<NaiveDate>,
+    pub unit_cost: Option<f64>,
+    pub expected_eol: Option<NaiveDate>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     /// Populated via LEFT JOIN users; NULL when unassigned.
     #[sqlx(default)]
     pub assigned_user_name: Option<String>,
+    /// Straight-line depreciation (3y from purchase_date or expected_eol),
+    /// computed in SQL; NULL when no cost/date basis exists.
+    #[sqlx(default)]
+    pub current_value: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -107,6 +113,9 @@ pub struct DashboardMetrics {
     pub open_tickets: i64,
     pub high_priority_count: i64,
     pub in_stock_count: i64,
+    /// Assets whose warranty expires within 90 days or has already expired
+    /// (excludes RETIRED — same filter as the Warranty view).
+    pub warranty_alerts_count: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -122,11 +131,53 @@ pub struct CreateAssetRequest {
     pub specs: Option<Value>,
     pub purchase_date: Option<NaiveDate>,
     pub warranty_expiry: Option<NaiveDate>,
+    pub unit_cost: Option<f64>,
+    pub expected_eol: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AssignAssetRequest {
     pub assigned_to_user_id: Option<Uuid>,
+}
+
+/// PATCH /assets/{id} — partial update. All fields optional; None = leave
+/// unchanged. `status` is validated against the lifecycle transition map.
+#[derive(Debug, Deserialize)]
+pub struct UpdateAssetRequest {
+    pub name: Option<String>,
+    pub category: Option<String>,
+    pub serial_number: Option<String>,
+    pub status: Option<String>,
+    pub specs: Option<Value>,
+    pub purchase_date: Option<Option<NaiveDate>>,
+    pub warranty_expiry: Option<Option<NaiveDate>>,
+    pub unit_cost: Option<Option<f64>>,
+    pub expected_eol: Option<Option<NaiveDate>>,
+}
+
+/// Row from asset_lifecycle_events (+ actor name).
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct LifecycleEvent {
+    pub id: Uuid,
+    pub asset_id: Uuid,
+    pub from_status: Option<String>,
+    pub to_status: String,
+    pub actor_id: Option<Uuid>,
+    pub note: Option<String>,
+    pub created_at: DateTime<Utc>,
+    #[sqlx(default)]
+    pub actor_name: Option<String>,
+}
+
+/// Warranty alert row: asset + warranty context (computed in SQL).
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct WarrantyAlert {
+    pub id: Uuid,
+    pub asset_tag: String,
+    pub name: String,
+    pub status: String,
+    pub warranty_expiry: Option<NaiveDate>,
+    pub days_left: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]

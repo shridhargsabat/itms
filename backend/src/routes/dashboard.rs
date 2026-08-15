@@ -24,7 +24,10 @@ async fn metrics(
             -- always equals the rows its link shows.
             (SELECT COUNT(*) FROM tickets WHERE status = 'OPEN')                                 AS open_tickets,
             (SELECT COUNT(*) FROM tickets WHERE priority = 'HIGH')                                AS high_priority_count,
-            (SELECT COUNT(*) FROM assets WHERE status = 'IN_STOCK')                              AS in_stock_count
+            (SELECT COUNT(*) FROM assets WHERE status = 'IN_STOCK')                              AS in_stock_count,
+            (SELECT COUNT(*) FROM assets
+                WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL
+                  AND warranty_expiry <= CURRENT_DATE + 90)                                       AS warranty_alerts_count
         "#,
     )
     .fetch_one(&state.pool)
