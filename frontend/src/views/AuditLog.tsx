@@ -2,17 +2,24 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { getAuditLog } from '@/api/client';
-import DataTable, { type Column } from '@/components/DataTable';
+import DataTable, { type Column, type SortState } from '@/components/DataTable';
 import { formatDate } from '@/lib/utils';
 import type { AuditLogEntry } from '@/api/types';
 
 export default function AuditLog() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [sort, setSort] = useState<SortState | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['audit', { page, pageSize }],
-    queryFn: () => getAuditLog({ limit: pageSize, offset: (page - 1) * pageSize }),
+    queryKey: ['audit', { page, pageSize, sort }],
+    queryFn: () =>
+      getAuditLog({
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        sort: sort?.key,
+        order: sort?.dir,
+      }),
   });
 
   const rows = data?.items ?? [];
@@ -22,6 +29,7 @@ export default function AuditLog() {
     {
       key: 'created_at',
       header: 'Time',
+      sortable: true,
       render: (e) => (
         <span className="whitespace-nowrap text-xs text-secondary">{formatDate(e.created_at)}</span>
       ),
@@ -29,12 +37,14 @@ export default function AuditLog() {
     {
       key: 'actor_name',
       header: 'Actor',
+      sortable: true,
       render: (e) =>
         e.actor_name ?? <span className="text-muted">system</span>,
     },
     {
       key: 'action',
       header: 'Action',
+      sortable: true,
       render: (e) => (
         <span
           title={e.action}
@@ -47,11 +57,13 @@ export default function AuditLog() {
     {
       key: 'target_type',
       header: 'Target Type',
+      sortable: true,
       render: (e) => <span className="text-xs text-secondary">{e.target_type}</span>,
     },
     {
       key: 'target_id',
       header: 'Target ID',
+      sortable: true,
       render: (e) => <span className="font-mono text-xs text-accent">{e.target_id}</span>,
     },
     {
@@ -84,6 +96,11 @@ export default function AuditLog() {
         onPageChange={setPage}
         onPageSizeChange={(s) => {
           setPageSize(s);
+          setPage(1);
+        }}
+        sort={sort}
+        onSortChange={(s) => {
+          setSort(s);
           setPage(1);
         }}
         loading={isLoading}

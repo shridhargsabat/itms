@@ -115,10 +115,17 @@ export const me = () => apiFetch<AuthUser>('/auth/me');
 
 // ---- dashboard ----
 export const getDashboardMetrics = () => apiFetch<DashboardMetrics>('/dashboard/metrics');
-export const getAuditLog = (params?: { limit?: number; offset?: number }) => {
+export const getAuditLog = (params?: {
+  limit?: number;
+  offset?: number;
+  sort?: string;
+  order?: string;
+}) => {
   const q = new URLSearchParams();
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
+  if (params?.sort) q.set('sort', params.sort);
+  if (params?.order) q.set('order', params.order);
   const qs = q.toString();
   return apiFetchCount<AuditLogEntry>(`/audit/log${qs ? `?${qs}` : ''}`);
 };
