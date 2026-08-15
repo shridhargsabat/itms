@@ -5,7 +5,14 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY migrations ./migrations
-RUN cargo build --release --bin server --bin seed
+# BuildKit cache mounts persist the crate registry + target dir ACROSS builds.
+# Without them every source change re-downloads ALL crates (~10 min); with
+# them only changed crates recompile (seconds). Requires DOCKER_BUILDKIT=1
+# (compose default) — classic builder (no BuildKit) silently ignores the mounts
+# and falls back to the slow path, so always build with BuildKit.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --bin server --bin seed
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget \
