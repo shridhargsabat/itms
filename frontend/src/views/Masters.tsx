@@ -159,6 +159,7 @@ function UsersTab() {
         key: 'name',
         header: 'Name',
         sortable: true,
+        className: 'max-w-[150px]',
         render: (u) => (
           <div className="min-w-0">
             <p className="truncate font-medium text-primary">{u.name}</p>
@@ -170,8 +171,9 @@ function UsersTab() {
         key: 'role',
         header: 'Role',
         sortable: true,
+        className: 'w-[86px]',
         render: (u) => (
-          <span className={cn('inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium', ROLE_STYLE[u.role] ?? ROLE_STYLE.EMPLOYEE)}>
+          <span className={cn('inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium', ROLE_STYLE[u.role] ?? ROLE_STYLE.EMPLOYEE)}>
             {u.role}
           </span>
         ),

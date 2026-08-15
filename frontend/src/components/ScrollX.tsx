@@ -35,7 +35,7 @@ export default function ScrollX({ children, className, innerClassName }: ScrollX
       <div
         aria-hidden
         className={cn(
-          'pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-base/85 to-transparent transition-opacity duration-200',
+          'pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-edge/80 to-transparent transition-opacity duration-200',
           canScroll ? 'opacity-100' : 'opacity-0',
         )}
       />
