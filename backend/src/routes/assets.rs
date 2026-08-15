@@ -615,18 +615,24 @@ async fn export_assets(
                 format!("too many ids (max {BULK_MAX_IDS})"),
             ));
         }
-        if any {
-            qb.push(" AND ");
-        }
         // NOTE: QueryBuilder::push_bind INLINES values into the SQL text —
-        // a Vec<Uuid> would become an unquoted `{...}` array literal
-        // ("trailing junk after numeric literal"). Bind each id separately.
+        // a Vec<Uuid> becomes an unquoted `{...}` array literal, a bare Uuid
+        // is inlined WITHOUT quotes, and a String binds as TEXT (no `uuid =
+        // text` operator). Since `ids` are already validated by
+        // `parse::<Uuid>()`, inline them as quoted literals: Postgres coerces
+        // 'uuid' literals to uuid (index-friendly) and there is no injection
+        // surface.
+        // The `AND` here is UNCONDITIONAL: WHERE is always followed by either
+        // a filter chain or the `1 = 1` fallback — never nothing. Guarding it
+        // with `if any` produced `WHERE 1 = 1a.id IN (...)` on pure ids
+        // exports (the `"1a"` error).
+        qb.push(" AND ");
         qb.push("a.id IN (");
         for (i, id) in ids.iter().enumerate() {
             if i > 0 {
                 qb.push(", ");
             }
-            qb.push_bind(*id);
+            qb.push("'").push(id.to_string()).push("'");
         }
         qb.push(")");
     }
