@@ -2,6 +2,9 @@ import type {
   Asset,
   AuditLogEntry,
   AuthUser,
+  TicketAttachment,
+  TicketComment,
+  TicketTimeline,
   CatalogItem,
   CreateAssetInput,
   CreateLicenseInput,
@@ -420,3 +423,47 @@ export const assignSeat = (id: string, userId: string) =>
 
 export const revokeSeat = (id: string, userId: string) =>
   apiFetch<LicenseAllocation>(`/licenses/${id}/revoke`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+
+// ── Ticket comments + attachments (P1-1) ────────────────────────────────────
+
+export const getTicketComments = (ticketId: string) =>
+  apiFetch<TicketComment[]>(`/tickets/${ticketId}/comments`);
+
+export const createTicketComment = (ticketId: string, input: { body: string; mentions?: string[] }) =>
+  apiFetch<TicketComment>(`/tickets/${ticketId}/comments`, { method: 'POST', body: JSON.stringify(input) });
+
+export const deleteTicketComment = (ticketId: string, commentId: string) =>
+  apiFetch<void>(`/tickets/${ticketId}/comments/${commentId}`, { method: 'DELETE' });
+
+export const getTicketTimeline = (ticketId: string) =>
+  apiFetch<TicketTimeline>(`/tickets/${ticketId}/timeline`);
+
+export const uploadTicketAttachment = async (ticketId: string, file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  // FormData needs the browser-set multipart boundary — bypass apiFetchRaw
+  // entirely (it forces a JSON Content-Type on any body).
+  const token = localStorage.getItem('itms_token');
+  const res = await fetch(`/api/v1/tickets/${ticketId}/attachments`, {
+    method: 'POST',
+    body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error || `upload failed: ${res.status}`);
+  }
+  return res.json() as Promise<TicketAttachment>;
+};
+
+export const deleteTicketAttachment = (ticketId: string, attachmentId: string) =>
+  apiFetch<void>(`/tickets/${ticketId}/attachments/${attachmentId}`, { method: 'DELETE' });
+
+export const downloadTicketAttachment = async (attachmentId: string) => {
+  const token = localStorage.getItem('itms_token');
+  const res = await fetch(`/api/v1/attachments/${attachmentId}/download`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`download failed: ${res.status}`);
+  return res.blob();
+};

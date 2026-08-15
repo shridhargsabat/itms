@@ -524,3 +524,40 @@ pub struct UpdateLicenseRequest {
 pub struct AssignSeatRequest {
     pub user_id: Uuid,
 }
+
+// ── Ticket comments + attachments (P1-1, issue #42) ─────────────────────────
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct TicketComment {
+    pub id: Uuid,
+    pub ticket_id: Uuid,
+    pub author_id: Uuid,
+    pub body: String,
+    pub mentions: Value,
+    pub created_at: DateTime<Utc>,
+    #[sqlx(default)]
+    pub author_name: Option<String>,
+    #[sqlx(default)]
+    pub author_role: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct TicketAttachment {
+    pub id: Uuid,
+    pub ticket_id: Uuid,
+    pub uploader_id: Uuid,
+    pub file_name: String,
+    pub content_type: Option<String>,
+    pub size_bytes: i64,
+    pub storage_key: String,
+    pub created_at: DateTime<Utc>,
+    #[sqlx(default)]
+    pub uploader_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateCommentRequest {
+    pub body: String,
+    #[serde(default)]
+    pub mentions: Vec<Uuid>,
+}

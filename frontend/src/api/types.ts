@@ -404,3 +404,42 @@ export interface CreateLicenseInput {
   renewal_cost?: number | null;
   notes?: string | null;
 }
+
+// ── Ticket comments + attachments (P1-1, issue #42) ─────────────────────────
+
+export interface TicketComment {
+  id: string;
+  ticket_id: string;
+  author_id: string;
+  body: string;
+  mentions: string[];
+  created_at: string;
+  author_name?: string | null;
+  author_role?: string | null;
+}
+
+export interface TicketAttachment {
+  id: string;
+  ticket_id: string;
+  uploader_id: string;
+  file_name: string;
+  content_type: string | null;
+  size_bytes: number;
+  storage_key: string;
+  created_at: string;
+  uploader_name?: string | null;
+}
+
+export interface TicketTimelineEntry {
+  kind: 'change';
+  actor: string;
+  action: string;
+  at: string;
+  details: Record<string, unknown>;
+}
+
+export interface TicketTimeline {
+  comments: TicketComment[];
+  changes: TicketTimelineEntry[];
+  attachments: TicketAttachment[];
+}
