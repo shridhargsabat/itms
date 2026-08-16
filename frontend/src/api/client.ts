@@ -5,6 +5,7 @@ import type {
   CannedResponse,
   KbArticle,
   Notification,
+  TicketTemplate,
   TicketAttachment,
   TicketComment,
   TicketTimeline,
@@ -174,6 +175,17 @@ export const convertTicketToArticle = (ticketId: string, body: { title?: string;
 
 export const suggestArticles = (query: string) =>
   apiFetch<KbArticle[]>('/kb/suggest?search=' + encodeURIComponent(query));
+
+export const listTemplates = (activeOnly = false) =>
+  apiFetch<TicketTemplate[]>('/templates' + (activeOnly ? '?active_only=1' : ''));
+
+export const createTemplate = (body: { name: string; ticket_type?: string; priority?: string; description?: string }) =>
+  apiFetch<TicketTemplate>('/templates', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateTemplate = (id: string, body: { name?: string; ticket_type?: string; priority?: string; description?: string; active?: boolean }) =>
+  apiFetch<TicketTemplate>(`/templates/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+export const deleteTemplate = (id: string) => apiFetch<void>(`/templates/${id}`, { method: 'DELETE' });
 
 export const changePassword = (body: { current_password: string; new_password: string }) =>
   apiFetch<{ ok: boolean }>('/auth/change-password', {

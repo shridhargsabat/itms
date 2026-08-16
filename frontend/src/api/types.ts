@@ -491,3 +491,19 @@ export interface CannedResponse {
   created_by: string | null;
   created_at: string;
 }
+
+// ── Ticket templates (#46) ──────────────────────────────────────────────────
+
+export interface TicketTemplate {
+  id: string;
+  name: string;
+  ticket_type: string;
+  priority: string;
+  description: string;
+  active: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_name?: string | null;
+}

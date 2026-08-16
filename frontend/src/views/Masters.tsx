@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Database, LoaderCircle, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
+import { ClipboardList, Database, LoaderCircle, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
 import Modal from '@/components/Modal';
 import ScrollX from '@/components/ScrollX';
@@ -10,22 +10,27 @@ import DataTable, { type Column } from '@/components/DataTable';
 import { getCachedUser } from '@/api/client';
 import {
   createMasterOption,
+  createTemplate,
   createUser,
   deleteMasterOption,
+  deleteTemplate,
   getMasters,
+  listTemplates,
   listUsers,
   updateMasterOption,
+  updateTemplate,
   updateUser,
 } from '@/api/client';
-import type { LookupOption, MasterFamily, UserRecord } from '@/api/types';
+import type { LookupOption, MasterFamily, TicketTemplate, UserRecord } from '@/api/types';
 
-const TABS: { id: MasterFamily | 'users'; label: string }[] = [
+const TABS: { id: MasterFamily | 'users' | 'templates'; label: string }[] = [
   { id: 'users', label: 'Users' },
   { id: 'department', label: 'Departments' },
   { id: 'asset_category', label: 'Asset Categories' },
   { id: 'ticket_type', label: 'Ticket Types' },
   { id: 'ticket_priority', label: 'Priorities' },
   { id: 'ticket_status', label: 'Statuses' },
+  { id: 'templates', label: 'Ticket Templates' },
 ];
 
 const ROLES = ['ADMIN', 'AGENT', 'EMPLOYEE'];
@@ -38,7 +43,7 @@ const ROLE_STYLE: Record<string, string> = {
 
 export default function Masters() {
   const me = getCachedUser();
-  const [tab, setTab] = useState<MasterFamily | 'users'>('users');
+  const [tab, setTab] = useState<MasterFamily | 'users' | 'templates'>('users');
   const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
 
   if (me?.role !== 'ADMIN') {
@@ -80,6 +85,8 @@ export default function Masters() {
 
       {tab === 'users' ? (
         <UsersTab />
+      ) : tab === 'templates' ? (
+        <TemplatesTab />
       ) : (
         <LookupTab family={tab} options={masters.data?.[tab] ?? []} loading={masters.isLoading} />
       )}
@@ -540,6 +547,113 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
           Add option
         </button>
         {createMut.isError && <p className="w-full text-xs text-red-400">{(createMut.error as Error).message}</p>}
+      </div>
+    </div>
+  );
+}
+
+
+function TemplatesTab() {
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+  const [tt, setTt] = useState('INCIDENT');
+  const [prio, setPrio] = useState('MEDIUM');
+  const [desc, setDesc] = useState('');
+  const [editing, setEditing] = useState<TicketTemplate | null>(null);
+  const templates = useQuery({ queryKey: ['templates'], queryFn: () => listTemplates() });
+
+  const create = useMutation({
+    mutationFn: () => createTemplate({ name, ticket_type: tt, priority: prio, description: desc }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setName(''); setDesc(''); },
+  });
+  const save = useMutation({
+    mutationFn: () => updateTemplate(editing!.id, { name, ticket_type: tt, priority: prio, description: desc, active: editing?.active }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setEditing(null); setName(''); setDesc(''); },
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => deleteTemplate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['templates'] }),
+  });
+  const toggle = useMutation({
+    mutationFn: (t: TicketTemplate) => updateTemplate(t.id, { active: !t.active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['templates'] }),
+  });
+
+  const startEdit = (t: TicketTemplate) => { setEditing(t); setName(t.name); setTt(t.ticket_type); setPrio(t.priority); setDesc(t.description); };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-edge bg-surface/60 p-4">
+        <h2 className="text-sm font-semibold text-primary">{editing ? 'Edit template' : 'New template'}</h2>
+        <p className="mt-0.5 text-xs text-muted">Standard intakes — requesters pick these in the New Ticket form.</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <div className="md:col-span-2">
+            <label className={labelCls}>Name *</label>
+            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="New-hire setup" />
+          </div>
+          <div>
+            <label className={labelCls}>Type</label>
+            <Select className="w-full" value={tt} onChange={(v) => setTt(v as string)}
+              options={['INCIDENT', 'REQUEST', 'CHANGE', 'PROBLEM', 'ACCESS', 'OTHER'].map((x) => ({ value: x, label: x }))} />
+          </div>
+          <div>
+            <label className={labelCls}>Priority</label>
+            <Select className="w-full" value={prio} onChange={(v) => setPrio(v as string)}
+              options={['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((x) => ({ value: x, label: x }))} />
+          </div>
+        </div>
+        <div className="mt-3">
+          <label className={labelCls}>Prefill description</label>
+          <textarea className={cn(inputCls, 'min-h-20 resize-y')} value={desc} onChange={(e) => setDesc(e.target.value)}
+            placeholder="Steps/details the requester should provide…" />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            disabled={!name.trim() || create.isPending || save.isPending}
+            onClick={() => (editing ? save.mutate() : create.mutate())}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            <Save className="h-3.5 w-3.5" /> {editing ? 'Save changes' : 'Create template'}
+          </button>
+          {editing && (
+            <button type="button" onClick={() => { setEditing(null); setName(''); setDesc(''); }}
+              className="rounded-lg border border-edge px-3 py-2 text-xs text-muted hover:bg-elevated">Cancel</button>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {templates.data?.map((t) => (
+          <div key={t.id} className={cn('rounded-xl border bg-surface/60 p-3.5', t.active ? 'border-edge' : 'border-edge opacity-60')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-secondary" />
+              <span className="text-sm font-semibold text-primary">{t.name}</span>
+              <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-accent">{t.ticket_type}</span>
+              <span className="rounded-full bg-elevated px-2 py-0.5 text-[10px] text-muted">{t.priority}</span>
+              {!t.active && <span className="text-[10px] text-muted">inactive</span>}
+              <div className="ml-auto flex items-center gap-1.5">
+                <button type="button" onClick={() => toggle.mutate(t)}
+                  className="rounded-lg border border-edge px-2 py-1 text-[11px] text-secondary hover:bg-elevated">
+                  {t.active ? 'Deactivate' : 'Activate'}
+                </button>
+                <button type="button" onClick={() => startEdit(t)}
+                  className="rounded-lg border border-edge px-2 py-1 text-[11px] text-accent hover:bg-elevated">
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <button type="button" onClick={() => del.mutate(t.id)}
+                  className="rounded-lg border border-edge px-2 py-1 text-[11px] text-red-400 hover:bg-red-500/10">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+            {t.description && <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-xs text-muted">{t.description}</p>}
+            <p className="mt-1 text-[10px] text-muted">by {t.created_by_name ?? '—'}</p>
+          </div>
+        ))}
+        {templates.data?.length === 0 && (
+          <p className="rounded-xl border border-dashed border-edge p-6 text-center text-sm text-muted">No templates yet.</p>
+        )}
       </div>
     </div>
   );
