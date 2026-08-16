@@ -14,7 +14,7 @@ use super::{notifications::notify, AppError};
 
 /// Shared joined SELECT for enriched ticket rows.
 const TICKET_SELECT: &str = "SELECT t.id, t.ticket_number, t.title, t.description, \
-     t.ticket_type, t.priority, t.status, t.requester_id, t.assignee_id, t.asset_id, \
+     t.ticket_type, t.priority, t.status, t.source, t.requester_id, t.assignee_id, t.asset_id, \
      t.created_at, t.updated_at, \
      r.name AS requester_name, a2.name AS assignee_name, a.asset_tag, a.name AS asset_name \
      FROM tickets t \
@@ -274,9 +274,9 @@ async fn insert_ticket_with_number_retry(
 
         let result = sqlx::query_as::<_, Ticket>(
             "INSERT INTO tickets (ticket_number, title, description, ticket_type, priority, status, \
-                requester_id, assignee_id, asset_id) \
-             VALUES ($1, $2, $3, $4, $5, 'OPEN', $6, $7, $8) \
-             RETURNING id, ticket_number, title, description, ticket_type, priority, status, \
+                source, requester_id, assignee_id, asset_id) \
+             VALUES ($1, $2, $3, $4, $5, 'OPEN', 'PORTAL', $6, $7, $8) \
+             RETURNING id, ticket_number, title, description, ticket_type, priority, status, source, \
                 requester_id, assignee_id, asset_id, created_at, updated_at, \
                 NULL::text AS requester_name, NULL::text AS assignee_name, \
                 NULL::text AS asset_tag, NULL::text AS asset_name",

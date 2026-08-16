@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod comments;
+pub mod intake;
 pub mod audit;
 pub mod auth;
 pub mod cmdb;
@@ -45,10 +46,15 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/licenses", licenses::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
 
+    // intake is PUBLIC (token-gated inside the handler — the email cron has
+    // no portal session, only the shared X-Intake-Token secret)
+    let public = Router::new().nest("/intake", intake::router());
+
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route("/auth/login", post(auth::login))
         .merge(protected)
+        .merge(public)
 }
 
 /// Uniform JSON error for the whole API: `{"error": "..."}`.

@@ -235,7 +235,16 @@ export default function Tickets() {
       ),
     },
     { key: 'priority', header: 'Priority', sortable: true, render: (t) => <PriorityBadge priority={t.priority} /> },
-    { key: 'status', header: 'Status', sortable: true, render: (t) => <StatusBadge status={t.status} /> },
+    { key: 'status', header: 'Status', sortable: true, render: (t) => (
+      <span className="flex items-center gap-1.5">
+        <StatusBadge status={t.status} />
+        {t.source === 'EMAIL' && (
+          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-400">
+            Email
+          </span>
+        )}
+      </span>
+    ) },
     {
       key: 'ticket_type',
       header: 'Type',
@@ -430,6 +439,11 @@ export default function Tickets() {
             <h2 className="mt-2 text-lg font-semibold text-primary">{selected.title}</h2>
             <p className="mt-1 text-xs uppercase tracking-wide text-muted">
               {selected.ticket_type.replace('_', ' ')}
+              {selected.source === 'EMAIL' && (
+                <span className="ml-2 rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-400">
+                  via Email
+                </span>
+              )}
             </p>
 
             <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-secondary">
