@@ -467,3 +467,27 @@ export interface Notification {
 export interface SlaPolicy {
   [priority: string]: { hours: number; label: string };
 }
+
+// ── Knowledge base (P1-7, issue #48) ────────────────────────────────────────
+
+export interface KbArticle {
+  id: string;
+  ticket_type: string;
+  title: string;
+  body: string;
+  source_ticket_id: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
+}
+
+export interface CannedResponse {
+  id: string;
+  title: string;
+  body: string;
+  created_by: string | null;
+  created_at: string;
+}

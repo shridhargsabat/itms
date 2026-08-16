@@ -10,6 +10,7 @@ import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 // navigation (Vite emits per-lazy-import chunks + a vendor chunk below).
 const PasswordFlow = lazy(() => import('@/views/PasswordFlow'));
 const Account = lazy(() => import('@/views/Account'));
+const KnowledgeBase = lazy(() => import('@/views/KnowledgeBase'));
 const Dashboard = lazy(() => import('@/views/Dashboard'));
 const Assets = lazy(() => import('@/views/Assets'));
 const Tickets = lazy(() => import('@/views/Tickets'));
@@ -110,6 +111,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/masters" element={<Masters />} />
                 <Route path="/offline" element={<Offline />} />
                 <Route path="/account" element={<Account />} />
+                <Route path="/kb" element={<KnowledgeBase />} />
               </Route>
             </Routes>
           </RouteErrorBoundary>

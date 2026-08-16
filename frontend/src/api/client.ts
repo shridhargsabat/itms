@@ -2,6 +2,8 @@ import type {
   Asset,
   AuditLogEntry,
   AuthUser,
+  CannedResponse,
+  KbArticle,
   Notification,
   TicketAttachment,
   TicketComment,
@@ -141,6 +143,37 @@ export const resetPassword = (body: { token: string; new_password: string }) =>
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+export const listKbArticles = (params?: { ticket_type?: string; search?: string; limit?: number }) => {
+  const q = new URLSearchParams();
+  if (params?.ticket_type) q.set('ticket_type', params.ticket_type);
+  if (params?.search) q.set('search', params.search);
+  if (params?.limit) q.set('limit', String(params.limit));
+  return apiFetch<KbArticle[]>(`/kb/articles?${q.toString()}`);
+};
+
+export const getKbArticle = (id: string) => apiFetch<KbArticle>(`/kb/articles/${id}`);
+
+export const createKbArticle = (body: { ticket_type?: string; title: string; body: string }) =>
+  apiFetch<KbArticle>('/kb/articles', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateKbArticle = (id: string, body: { ticket_type?: string; title?: string; body?: string }) =>
+  apiFetch<KbArticle>(`/kb/articles/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+export const deleteKbArticle = (id: string) => apiFetch<void>(`/kb/articles/${id}`, { method: 'DELETE' });
+
+export const listCanned = () => apiFetch<CannedResponse[]>('/kb/canned');
+
+export const createCanned = (body: { title: string; body: string }) =>
+  apiFetch<CannedResponse>('/kb/canned', { method: 'POST', body: JSON.stringify(body) });
+
+export const deleteCanned = (id: string) => apiFetch<void>(`/kb/canned/${id}`, { method: 'DELETE' });
+
+export const convertTicketToArticle = (ticketId: string, body: { title?: string; body?: string }) =>
+  apiFetch<KbArticle>(`/tickets/${ticketId}/convert-to-article`, { method: 'POST', body: JSON.stringify(body) });
+
+export const suggestArticles = (query: string) =>
+  apiFetch<KbArticle[]>('/kb/suggest?search=' + encodeURIComponent(query));
 
 export const changePassword = (body: { current_password: string; new_password: string }) =>
   apiFetch<{ ok: boolean }>('/auth/change-password', {
