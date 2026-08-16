@@ -68,6 +68,7 @@ pub struct Ticket {
     pub ticket_type: String,
     pub priority: String,
     pub status: String,
+    pub source: String,
     pub requester_id: Uuid,
     pub assignee_id: Option<Uuid>,
     pub asset_id: Option<Uuid>,

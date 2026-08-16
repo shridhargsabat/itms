@@ -154,6 +154,7 @@ export interface Ticket {
   ticket_type: TicketType;
   priority: Priority;
   status: TicketStatus;
+  source?: string;
   requester_id: string;
   requester_name: string;
   assignee_id: string | null;
