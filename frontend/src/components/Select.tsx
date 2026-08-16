@@ -170,8 +170,8 @@ export default function Select({
                 className={cn(
                   'flex w-full items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md px-3 py-2 text-left text-sm transition-colors',
                   o.value === value
-                    ? 'bg-elevated2/70 text-white'
-                    : 'text-secondary hover:bg-elevated2/40 hover:text-white',
+                    ? 'bg-elevated2/70 text-primary'
+                    : 'text-secondary hover:bg-elevated2/40 hover:text-primary',
                 )}
               >
                 <span className="min-w-0 truncate">{o.label}</span>
