@@ -15,7 +15,7 @@ use super::{notifications::notify, AppError};
 /// Shared joined SELECT for enriched ticket rows.
 const TICKET_SELECT: &str = "SELECT t.id, t.ticket_number, t.title, t.description, \
      t.ticket_type, t.priority, t.status, t.source, t.requester_id, t.assignee_id, t.asset_id, \
-     t.created_at, t.updated_at, \
+     t.created_at, t.updated_at, t.sla_due_at, t.sla_escalated_at, \
      r.name AS requester_name, a2.name AS assignee_name, a.asset_tag, a.name AS asset_name \
      FROM tickets t \
      LEFT JOIN users r  ON r.id  = t.requester_id \
@@ -33,6 +33,7 @@ pub fn router() -> Router<AppState> {
 pub struct TicketListParams {
     pub status: Option<String>,
     pub priority: Option<String>,
+    pub overdue: Option<bool>,
     #[serde(rename = "type")]
     pub ticket_type: Option<String>,
     pub limit: Option<i64>,
@@ -94,6 +95,15 @@ async fn list_tickets(
         cqb.push("t.ticket_type = ").push_bind(ticket_type.clone());
         any = true;
     }
+    if params.overdue == Some(true) {
+        if any {
+            qb.push(" AND ");
+            cqb.push(" AND ");
+        }
+        qb.push("t.sla_due_at IS NOT NULL AND t.sla_due_at < NOW() AND t.status IN ('OPEN', 'IN_PROGRESS')");
+        cqb.push("t.sla_due_at IS NOT NULL AND t.sla_due_at < NOW() AND t.status IN ('OPEN', 'IN_PROGRESS')");
+        any = true;
+    }
     if !any {
         qb.push("1 = 1");
         cqb.push("1 = 1");
@@ -127,7 +137,7 @@ async fn create_ticket(
     State(state): State<AppState>,
     Json(body): Json<CreateTicketRequest>,
 ) -> Result<(StatusCode, Json<Ticket>), AppError> {
-    let ticket = insert_ticket_with_number_retry(&state.pool, &body).await?;
+    let mut ticket = insert_ticket_with_number_retry(&state.pool, &body).await?;
 
     sqlx::query(
         "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
@@ -149,6 +159,11 @@ async fn create_ticket(
     }))
     .execute(&state.pool)
     .await?;
+
+    // P1-4: SLA deadline from creation time
+    super::sla::set_sla_due(&state.pool, ticket.id, &ticket.priority, "OPEN", ticket.created_at).await?;
+    ticket.sla_due_at =
+        Some(ticket.created_at + chrono::Duration::hours(super::sla::sla_hours(&ticket.priority).unwrap_or(24)));
 
     // P1-2: notify the assignee when a ticket is created pre-assigned
     if let Some(aid) = ticket.assignee_id {
@@ -173,11 +188,12 @@ async fn update_ticket_status(
     Path(ticket_id): Path<Uuid>,
     Json(body): Json<UpdateTicketStatusRequest>,
 ) -> Result<Json<Ticket>, AppError> {
-    let current: Option<(String,)> = sqlx::query_as("SELECT status FROM tickets WHERE id = $1")
-        .bind(ticket_id)
-        .fetch_optional(&state.pool)
-        .await?;
-    let Some((old_status,)) = current else {
+    let current: Option<(String, String, chrono::DateTime<chrono::Utc>)> =
+        sqlx::query_as("SELECT status, priority, created_at FROM tickets WHERE id = $1")
+            .bind(ticket_id)
+            .fetch_optional(&state.pool)
+            .await?;
+    let Some((old_status, old_priority, old_created_at)) = current else {
         return Err(AppError::not_found("ticket not found"));
     };
 
@@ -193,6 +209,9 @@ async fn update_ticket_status(
         .bind(&body.status)
         .execute(&state.pool)
         .await?;
+
+    // P1-4: SLA clock runs while OPEN/IN_PROGRESS, stops when closed
+    super::sla::set_sla_due(&state.pool, ticket_id, &old_priority, &body.status, old_created_at).await?;
 
     let updated: Ticket =
         sqlx::query_as::<_, Ticket>(&format!("{TICKET_SELECT} WHERE t.id = $1"))
@@ -278,6 +297,7 @@ async fn insert_ticket_with_number_retry(
              VALUES ($1, $2, $3, $4, $5, 'OPEN', 'PORTAL', $6, $7, $8) \
              RETURNING id, ticket_number, title, description, ticket_type, priority, status, source, \
                 requester_id, assignee_id, asset_id, created_at, updated_at, \
+                NULL::timestamptz AS sla_due_at, NULL::timestamptz AS sla_escalated_at, \
                 NULL::text AS requester_name, NULL::text AS assignee_name, \
                 NULL::text AS asset_tag, NULL::text AS asset_name",
         )

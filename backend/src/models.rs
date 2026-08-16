@@ -50,6 +50,8 @@ pub struct Asset {
     pub expected_eol: Option<NaiveDate>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub sla_due_at: Option<DateTime<Utc>>,
+    pub sla_escalated_at: Option<DateTime<Utc>>,
     /// Populated via LEFT JOIN users; NULL when unassigned.
     #[sqlx(default)]
     pub assigned_user_name: Option<String>,
@@ -74,6 +76,8 @@ pub struct Ticket {
     pub asset_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub sla_due_at: Option<DateTime<Utc>>,
+    pub sla_escalated_at: Option<DateTime<Utc>>,
     /// Populated via LEFT JOINs on users + assets.
     #[sqlx(default)]
     pub requester_name: Option<String>,
@@ -123,6 +127,8 @@ pub struct DashboardMetrics {
     pub open_requests: i64,
     /// Active licenses expiring within 90 days or already expired.
     pub license_alerts: i64,
+    /// Open/IN_PROGRESS tickets whose SLA deadline has passed.
+    pub overdue_tickets: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -276,6 +282,8 @@ pub struct OnboardingEvent {
     pub created_by: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub sla_due_at: Option<DateTime<Utc>>,
+    pub sla_escalated_at: Option<DateTime<Utc>>,
     /// task progress columns (list queries only)
     #[sqlx(default)]
     pub total_tasks: i64,
@@ -366,6 +374,8 @@ pub struct CatalogItem {
     pub sort_order: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub sla_due_at: Option<DateTime<Utc>>,
+    pub sla_escalated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -383,6 +393,8 @@ pub struct ServiceRequest {
     pub approved_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub sla_due_at: Option<DateTime<Utc>>,
+    pub sla_escalated_at: Option<DateTime<Utc>>,
     /// joined display fields (list queries only)
     #[sqlx(default)]
     pub requester_name: Option<String>,
@@ -462,6 +474,8 @@ pub struct License {
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub sla_due_at: Option<DateTime<Utc>>,
+    pub sla_escalated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]

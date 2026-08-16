@@ -86,6 +86,7 @@ export const TICKET_TYPES: TicketType[] = ['INCIDENT', 'SERVICE_REQUEST', 'CHANG
 export const PRIORITIES: Priority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 export interface DashboardMetrics {
+  overdue_tickets: number;
   asset_count: number;
   open_tickets: number;
   high_priority_count: number;
@@ -155,6 +156,8 @@ export interface Ticket {
   priority: Priority;
   status: TicketStatus;
   source?: string;
+  sla_due_at: string | null;
+  sla_escalated_at: string | null;
   requester_id: string;
   requester_name: string;
   assignee_id: string | null;
@@ -457,4 +460,10 @@ export interface Notification {
   ref_id: string | null;
   read_at: string | null;
   created_at: string;
+}
+
+// ── SLA (P1-4, issue #45) ────────────────────────────────────────────────────
+
+export interface SlaPolicy {
+  [priority: string]: { hours: number; label: string };
 }

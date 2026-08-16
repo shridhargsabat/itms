@@ -36,7 +36,10 @@ async fn metrics(
                 WHERE status IN ('SUBMITTED', 'APPROVED', 'IN_PROGRESS'))                       AS open_requests,
             (SELECT COUNT(*) FROM licenses
                 WHERE active = TRUE AND expiry_date IS NOT NULL
-                  AND expiry_date <= CURRENT_DATE + 90)                                         AS license_alerts
+                  AND expiry_date <= CURRENT_DATE + 90)                                         AS license_alerts,
+                (SELECT COUNT(*) FROM tickets
+                  WHERE sla_due_at IS NOT NULL AND sla_due_at < NOW()
+                    AND status IN ('OPEN', 'IN_PROGRESS'))                                     AS overdue_tickets
         "#,
     )
     .fetch_one(&state.pool)

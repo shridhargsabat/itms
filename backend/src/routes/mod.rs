@@ -7,6 +7,7 @@ pub mod cmdb;
 pub mod dashboard;
 pub mod masters;
 pub mod notifications;
+pub mod sla;
 pub mod onboarding;
 pub mod licenses;
 pub mod requests;
@@ -42,13 +43,16 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/masters", masters::router())
         .nest("/onboarding", onboarding::router())
         .nest("/notifications", notifications::router())
+        .nest("/sla", sla::router())
         .nest("/requests", requests::router())
         .nest("/licenses", licenses::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
 
     // intake is PUBLIC (token-gated inside the handler — the email cron has
     // no portal session, only the shared X-Intake-Token secret)
-    let public = Router::new().nest("/intake", intake::router());
+    let public = Router::new()
+        .nest("/intake", intake::router())
+        .nest("/sla", sla::escalate_router());
 
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
