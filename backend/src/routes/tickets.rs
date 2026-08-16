@@ -401,16 +401,16 @@ async fn export_tickets(
     .map_err(csv_err)?;
     for t in &tickets {
         wtr.write_record(vec![
-            t.ticket_number.clone(),
-            t.title.clone(),
-            t.description.clone(),
-            t.ticket_type.clone(),
-            t.priority.clone(),
-            t.status.clone(),
-            t.requester_name.clone().unwrap_or_default(),
-            t.assignee_name.clone().unwrap_or_default(),
-            t.asset_tag.clone().unwrap_or_default(),
-            t.asset_name.clone().unwrap_or_default(),
+            crate::routes::csv_safe(&t.ticket_number),
+            crate::routes::csv_safe(&t.title),
+            crate::routes::csv_safe(&t.description),
+            crate::routes::csv_safe(&t.ticket_type),
+            crate::routes::csv_safe(&t.priority),
+            crate::routes::csv_safe(&t.status),
+            crate::routes::csv_safe(&t.requester_name.clone().unwrap_or_default()),
+            crate::routes::csv_safe(&t.assignee_name.clone().unwrap_or_default()),
+            crate::routes::csv_safe(&t.asset_tag.clone().unwrap_or_default()),
+            crate::routes::csv_safe(&t.asset_name.clone().unwrap_or_default()),
             t.created_at.to_rfc3339(),
             t.updated_at.to_rfc3339(),
         ])
