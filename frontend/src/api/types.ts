@@ -85,6 +85,12 @@ export const TICKET_STATUSES: TicketStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED
 export const TICKET_TYPES: TicketType[] = ['INCIDENT', 'SERVICE_REQUEST', 'CHANGE'];
 export const PRIORITIES: Priority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
+/** One GROUP BY bucket of a dashboard breakdown (key = priority/status code). */
+export interface MetricBucket {
+  key: string;
+  count: number;
+}
+
 export interface DashboardMetrics {
   overdue_tickets: number;
   asset_count: number;
@@ -95,6 +101,8 @@ export interface DashboardMetrics {
   onboarding_overdue: number;
   open_requests: number;
   license_alerts: number;
+  tickets_by_priority: MetricBucket[];
+  assets_by_status: MetricBucket[];
 }
 
 export interface Asset {

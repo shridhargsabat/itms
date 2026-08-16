@@ -3,7 +3,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 
 use crate::db::AppState;
-use crate::models::DashboardMetrics;
+use crate::models::{DashboardMetrics, DashboardMetricsScalars, MetricBucket};
 
 use super::AppError;
 
@@ -15,7 +15,7 @@ pub fn router() -> Router<AppState> {
 async fn metrics(
     State(state): State<AppState>,
 ) -> Result<Json<DashboardMetrics>, AppError> {
-    let metrics = sqlx::query_as::<_, DashboardMetrics>(
+    let scalars = sqlx::query_as::<_, DashboardMetricsScalars>(
         r#"
         SELECT
             (SELECT COUNT(*) FROM assets)                                                        AS asset_count,
@@ -45,5 +45,43 @@ async fn metrics(
     .fetch_one(&state.pool)
     .await?;
 
-    Ok(Json(metrics))
+    // Open tickets grouped by priority — sums to open_tickets (same status
+    // filter), so the hero bar always matches its drill-down links.
+    let tickets_by_priority: Vec<MetricBucket> = sqlx::query_as::<_, (String, i64)>(
+        "SELECT priority AS key, COUNT(*)::int8 AS count FROM tickets
+         WHERE status = 'OPEN'
+         GROUP BY priority
+         ORDER BY CASE priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END",
+    )
+    .fetch_all(&state.pool)
+    .await?
+    .into_iter()
+    .map(|(key, count)| MetricBucket { key, count })
+    .collect();
+
+    // Assets grouped by status — IN_STOCK bucket equals in_stock_count.
+    let assets_by_status: Vec<MetricBucket> = sqlx::query_as::<_, (String, i64)>(
+        "SELECT status AS key, COUNT(*)::int8 AS count FROM assets
+         GROUP BY status
+         ORDER BY CASE status WHEN 'IN_STOCK' THEN 0 WHEN 'ASSIGNED' THEN 1 WHEN 'MAINTENANCE' THEN 2 ELSE 3 END",
+    )
+    .fetch_all(&state.pool)
+    .await?
+    .into_iter()
+    .map(|(key, count)| MetricBucket { key, count })
+    .collect();
+
+    Ok(Json(DashboardMetrics {
+        asset_count: scalars.asset_count,
+        open_tickets: scalars.open_tickets,
+        high_priority_count: scalars.high_priority_count,
+        in_stock_count: scalars.in_stock_count,
+        warranty_alerts_count: scalars.warranty_alerts_count,
+        onboarding_overdue: scalars.onboarding_overdue,
+        open_requests: scalars.open_requests,
+        license_alerts: scalars.license_alerts,
+        overdue_tickets: scalars.overdue_tickets,
+        tickets_by_priority,
+        assets_by_status,
+    }))
 }
