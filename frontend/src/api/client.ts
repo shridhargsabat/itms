@@ -29,6 +29,7 @@ import type {
   UpdateTaskInput,
   MasterFamily,
   MastersMap,
+  SlaPolicy,
   Ticket,
   Topology,
   UpdateAssetInput,
@@ -269,11 +270,12 @@ export const exportTicketsCsv = async (params?: {
 };
 
 // ---- tickets ----
-export const listTickets = (params?: { status?: string; priority?: string; type?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
+export const listTickets = (params?: { status?: string; priority?: string; type?: string; overdue?: boolean; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.priority) q.set('priority', params.priority);
   if (params?.type) q.set('type', params.type);
+  if (params?.overdue) q.set('overdue', 'true');
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
   if (params?.sort) q.set('sort', params.sort);
@@ -482,3 +484,7 @@ export const markNotificationRead = (id: string) =>
 
 export const markAllNotificationsRead = () =>
   apiFetch<void>('/notifications/read-all', { method: 'GET' });
+
+export const getSlaPolicy = () => apiFetch<SlaPolicy>('/sla/policy');
+
+export const listOverdueTickets = (limit = 10) => apiFetchCount<Ticket>(`/tickets?overdue=true&limit=${limit}`);

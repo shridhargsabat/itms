@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
+import { PriorityBadge } from '@/components/TicketBadge';
+import SlaChip from '@/components/SlaChip';
 import {
+  Timer,
   Activity,
   Boxes,
   ChevronRight,
@@ -17,13 +21,17 @@ import {
   UserRoundCheck,
   X,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { createAsset, createTicket, getAuditLog, getDashboardMetrics, getCachedUser } from '@/api/client';
-import { ASSET_CATEGORIES, ASSET_STATUSES, PRIORITIES, TICKET_TYPES } from '@/api/types';
+import {
+  Link } from 'react-router-dom';
+import {
+  createAsset, createTicket, getAuditLog, getDashboardMetrics, getCachedUser, listOverdueTickets } from '@/api/client';
+import {
+  ASSET_CATEGORIES, ASSET_STATUSES, PRIORITIES, TICKET_TYPES } from '@/api/types';
 import type { CreateAssetInput, CreateTicketInput, DashboardMetrics } from '@/api/types';
 import Modal from '@/components/Modal';
 import Select from '@/components/Select';
-import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
+import {
+  cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 
 type MetricCard = {
   label: string;
@@ -34,6 +42,8 @@ type MetricCard = {
   admin?: boolean;
 };
 
+const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
+
 const METRIC_CARDS: MetricCard[] = [
   { label: 'Total Assets', key: 'asset_count', icon: Boxes, accent: 'bg-accent/10 text-accent', to: '/assets' },
   { label: 'Open Tickets', key: 'open_tickets', icon: Ticket, accent: 'bg-blue-500/10 text-blue-400', to: '/tickets?status=OPEN' },
@@ -43,7 +53,51 @@ const METRIC_CARDS: MetricCard[] = [
   { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-400', to: '/onboarding' },
   { label: 'Open Requests', key: 'open_requests', icon: ClipboardList, accent: 'bg-blue-500/10 text-blue-400', to: '/requests' },
   { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-400', to: '/licenses', admin: true },
+  { label: 'SLA Overdue', key: 'overdue_tickets', icon: Timer, accent: 'bg-red-500/10 text-red-400', to: '/tickets?overdue=true', admin: true },
 ];
+
+function OverdueTickets() {
+  const isAdmin = getCachedUser()?.role === 'ADMIN';
+  const { data, isLoading } = useQuery({
+    queryKey: ['overdue-tickets'],
+    queryFn: () => listOverdueTickets(5),
+    refetchInterval: 60_000,
+    enabled: isAdmin,
+  });
+  const navigate = useNavigate();
+  if (!isAdmin) return null;
+  const rows = data?.items ?? [];
+  if (isLoading || rows.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-primary">SLA Overdue</h2>
+        <button
+          type="button"
+          onClick={() => navigate('/tickets?overdue=true')}
+          className="text-xs text-accent hover:underline"
+        >
+          View all →
+        </button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {rows.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => navigate(`/tickets?open=${t.id}`)}
+            className="flex items-center gap-3 rounded-xl border border-edge bg-surface/70 p-2.5 text-left transition-colors hover:bg-elevated/40"
+          >
+            <span className="font-mono text-xs text-red-400">{t.ticket_number}</span>
+            <span className="min-w-0 flex-1 truncate text-sm text-secondary">{t.title}</span>
+            <PriorityBadge priority={t.priority} />
+            <SlaChip dueAt={t.sla_due_at} policyHours={SLA_HOURS[t.priority]} />
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function CountUp({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
@@ -442,6 +496,8 @@ export default function Dashboard() {
           </Link>
         ))}
       </div>
+
+      <OverdueTickets />
 
       <div className="rounded-xl border border-edge bg-surface/60">
         <div className="flex items-center gap-2 border-b border-edge px-5 py-4">

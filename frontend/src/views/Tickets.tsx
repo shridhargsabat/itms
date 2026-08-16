@@ -34,7 +34,10 @@ import Modal from '@/components/Modal';
 import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
+import SlaChip, { SlaBar } from '@/components/SlaChip';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
+
+const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
 const NEXT_STATUS: Partial<Record<TicketStatus, TicketStatus>> = {
   OPEN: 'IN_PROGRESS',
@@ -173,6 +176,7 @@ export default function Tickets() {
     status: status || undefined,
     priority: priority || undefined,
     type: type || undefined,
+    overdue: params.get('overdue') === 'true' ? true : undefined,
     sort: sort ?? undefined,
     order: order ?? undefined,
   };
@@ -245,6 +249,7 @@ export default function Tickets() {
         )}
       </span>
     ) },
+    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <SlaChip dueAt={t.sla_due_at} policyHours={SLA_HOURS[t.priority]} /> },
     {
       key: 'ticket_type',
       header: 'Type',
@@ -445,6 +450,23 @@ export default function Tickets() {
                 </span>
               )}
             </p>
+
+            <div className="mt-3 rounded-lg border border-edge bg-surface/60 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                  SLA · {SLA_HOURS[selected.priority] ?? 24}h policy
+                </span>
+                <SlaChip dueAt={selected.sla_due_at} policyHours={SLA_HOURS[selected.priority]} />
+              </div>
+              <div className="mt-2">
+                <SlaBar dueAt={selected.sla_due_at} policyHours={SLA_HOURS[selected.priority]} />
+              </div>
+              <p className="mt-1.5 text-[10px] text-muted">
+                {selected.sla_due_at
+                  ? `Due ${new Date(selected.sla_due_at).toLocaleString()}${selected.sla_escalated_at ? ' · escalated' : ''}`
+                  : 'No SLA (closed)'}
+              </p>
+            </div>
 
             <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-secondary">
               {selected.description || 'No description provided.'}
