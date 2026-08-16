@@ -7,6 +7,10 @@ use axum::response::Response;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+/// #95: constant-time login — unknown emails burn an argon2 verify against
+/// this fixed hash so response latency doesn't leak account existence.
+const DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$WJTsXQIWAJyDithOWz2n3A$FV4ZObbnkcR6pwM5YvRD/GyFpbxWT92CqB7KOs97lxg";
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -43,10 +47,18 @@ pub async fn login(
     )
     .bind(body.email.trim().to_lowercase())
     .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "invalid email or password"))?;
+    .await?;
 
-    let (id, email, name, role, department, password_hash, active) = row;
+    let (id, email, name, role, department, password_hash, active) = match row {
+        Some(r) => r,
+        None => {
+            // #95: burn a full argon2 verify so unknown/known emails are
+            // indistinguishable by latency; also count toward the rate bucket
+            rate_limited_public(&state, &ip)?;
+            let _ = verify_password(&body.password, DUMMY_HASH);
+            return Err(AppError::new(StatusCode::UNAUTHORIZED, "invalid email or password"));
+        }
+    };
     if !active {
         return Err(AppError::new(
             StatusCode::FORBIDDEN,

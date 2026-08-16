@@ -56,6 +56,15 @@ export function setSession(token: string, user: AuthUser) {
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // #92: purge cached API responses (api-fresh/api-catalog hold authed data —
+  // tickets, assets, CMDB, audits) so nothing sensitive survives logout.
+  // Fire-and-forget; CacheStorage can stall on iOS (see apiFetch note).
+  if ('caches' in window) {
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('api-')).map((k) => caches.delete(k))))
+      .catch(() => {});
+  }
 }
 
 export function getCachedUser(): AuthUser | null {
