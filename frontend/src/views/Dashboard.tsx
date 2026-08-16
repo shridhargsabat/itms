@@ -43,6 +43,8 @@ type Chip = {
   accent: string;
   to: string;
   admin?: boolean;
+  /** Desktop: spans 2 columns (fills the row below the top band). */
+  wide?: boolean;
 };
 
 const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
@@ -52,8 +54,8 @@ const CHIPS: Chip[] = [
   { label: 'SLA Overdue', key: 'overdue_tickets', icon: Timer, accent: 'bg-red-500/10 text-red-400', to: '/tickets?overdue=true', admin: true },
   { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
   { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-400', to: '/warranty' },
-  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-400', to: '/onboarding' },
-  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-400', to: '/licenses', admin: true },
+  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-400', to: '/onboarding', wide: true },
+  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-400', to: '/licenses', admin: true, wide: true },
 ];
 
 function OverdueTickets() {
@@ -506,10 +508,11 @@ export default function Dashboard() {
           </Link>
         </BentoCard>
 
-        {/* Assets (tall 1×2): CountUp + status BucketBar. The IN_STOCK row
+        {/* Assets (tall 2×2 — same size as the hero so the status breakdown
+            legend is readable): CountUp + status BucketBar. The IN_STOCK row
             doubles as the former In Stock KPI. */}
         <BentoCard
-          className="animate-fade-up lg:row-span-2"
+          className="animate-fade-up col-span-2 lg:row-span-2"
           data-testid="bento-assets"
           style={{ animationDelay: '70ms' }}
         >
@@ -537,12 +540,17 @@ export default function Dashboard() {
           </div>
         </BentoCard>
 
-        {/* KPI chips: unchanged card markup, whole-card links. */}
-        {CHIPS.filter((c) => !c.admin || isAdmin).map(({ label, key, icon: Icon, accent, to }, i) => (
+        {/* KPI chips: unchanged card markup, whole-card links. The last two
+            chips go 2-col wide on desktop (admin) to fill the row below the
+            hero+assets band without dead cells. */}
+        {CHIPS.filter((c) => !c.admin || isAdmin).map(({ label, key, icon: Icon, accent, to, wide }, i) => (
           <Link
             key={key}
             to={to}
-            className="group animate-fade-up min-w-0 rounded-xl border border-edge bg-surface/60 p-4 transition-all duration-150 hover:border-edge2/80 hover:bg-surface active:scale-[0.98] sm:p-5"
+            className={cn(
+              'group animate-fade-up min-w-0 rounded-xl border border-edge bg-surface/60 p-4 transition-all duration-150 hover:border-edge2/80 hover:bg-surface active:scale-[0.98] sm:p-5',
+              wide && isAdmin && 'lg:col-span-2',
+            )}
             style={{ animationDelay: `${Math.min(i + 2, 8) * 70}ms` }}
           >
             <div className="flex items-center justify-between gap-2">
