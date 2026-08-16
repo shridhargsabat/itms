@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
 import AnimatedBackground from '@/components/AnimatedBackground';
-import { login, setSession } from '@/api/client';
+import { demoLogin as apiDemoLogin, login, setSession } from '@/api/client';
 
-const DEMO_EMAIL = 'admin@itms.local';
-const DEMO_PASSWORD = 'demo1234';
-
-/** Real auth login (backend + DB). Any seeded user works: <email> / demo1234. */
+/**
+ * Real auth login (backend + DB). Any seeded user works: <email> / demo1234
+ * (until #87 rotation lands — after that only the demo account uses the
+ * demo button, which calls POST /auth/demo server-side: no credentials in
+ * the JS bundle).
+ */
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -32,7 +34,20 @@ export default function Login() {
     mutation.mutate({ email, password });
   };
 
-  const demoLogin = () => mutation.mutate({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+  // demo uses a dedicated mutation (server-side demo account, #87 — no
+  // credentials in the JS bundle)
+  const demoMutation = useMutation({
+    mutationFn: () => apiDemoLogin(),
+    onSuccess: (res) => {
+      setSession(res.token, res.user);
+      if ('startViewTransition' in document) {
+        document.startViewTransition(() => navigate('/', { replace: true }));
+      } else {
+        navigate('/', { replace: true });
+      }
+    },
+  });
+  const onDemoClick = () => demoMutation.mutate();
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-base px-4">
@@ -123,20 +138,18 @@ export default function Login() {
               <span className="h-px flex-1 bg-elevated" />
             </div>
             <button
-              onClick={demoLogin}
-              disabled={mutation.isPending}
+              onClick={onDemoClick}
+              disabled={demoMutation.isPending}
               className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-edge2 text-sm font-medium text-primary transition-all hover:border-indigo-500/50 hover:bg-elevated/60 active:scale-[0.97] disabled:opacity-60"
             >
-              Use demo account
+              {demoMutation.isPending ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                'Use demo account'
+              )}
             </button>
             <p className="mt-4 text-center text-[11px] text-muted">
-              <code className="rounded bg-elevated/80 px-1.5 py-0.5 text-accent">
-                {DEMO_EMAIL}
-              </code>{' '}
-              ·{' '}
-              <code className="rounded bg-elevated/80 px-1.5 py-0.5 text-accent">
-                {DEMO_PASSWORD}
-              </code>
+              One-click showcase account — no password needed
             </p>
 
             <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted">

@@ -66,6 +66,7 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .route("/auth/login", post(auth::login))
         .route("/auth/forgot-password", post(password::forgot_password))
         .route("/auth/reset-password", post(password::reset_password))
+        .route("/auth/demo", post(auth::demo_login))
         .merge(protected)
         .merge(public)
 }

@@ -4,7 +4,7 @@
 // configured) and an in-app notification (works today, no SMTP needed).
 
 use axum::extract::{Extension, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
@@ -47,8 +47,13 @@ fn validate_password(pw: &str) -> Result<(), AppError> {
 /// POST /auth/forgot-password — always 200 (no enumeration).
 pub async fn forgot_password(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(body): Json<ForgotPasswordRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    // #86: shared per-IP bucket with login (separate key so a forgot-password
+    // storm can't lock the account out of login itself)
+    let ip = crate::routes::auth::client_ip_public(&headers);
+    crate::routes::auth::rate_limited_public(&state, &format!("fp:{ip}"))?;
     let email = body.email.trim().to_lowercase();
     let user: Option<(Uuid,)> =
         sqlx::query_as("SELECT id FROM users WHERE email = $1 AND active = TRUE")

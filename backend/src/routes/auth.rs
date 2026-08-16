@@ -34,8 +34,10 @@ pub struct AuthUser {
 /// POST /auth/login — verify credentials, mint an opaque session token.
 pub async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(body): Json<LoginRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    let ip = client_ip_public(&headers);
     let row = sqlx::query_as::<_, (Uuid, String, String, String, String, Option<String>, bool)>(
         "SELECT id, email, name, role, department, password_hash, active FROM users WHERE email = $1",
     )
@@ -56,8 +58,13 @@ pub async fn login(
         .map(|h| verify_password(&body.password, h))
         .unwrap_or(false);
     if !valid {
+        // #86: count FAILED attempts per IP; 11th failure within 15 min → 429
+        rate_limited_public(&state, &ip)?;
         return Err(AppError::new(StatusCode::UNAUTHORIZED, "invalid email or password"));
     }
+
+    // correct credentials always pass and reset the IP bucket
+    clear_rate_public(&state, &ip);
 
     let token = generate_token();
     let expires_at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
@@ -156,4 +163,94 @@ async fn current_user(pool: &PgPool, headers: &HeaderMap) -> Result<AuthUser, Ap
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "session expired or invalid"))
+}
+
+
+// ---- #86: per-IP rate limiting on public auth endpoints ----
+
+const AUTH_RATE_MAX: usize = 10;
+const AUTH_RATE_WINDOW_SECS: u64 = 900;
+
+pub fn client_ip_public(headers: &HeaderMap) -> String {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "unknown".into())
+}
+
+pub fn rate_limited_public(state: &AppState, key: &str) -> Result<(), AppError> {
+    let mut m = state.login_attempts.lock().unwrap();
+    let now = std::time::Instant::now();
+    let v = m.entry(key.to_string()).or_default();
+    v.retain(|t| now.duration_since(*t).as_secs() < AUTH_RATE_WINDOW_SECS);
+    if v.len() >= AUTH_RATE_MAX {
+        return Err(AppError::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "too many login attempts — try again in 15 minutes",
+        ));
+    }
+    v.push(now);
+    Ok(())
+}
+
+pub fn clear_rate_public(state: &AppState, key: &str) {
+    if let Ok(mut m) = state.login_attempts.lock() {
+        m.remove(key);
+    }
+}
+
+async fn issue_session(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<(String, chrono::DateTime<chrono::Utc>), sqlx::Error> {
+    let token = generate_token();
+    let expires_at = sqlx::query_scalar(
+        "INSERT INTO sessions (user_id, token_hash, expires_at)
+         VALUES ($1, $2, NOW() + $3::interval)
+         RETURNING expires_at",
+    )
+    .bind(user_id)
+    .bind(hash_token(&token))
+    .bind("7 days")
+    .fetch_one(pool)
+    .await?;
+    Ok((token, expires_at))
+}
+
+// ---- #87: server-side demo login (no credentials in the JS bundle) ----
+
+pub async fn demo_login(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let ip = client_ip_public(&headers);
+    rate_limited_public(&state, &format!("demo:{ip}"))?;
+    let enabled = std::env::var("DEMO_LOGIN_ENABLED")
+        .map(|v| v != "false")
+        .unwrap_or(true);
+    if !enabled {
+        return Err(AppError::new(StatusCode::NOT_FOUND, "demo login disabled"));
+    }
+    let email = std::env::var("DEMO_LOGIN_EMAIL")
+        .unwrap_or_else(|_| "demo@itms.local".into())
+        .to_lowercase();
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, bool)>(
+        "SELECT id, email, name, role, department, active FROM users WHERE email = $1",
+    )
+    .bind(&email)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::new(StatusCode::NOT_FOUND, "demo login disabled"))?;
+    let (id, email, name, role, department, active) = row;
+    if !active {
+        return Err(AppError::new(StatusCode::NOT_FOUND, "demo login disabled"));
+    }
+    let (token, expires_at) = issue_session(&state.pool, id).await?;
+    Ok(Json(serde_json::json!({
+        "token": token,
+        "expires_at": expires_at,
+        "user": { "id": id, "email": email, "name": name, "role": role, "department": department }
+    })))
 }

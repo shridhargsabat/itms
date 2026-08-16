@@ -15,4 +15,6 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    /// Per-IP failed-login attempt window (login + forgot-password rate limit, #86)
+    pub login_attempts: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, Vec<std::time::Instant>>>>,
 }

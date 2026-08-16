@@ -29,7 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sqlx::migrate!("./migrations").run(&pool).await?;
     tracing::info!("database migrations applied");
 
-    let state = db::AppState { pool };
+    let state = db::AppState {
+        pool,
+        login_attempts: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+    };
 
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::list([
