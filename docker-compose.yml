@@ -27,6 +27,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://itms:${POSTGRES_PASSWORD:?set in .env}@db:5432/itms
+      INTAKE_TOKEN: ${INTAKE_TOKEN:-}
       TZ: Asia/Kolkata
     volumes:
       - itms_uploads:/app/uploads
