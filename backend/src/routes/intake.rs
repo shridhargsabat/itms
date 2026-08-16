@@ -58,18 +58,21 @@ fn clean_subject(raw: &str) -> String {
 }
 
 fn extract_ticket_number(subject: &str) -> Option<String> {
-    // scan for INC-XXXX / REQ-XXXX anywhere in the subject
+    // scan for INC-XXXX / REQ-XXXX with ANY digit count (live numbers are
+    // 5+ digits — never truncate at a fixed window)
     let chars: Vec<char> = subject.chars().collect();
-    for (i, w) in chars.windows(8).enumerate() {
-        if (w[0] == 'I' || w[0] == 'R') && w[1] == 'N' || w[0] == 'R' && w[1] == 'E' {
-            if w[0] == 'I' && w[1] == 'N' && w[2] == 'C' && w[3] == '-'
-                && w[4].is_ascii_digit() && w[5].is_ascii_digit() && w[6].is_ascii_digit() && w[7].is_ascii_digit() {
-                return Some(subject[i..i + 8].to_string());
-            }
-            if w[0] == 'R' && w[1] == 'E' && w[2] == 'Q' && w[3] == '-'
-                && w[4].is_ascii_digit() && w[5].is_ascii_digit() && w[6].is_ascii_digit() && w[7].is_ascii_digit() {
-                return Some(subject[i..i + 8].to_string());
-            }
+    for (i, _) in chars.iter().enumerate() {
+        let is_inc = i + 4 <= chars.len() && chars[i] == 'I' && chars[i + 1] == 'N' && chars[i + 2] == 'C' && chars[i + 3] == '-';
+        let is_req = i + 4 <= chars.len() && chars[i] == 'R' && chars[i + 1] == 'E' && chars[i + 2] == 'Q' && chars[i + 3] == '-';
+        if !is_inc && !is_req {
+            continue;
+        }
+        let mut j = i + 4;
+        while j < chars.len() && chars[j].is_ascii_digit() {
+            j += 1;
+        }
+        if j > i + 4 {
+            return Some(subject[i..j].to_string());
         }
     }
     None
