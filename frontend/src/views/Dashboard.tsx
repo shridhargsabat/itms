@@ -575,7 +575,7 @@ export default function Dashboard() {
             behavior (30s refetch, pause). p-0 keeps the inner px-5 rows at
             their original edge-to-edge rhythm inside the bento shell. */}
         <BentoCard
-          className="animate-fade-up col-span-2 p-0 sm:p-0 lg:row-span-2"
+          className="animate-fade-up col-span-2 p-0 sm:p-0 lg:col-span-4"
           data-testid="bento-activity"
           style={{ animationDelay: `${Math.min(8, 8) * 70}ms` }}
         >
