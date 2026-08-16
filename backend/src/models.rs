@@ -114,7 +114,13 @@ pub struct AuditLogEntry {
     pub actor_name: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MetricBucket {
+    pub key: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DashboardMetrics {
     pub asset_count: i64,
     pub open_tickets: i64,
@@ -130,6 +136,25 @@ pub struct DashboardMetrics {
     /// Active licenses expiring within 90 days or already expired.
     pub license_alerts: i64,
     /// Open/IN_PROGRESS tickets whose SLA deadline has passed.
+    pub overdue_tickets: i64,
+    /// Open tickets grouped by priority (sums to open_tickets).
+    pub tickets_by_priority: Vec<MetricBucket>,
+    /// Assets grouped by status (IN_STOCK bucket equals in_stock_count).
+    pub assets_by_status: Vec<MetricBucket>,
+}
+
+// scalar-only FromRow target (keeps the existing single SELECT untouched;
+// FromRow cannot decode a Vec field, hence the split)
+#[derive(Debug, sqlx::FromRow)]
+pub struct DashboardMetricsScalars {
+    pub asset_count: i64,
+    pub open_tickets: i64,
+    pub high_priority_count: i64,
+    pub in_stock_count: i64,
+    pub warranty_alerts_count: i64,
+    pub onboarding_overdue: i64,
+    pub open_requests: i64,
+    pub license_alerts: i64,
     pub overdue_tickets: i64,
 }
 
