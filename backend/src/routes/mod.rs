@@ -3,6 +3,7 @@ pub mod comments;
 pub mod intake;
 pub mod audit;
 pub mod auth;
+pub mod password;
 pub mod cmdb;
 pub mod dashboard;
 pub mod masters;
@@ -30,6 +31,7 @@ pub fn api_router(state: AppState) -> Router<AppState> {
     let protected = Router::new()
         .route("/auth/logout", post(auth::logout))
         .route("/auth/me", get(auth::me))
+        .route("/auth/change-password", post(password::change_password))
         .nest("/dashboard", dashboard::router())
         .nest("/assets", assets::router())
         .nest("/tickets", comments::router())
@@ -57,6 +59,8 @@ pub fn api_router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route("/auth/login", post(auth::login))
+        .route("/auth/forgot-password", post(password::forgot_password))
+        .route("/auth/reset-password", post(password::reset_password))
         .merge(protected)
         .merge(public)
 }

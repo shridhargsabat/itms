@@ -8,6 +8,8 @@ import Layout from '@/components/Layout';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 // Route-level code splitting: each view is its own chunk, loaded on first
 // navigation (Vite emits per-lazy-import chunks + a vendor chunk below).
+const PasswordFlow = lazy(() => import('@/views/PasswordFlow'));
+const Account = lazy(() => import('@/views/Account'));
 const Dashboard = lazy(() => import('@/views/Dashboard'));
 const Assets = lazy(() => import('@/views/Assets'));
 const Tickets = lazy(() => import('@/views/Tickets'));
@@ -86,6 +88,8 @@ createRoot(document.getElementById('root')!).render(
           <RouteErrorBoundary>
             <Routes>
               <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<PasswordFlow />} />
+                <Route path="/reset-password" element={<PasswordFlow />} />
               <Route
                 element={
                   <RequireAuth>
@@ -105,6 +109,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/audit" element={<AuditLog />} />
                 <Route path="/masters" element={<Masters />} />
                 <Route path="/offline" element={<Offline />} />
+                <Route path="/account" element={<Account />} />
               </Route>
             </Routes>
           </RouteErrorBoundary>

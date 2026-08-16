@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import ThemeToggle from '@/components/ThemeToggle';
 import { applyTheme, watchSystemTheme } from '@/lib/theme';
 import {
   Download,
+  KeyRound,
   LogOut,
   Network,
   PanelLeftClose,
@@ -210,6 +211,17 @@ export default function Layout() {
             <LogOut className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Sign out</span>}
           </button>
+          <Link
+            to="/account"
+            className={cn(
+              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-accent/10 hover:text-accent',
+              collapsed && 'justify-center px-0',
+            )}
+            title="Change password"
+          >
+            <KeyRound className="h-5 w-5 shrink-0" />
+            {!collapsed && <span>Change password</span>}
+          </Link>
           {installable && (
             <button
               type="button"
