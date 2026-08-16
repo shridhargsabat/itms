@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
 import AnimatedBackground from '@/components/AnimatedBackground';
@@ -109,6 +109,13 @@ export default function Login() {
                 )}
               </button>
             </form>
+
+            <Link
+              to="/forgot-password"
+              className="mt-3 block text-center text-xs text-secondary transition-colors hover:text-accent hover:underline"
+            >
+              Forgot password?
+            </Link>
 
             <div className="mt-8 flex items-center gap-3 text-[11px] text-muted">
               <span className="h-px flex-1 bg-elevated" />

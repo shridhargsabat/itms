@@ -129,6 +129,25 @@ export const login = (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   });
 
+// P1-6 password reset flow
+export const forgotPassword = (email: string) =>
+  apiFetch<{ ok: boolean }>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
+export const resetPassword = (body: { token: string; new_password: string }) =>
+  apiFetch<{ ok: boolean }>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const changePassword = (body: { current_password: string; new_password: string }) =>
+  apiFetch<{ ok: boolean }>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
 export const logout = () =>
   apiFetch<{ ok: boolean }>('/auth/logout', { method: 'POST' }).catch(() => ({ ok: false }));
 
