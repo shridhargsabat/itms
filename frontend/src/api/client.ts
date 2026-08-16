@@ -132,6 +132,9 @@ export const login = (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   });
 
+/** #87: server-side demo account — no credentials in the JS bundle. */
+export const demoLogin = () => apiFetch<LoginResponse>('/auth/demo', { method: 'POST' });
+
 // P1-6 password reset flow
 export const forgotPassword = (email: string) =>
   apiFetch<{ ok: boolean }>('/auth/forgot-password', {
