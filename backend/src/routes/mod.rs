@@ -4,6 +4,7 @@ pub mod intake;
 pub mod audit;
 pub mod auth;
 pub mod password;
+pub mod kb;
 pub mod cmdb;
 pub mod dashboard;
 pub mod masters;
@@ -36,6 +37,7 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/assets", assets::router())
         .nest("/tickets", comments::router())
         .nest("/tickets", tickets::router())
+        .route("/tickets/{id}/convert-to-article", post(kb::convert_to_article))
         .route("/attachments/{attachment_id}/download", get(comments::download_attachment))
         .nest("/cmdb", cmdb::router())
         .nest("/audit", audit::router())
@@ -46,6 +48,7 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/onboarding", onboarding::router())
         .nest("/notifications", notifications::router())
         .nest("/sla", sla::router())
+        .nest("/kb", kb::router())
         .nest("/requests", requests::router())
         .nest("/licenses", licenses::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));

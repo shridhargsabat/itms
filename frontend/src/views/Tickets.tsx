@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
+  BookOpen,
   Columns3,
   Download,
   Link2,
@@ -13,8 +14,10 @@ import {
   Table,
   Trash2,
   User,
+  Zap,
 } from 'lucide-react';
 import {
+  convertTicketToArticle,
   createTicket,
   createTicketComment,
   getCachedUser,
@@ -23,8 +26,10 @@ import {
   downloadTicketAttachment,
   exportTicketsCsv,
   getTicketTimeline,
+  listCanned,
   listTickets,
   patchTicketStatus,
+  suggestArticles,
   uploadTicketAttachment,
 } from '@/api/client';
 import { PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
@@ -91,6 +96,7 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
           placeholder="Details (optional)"
         />
       </div>
+      <SuggestionPanel query={form.title} />
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={labelCls}>Type</label>
@@ -527,6 +533,10 @@ export default function Tickets() {
                 </p>
               )}
             </div>
+
+            <div className="mt-3">
+              <ConvertButton ticket={selected} />
+            </div>
           </aside>
         )}
       </div>
@@ -698,6 +708,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
 
       {/* new comment */}
       <div className="flex flex-col gap-2">
+        <CannedPicker onPick={(t) => setDraft((d) => (d ? d + '\n\n' + t : t))} />
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -738,6 +749,107 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// P1-7 (issue #48): KB integrations — suggestions at creation, convert at
+// close, canned responses in the comment composer.
+
+function SuggestionPanel({ query }: { query: string }) {
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 400);
+    return () => clearTimeout(t);
+  }, [query]);
+  const suggestions = useQuery({
+    queryKey: ['kb-suggest', debounced],
+    queryFn: () => suggestArticles(debounced),
+    enabled: debounced.length >= 3,
+  });
+  if (debounced.length < 3 || !suggestions.data?.length) return null;
+  return (
+    <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">
+        Maybe this already exists in the KB?
+      </p>
+      <div className="mt-1.5 space-y-1">
+        {suggestions.data.slice(0, 3).map((a) => (
+          <Link
+            key={a.id}
+            to={`/kb?open=${a.id}`}
+            className="block truncate text-xs text-secondary hover:text-accent hover:underline"
+            title={a.body}
+          >
+            <span className="mr-1.5 rounded bg-indigo-500/15 px-1 py-0.5 text-[9px] font-medium text-accent">
+              {a.ticket_type}
+            </span>
+            {a.title}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConvertButton({ ticket }: { ticket: Ticket }) {
+  const qc = useQueryClient();
+  const user = getCachedUser();
+  const navigate = useNavigate();
+  const convert = useMutation({
+    mutationFn: () => convertTicketToArticle(ticket.id, {}),
+    onSuccess: (a) => {
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      navigate(`/kb?open=${a.id}`);
+    },
+  });
+  if (user?.role === 'EMPLOYEE') return null;
+  if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') return null;
+  return (
+    <button
+      type="button"
+      disabled={convert.isPending}
+      onClick={() => convert.mutate()}
+      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-indigo-500/20 disabled:opacity-60"
+      title="Capture this resolution as a knowledge-base article"
+    >
+      {convert.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
+      Convert to KB article
+    </button>
+  );
+}
+
+function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
+  const user = getCachedUser();
+  const [open, setOpen] = useState(false);
+  const canned = useQuery({ queryKey: ['kb-canned'], queryFn: () => listCanned(), enabled: user?.role !== 'EMPLOYEE' });
+  if (user?.role === 'EMPLOYEE') return null;
+  if (!canned.data?.length) return null;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 rounded-lg border border-edge px-2 py-1 text-[11px] text-accent hover:bg-elevated"
+      >
+        <Zap className="h-3 w-3" /> Canned response
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-80 overflow-y-auto rounded-xl border border-edge bg-surface p-1 shadow-xl">
+          {canned.data.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => { onPick(c.body); setOpen(false); }}
+              className="block w-full rounded-lg px-2.5 py-2 text-left hover:bg-elevated"
+            >
+              <span className="block text-xs font-semibold text-primary">{c.title}</span>
+              <span className="block truncate text-[11px] text-muted">{c.body}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
