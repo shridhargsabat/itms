@@ -23,6 +23,17 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
+
+/// #91: CSV formula injection guard — cells starting with = + - @ tab CR get a
+/// single-quote prefix (OWASP mitigation) so Excel/Sheets never evaluates them.
+pub fn csv_safe(v: &str) -> String {
+    let v = v.trim_start_matches('\u{feff}');
+    if v.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{v}")
+    } else {
+        v.to_string()
+    }
+}
 use serde_json::json;
 
 use crate::db::AppState;

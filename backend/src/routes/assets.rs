@@ -970,22 +970,18 @@ async fn export_assets(
     .map_err(csv_err)?;
     for a in &assets {
         wtr.write_record(vec![
-            a.asset_tag.clone(),
-            a.name.clone(),
-            a.category.clone(),
-            a.serial_number.clone(),
-            a.status.clone(),
-            a.assigned_user_name.clone().unwrap_or_default(),
-            a.purchase_date.map(|d| d.to_string()).unwrap_or_default(),
-            a.warranty_expiry.map(|d| d.to_string()).unwrap_or_default(),
-            a.unit_cost
-                .map(|c| format!("{c:.2}"))
-                .unwrap_or_default(),
-            a.expected_eol.map(|d| d.to_string()).unwrap_or_default(),
-            a.current_value
-                .map(|c| format!("{c:.2}"))
-                .unwrap_or_default(),
-            a.specs.to_string(),
+            crate::routes::csv_safe(&a.asset_tag),
+            crate::routes::csv_safe(&a.name),
+            crate::routes::csv_safe(&a.category),
+            crate::routes::csv_safe(&a.serial_number),
+            crate::routes::csv_safe(&a.status),
+            crate::routes::csv_safe(&a.assigned_user_name.clone().unwrap_or_default()),
+            crate::routes::csv_safe(&a.purchase_date.map(|d| d.to_string()).unwrap_or_default()),
+            crate::routes::csv_safe(&a.warranty_expiry.map(|d| d.to_string()).unwrap_or_default()),
+            crate::routes::csv_safe(&a.unit_cost.map(|c| format!("{c:.2}")).unwrap_or_default()),
+            crate::routes::csv_safe(&a.expected_eol.map(|d| d.to_string()).unwrap_or_default()),
+            crate::routes::csv_safe(&a.current_value.map(|c| format!("{c:.2}")).unwrap_or_default()),
+            crate::routes::csv_safe(&a.specs.to_string()),
             a.created_at.to_rfc3339(),
         ])
         .map_err(csv_err)?;
