@@ -19,6 +19,7 @@ import {
 import {
   convertTicketToArticle,
   createTicket,
+  listTemplates,
   createTicketComment,
   getCachedUser,
   deleteTicketAttachment,
@@ -33,7 +34,7 @@ import {
   uploadTicketAttachment,
 } from '@/api/client';
 import { PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
-import type { CreateTicketInput, Ticket, TicketStatus } from '@/api/types';
+import type { CreateTicketInput, Ticket, TicketStatus, TicketTemplate } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import Modal from '@/components/Modal';
 import ScrollX from '@/components/ScrollX';
@@ -76,6 +77,14 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         mutation.mutate(form);
       }}
     >
+      <TemplatePicker
+        onApply={(t) => setForm((f) => ({
+          ...f,
+          ticket_type: t.ticket_type as CreateTicketInput['ticket_type'],
+          priority: t.priority as CreateTicketInput['priority'],
+          description: t.description || f.description,
+        }))}
+      />
       <div>
         <label className={labelCls}>Title *</label>
         <input
@@ -850,6 +859,29 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+function TemplatePicker({ onApply }: { onApply: (t: TicketTemplate) => void }) {
+  const templates = useQuery({ queryKey: ['templates', 'active'], queryFn: () => listTemplates(true) });
+  const [selected, setSelected] = useState('');
+  if (!templates.data?.length) return null;
+  return (
+    <div>
+      <label className={labelCls}>Start from a template</label>
+      <Select
+        className="w-full"
+        value={selected}
+        placeholder="Choose a template…"
+        onChange={(v) => {
+          const t = templates.data?.find((x) => x.id === v);
+          if (t) onApply(t);
+          setSelected('');
+        }}
+        options={templates.data.map((t) => ({ value: t.id, label: `${t.name} — ${t.ticket_type} / ${t.priority}` }))}
+      />
     </div>
   );
 }
