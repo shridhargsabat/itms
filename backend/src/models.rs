@@ -57,6 +57,11 @@ pub struct Asset {
     /// computed in SQL; NULL when no cost/date basis exists.
     #[sqlx(default)]
     pub current_value: Option<f64>,
+    /// #39: vendor master link (NULL until a vendor is assigned)
+    #[sqlx(default)]
+    pub vendor_id: Option<Uuid>,
+    #[sqlx(default)]
+    pub vendor_name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -173,6 +178,8 @@ pub struct CreateAssetRequest {
     pub warranty_expiry: Option<NaiveDate>,
     pub unit_cost: Option<f64>,
     pub expected_eol: Option<NaiveDate>,
+    /// #39: vendor master link (validated against vendors table)
+    pub vendor_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -197,6 +204,9 @@ pub struct UpdateAssetRequest {
     pub unit_cost: Option<Option<f64>>,
     #[serde(default, deserialize_with = "double_option")]
     pub expected_eol: Option<Option<NaiveDate>>,
+    /// #39: None = unchanged, Some(None) = clear the vendor link
+    #[serde(default, deserialize_with = "double_option")]
+    pub vendor_id: Option<Option<Uuid>>,
 }
 
 /// serde does NOT distinguish `"field": null` (→ None, same as absent) in

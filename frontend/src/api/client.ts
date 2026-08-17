@@ -39,6 +39,11 @@ import type {
   UpdateUserInput,
   UserRecord,
   WarrantyAlert,
+  RepeatIncident,
+  Vendor,
+  VendorClaim,
+  VendorInput,
+  ClaimInput,
 } from '@/api/types';
 
 const TOKEN_KEY = 'itms_token';
@@ -564,3 +569,31 @@ export const markAllNotificationsRead = () =>
 export const getSlaPolicy = () => apiFetch<SlaPolicy>('/sla/policy');
 
 export const listOverdueTickets = (limit = 10) => apiFetchCount<Ticket>(`/tickets?overdue=true&limit=${limit}`);
+
+// ── Phase 2: vendors + claims (#39) ─────────────────────────────────────────
+export const listVendors = () => apiFetch<Vendor[]>('/vendors');
+export const createVendor = (input: VendorInput) =>
+  apiFetch<Vendor>('/vendors', { method: 'POST', body: JSON.stringify(input) });
+export const updateVendor = (id: string, input: VendorInput) =>
+  apiFetch<Vendor>(`/vendors/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+export const deleteVendor = (id: string) => apiFetch<void>(`/vendors/${id}`, { method: 'DELETE' });
+
+export const listClaims = (params?: { vendor_id?: string; asset_id?: string; limit?: number }) => {
+  const q = new URLSearchParams();
+  if (params?.vendor_id) q.set('vendor_id', params.vendor_id);
+  if (params?.asset_id) q.set('asset_id', params.asset_id);
+  if (params?.limit) q.set('limit', String(params.limit));
+  return apiFetch<VendorClaim[]>(`/claims${q.toString() ? `?${q}` : ''}`);
+};
+export const createClaim = (input: ClaimInput) =>
+  apiFetch<VendorClaim>('/claims', { method: 'POST', body: JSON.stringify(input) });
+export const deleteClaim = (id: string) => apiFetch<void>(`/claims/${id}`, { method: 'DELETE' });
+
+// ── Phase 2: reports (#49) ──────────────────────────────────────────────────
+export const getRepeatIncidents = (params?: { days?: number; min_count?: number; ticket_type?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.days) q.set('days', String(params.days));
+  if (params?.min_count) q.set('min_count', String(params.min_count));
+  if (params?.ticket_type) q.set('ticket_type', params.ticket_type);
+  return apiFetch<RepeatIncident[]>(`/reports/repeat-incidents${q.toString() ? `?${q}` : ''}`);
+};

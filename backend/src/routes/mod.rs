@@ -6,6 +6,8 @@ pub mod auth;
 pub mod password;
 pub mod kb;
 pub mod templates;
+pub mod vendors;
+pub mod reports;
 pub mod cmdb;
 pub mod dashboard;
 pub mod masters;
@@ -20,7 +22,7 @@ pub mod users;
 use axum::http::StatusCode;
 use axum::middleware;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post, put};
 use axum::Json;
 use axum::Router;
 
@@ -64,6 +66,12 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/templates", templates::router())
         .nest("/requests", requests::router())
         .nest("/licenses", licenses::router())
+        // Phase 2 (#39 vendors/claims, #49 reports) — flat routes, same auth layer
+        .route("/vendors", get(vendors::list_vendors).post(vendors::create_vendor))
+        .route("/vendors/{id}", put(vendors::update_vendor).delete(vendors::delete_vendor))
+        .route("/claims", get(vendors::list_claims).post(vendors::create_claim))
+        .route("/claims/{id}", delete(vendors::delete_claim))
+        .route("/reports/repeat-incidents", get(reports::repeat_incidents))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
 
     // intake is PUBLIC (token-gated inside the handler — the email cron has
