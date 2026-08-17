@@ -42,6 +42,9 @@ import type {
   LocationInput,
   AssetMove,
   Location,
+  OAuthConfig,
+  OAuthConfigUpdate,
+  OAuthStatus,
   WarrantyAlert,
   QrScanResult,
   RepeatIncident,
@@ -622,3 +625,10 @@ export const deleteLocation = (id: string) =>
   apiFetch<void>(`/locations/${id}`, { method: 'DELETE' });
 export const listLocationAssets = (id: string) => apiFetch<Asset[]>(`/locations/${id}/assets`);
 export const listAssetMoves = (assetId: string) => apiFetch<AssetMove[]>(`/assets/${assetId}/moves`);
+
+
+// ── #53 Google SSO ──────────────────────────────────────────────────────────
+export const getOAuthStatus = () => apiFetch<OAuthStatus>('/auth/oauth/status');
+export const getOAuthAdmin = () => apiFetch<OAuthConfig>('/admin/oauth');
+export const updateOAuthAdmin = (input: OAuthConfigUpdate) =>
+  apiFetch<OAuthConfig>('/admin/oauth', { method: 'PUT', body: JSON.stringify(input) });

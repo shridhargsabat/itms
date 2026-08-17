@@ -627,3 +627,26 @@ export interface LocationInput {
   floor: string;
   room: string;
 }
+
+
+// ── #53 Google SSO ──────────────────────────────────────────────────────────
+export interface OAuthStatus {
+  enabled: boolean;
+  provider: 'google';
+  client_id_set: boolean;
+}
+
+export interface OAuthConfig {
+  provider: 'google';
+  enabled: boolean;
+  client_id: string;
+  has_secret: boolean;
+  allowed_domains: string[];
+}
+
+export interface OAuthConfigUpdate {
+  enabled?: boolean;
+  client_id?: string;
+  client_secret?: string;
+  allowed_domains?: string[];
+}

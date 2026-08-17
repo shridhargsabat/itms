@@ -20,6 +20,8 @@ const Tickets = lazy(() => import('@/views/Tickets'));
 const CMDB = lazy(() => import('@/views/CMDB'));
 const AuditLog = lazy(() => import('@/views/AuditLog'));
 const Masters = lazy(() => import('@/views/Masters'));
+const Settings = lazy(() => import('@/views/Settings'));
+const OAuthCallback = lazy(() => import('@/views/OAuthCallback'));
 const Offline = lazy(() => import('@/views/Offline'));
 const Login = lazy(() => import('@/views/Login'));
 const WarrantyView = lazy(() => import('@/views/Warranty'));
@@ -94,6 +96,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<PasswordFlow />} />
                 <Route path="/reset-password" element={<PasswordFlow />} />
+                {/* #53: SSO landing — must be OUTSIDE RequireAuth (token arrives in the URL) */}
+                <Route path="/oauth/callback" element={<OAuthCallback />} />
               <Route
                 element={
                   <RequireAuth>
@@ -112,6 +116,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/cmdb" element={<CMDB />} />
                 <Route path="/audit" element={<AuditLog />} />
                 <Route path="/masters" element={<Masters />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/offline" element={<Offline />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/kb" element={<KnowledgeBase />} />
