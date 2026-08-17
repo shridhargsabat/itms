@@ -5,6 +5,7 @@ pub mod audit;
 pub mod auth;
 pub mod password;
 pub mod kb;
+pub mod locations;
 pub mod templates;
 pub mod vendors;
 pub mod reports;
@@ -69,6 +70,10 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         // Phase 2 (#39 vendors/claims, #49 reports) — flat routes, same auth layer
         .route("/vendors", get(vendors::list_vendors).post(vendors::create_vendor))
         .route("/vendors/{id}", put(vendors::update_vendor).delete(vendors::delete_vendor))
+        // Phase 2 (#40 locations)
+        .route("/locations", get(locations::list_locations).post(locations::create_location))
+        .route("/locations/{id}", put(locations::update_location).delete(locations::delete_location))
+        .route("/locations/{id}/assets", get(locations::location_assets))
         .route("/claims", get(vendors::list_claims).post(vendors::create_claim))
         .route("/claims/{id}", delete(vendors::delete_claim))
         .route("/reports/repeat-incidents", get(reports::repeat_incidents))

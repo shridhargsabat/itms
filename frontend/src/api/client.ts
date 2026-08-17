@@ -38,6 +38,10 @@ import type {
   UpdateAssetInput,
   UpdateUserInput,
   UserRecord,
+  LocationWithCount,
+  LocationInput,
+  AssetMove,
+  Location,
   WarrantyAlert,
   QrScanResult,
   RepeatIncident,
@@ -246,7 +250,7 @@ async function apiFetchCount<T>(path: string): Promise<ListResult<T>> {
   return { items: (await res.json()) as T[], total };
 }
 
-export const listAssets = (params?: { search?: string; category?: string; status?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
+export const listAssets = (params?: { search?: string; category?: string; status?: string; location_id?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.category) q.set('category', params.category);
@@ -316,6 +320,7 @@ export const exportAssetsCsv = async (params?: {
   search?: string;
   category?: string;
   status?: string;
+  location_id?: string;
   sort?: string;
   order?: 'asc' | 'desc';
   ids?: string[];
@@ -602,3 +607,18 @@ export const getRepeatIncidents = (params?: { days?: number; min_count?: number;
 // ── Phase 2 (#65): QR scan audit ────────────────────────────────────────────
 export const scanAudit = (id: string) =>
   apiFetch<QrScanResult>(`/assets/${id}/scan-audit`, { method: 'POST' });
+
+
+// ── Phase 2 (#40 multi-location) ────────────────────────────────────────────
+export const listLocations = (search?: string) => {
+  const q = search ? `?search=${encodeURIComponent(search)}` : '';
+  return apiFetch<LocationWithCount[]>(`/locations${q}`);
+};
+export const createLocation = (input: LocationInput) =>
+  apiFetch<Location>('/locations', { method: 'POST', body: JSON.stringify(input) });
+export const updateLocation = (id: string, input: LocationInput) =>
+  apiFetch<Location>(`/locations/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+export const deleteLocation = (id: string) =>
+  apiFetch<void>(`/locations/${id}`, { method: 'DELETE' });
+export const listLocationAssets = (id: string) => apiFetch<Asset[]>(`/locations/${id}/assets`);
+export const listAssetMoves = (assetId: string) => apiFetch<AssetMove[]>(`/assets/${assetId}/moves`);

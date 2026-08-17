@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, History, IndianRupee, LoaderCircle, Pencil, User, Wrench, X } from 'lucide-react';
-import { assignAsset, createClaim, getAssetLifecycle, getCachedUser, listClaims, listVendors, updateAsset } from '@/api/client';
-import type { Asset, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
+import { ArrowRight, CalendarDays, History, IndianRupee, LoaderCircle, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
+import { assignAsset, createClaim, getAssetLifecycle, getCachedUser, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
+import type { Asset, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import Select from '@/components/Select';
 import { formatDateOnly, inputCls, labelCls, pretty } from '@/lib/utils';
@@ -68,6 +68,12 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
   });
 
   const vendors = useQuery({ queryKey: ['vendors'], queryFn: () => listVendors() });
+  const locations = useQuery({ queryKey: ['locations'], queryFn: () => listLocations() });
+  const moves = useQuery({
+    queryKey: ['asset-moves', asset?.id],
+    queryFn: () => (asset ? listAssetMoves(asset.id) : Promise.resolve([])),
+    enabled: !!asset,
+  });
   const claims = useQuery({
     queryKey: ['claims', 'asset', asset?.id],
     queryFn: () => listClaims({ asset_id: asset!.id }),
@@ -237,6 +243,20 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                   ]}
                 />
               </div>
+              <div>
+                <label className={labelCls}>Location</label>
+                <Select
+                  value={form.location_id ?? asset.location_id ?? ''}
+                  onChange={(v) => setForm((f) => ({ ...f, location_id: v || null }))}
+                  options={[
+                    { value: '', label: '— unplaced —' },
+                    ...(locations.data ?? []).map((l) => ({
+                      value: l.id,
+                      label: [l.site, l.building, l.floor, l.room].filter(Boolean).join(' / ') || l.id.slice(0, 8),
+                    })),
+                  ]}
+                />
+              </div>
               {save.isError && (
                 <p className="text-xs text-red-400">
                   {save.error instanceof Error ? save.error.message : 'Update failed.'}
@@ -270,6 +290,12 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                     <User className="h-3 w-3" /> Assigned To
                   </p>
                   <p className="mt-1 truncate text-primary">{asset.assigned_user_name ?? '—'}</p>
+                </div>
+                <div className="rounded-lg border border-edge bg-base p-3">
+                  <p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
+                    <MapPin className="h-3 w-3" /> Location
+                  </p>
+                  <p className="mt-1 truncate text-primary">{asset.location_name ?? '—'}</p>
                 </div>
                 <div className="rounded-lg border border-edge bg-base p-3">
                   <p className="text-xs uppercase tracking-wide text-muted">Serial Number</p>
@@ -307,6 +333,35 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                   <p className="text-xs uppercase tracking-wide text-muted">Expected EOL</p>
                   <p className="mt-1 text-primary">{formatDateOnly(asset.expected_eol) || '—'}</p>
                 </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-secondary">
+                  <History className="h-3.5 w-3.5" /> Move History
+                </h3>
+                {moves.data && moves.data.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-edge p-3 text-center text-xs text-muted">
+                    No moves recorded yet — change the location above to log one.
+                  </p>
+                ) : (
+                  <div className="max-h-44 divide-y divide-edge/60 overflow-y-auto rounded-lg border border-edge bg-base">
+                    {(moves.data ?? []).map((m: AssetMove) => (
+                      <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="truncate text-primary">
+                            <span className="text-muted">{m.from_location_name ?? '—'}</span>
+                            <ArrowRight className="mx-1 inline h-3 w-3 text-muted" />
+                            <span>{m.to_location_name ?? '—'}</span>
+                          </p>
+                          <p className="truncate text-[10px] text-muted">
+                            {m.note}{m.actor_name ? ` · ${m.actor_name}` : ''}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-[10px] text-muted">{formatDateOnly(m.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

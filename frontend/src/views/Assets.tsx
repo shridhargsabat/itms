@@ -10,6 +10,7 @@ import {
   getCachedUser,
   importAssetsCsv,
   listAssets,
+  listLocations,
   listUsers,
 } from '@/api/client';
 import type { ImportResult } from '@/api/client';
@@ -130,6 +131,7 @@ export default function Assets() {
       search: search || undefined,
       category: category || undefined,
       status: status || undefined,
+      location_id: location || undefined,
       sort: sort ?? undefined,
       order: order ?? undefined,
     });
@@ -138,13 +140,17 @@ export default function Assets() {
   const search = params.get('search') ?? '';
   const category = params.get('category') ?? '';
   const status = params.get('status') ?? '';
+  const location = params.get('location') ?? '';
   const sort = params.get('sort') ?? null;
   const order = (params.get('order') as 'asc' | 'desc' | null) ?? null;
+
+  const locationsQ = useQuery({ queryKey: ['locations'], queryFn: () => listLocations() });
 
   const filters = {
     search: search || undefined,
     category: category || undefined,
     status: status || undefined,
+    location_id: location || undefined,
     sort: sort ?? undefined,
     order: order ?? undefined,
   };
@@ -157,7 +163,7 @@ export default function Assets() {
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [search, category, status, sort, order]);
+  }, [search, category, status, location, sort, order]);
 
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -196,6 +202,11 @@ export default function Assets() {
       render: (a) => <span className="font-medium text-primary">{a.name}</span>,
     },
     { key: 'category', header: 'Category', sortable: true },
+    {
+      key: 'location_name',
+      header: 'Location',
+      render: (a) => <span className="text-secondary">{a.location_name ?? '—'}</span>,
+    },
     {
       key: 'status',
       header: 'Status',
@@ -271,6 +282,18 @@ export default function Assets() {
             options={[
               { value: '', label: 'All Statuses' },
               ...ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
+            ]}
+          />
+          <Select
+            className="w-auto min-w-[150px]"
+            value={location}
+            onChange={(v) => update('location', v)}
+            options={[
+              { value: '', label: 'All Locations' },
+              ...(locationsQ.data ?? []).map((l) => ({
+                value: l.id,
+                label: [l.site, l.building, l.floor, l.room].filter(Boolean).join(' / ') || '—',
+              })),
             ]}
           />
         </div>

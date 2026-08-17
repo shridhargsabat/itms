@@ -12,21 +12,24 @@ use uuid::Uuid;
 
 use crate::db::AppState;
 use crate::models::{
-    Asset, AssignAssetRequest, CreateAssetRequest, LifecycleEvent, UpdateAssetRequest,
+    Asset, AssetMove, AssignAssetRequest, CreateAssetRequest, LifecycleEvent, UpdateAssetRequest,
     WarrantyAlert,
 };
 
 use super::AppError;
 
 /// Shared joined SELECT so every handler returns the same enriched shape.
-const ASSET_SELECT: &str = "SELECT a.id, a.asset_tag, a.name, a.category, a.serial_number, \
+pub const ASSET_SELECT: &str = "SELECT a.id, a.asset_tag, a.name, a.category, a.serial_number, \
      a.status, a.assigned_to_user_id, a.specs, a.purchase_date, a.warranty_expiry, \
      a.unit_cost, a.expected_eol, a.created_at, a.updated_at, u.name AS assigned_user_name, \
+     a.location_id, CASE WHEN l.id IS NULL THEN NULL \
+       ELSE concat_ws(' / ', NULLIF(l.site, ''), NULLIF(l.building, ''), NULLIF(l.floor, ''), NULLIF(l.room, '')) END AS location_name, \
      ROUND((a.unit_cost * LEAST(1.0, GREATEST(0.0, \
         (CURRENT_DATE - COALESCE(a.purchase_date, a.expected_eol))::float8 / 1095.0)))::numeric, 2)::float8 \
         AS current_value, a.vendor_id, v.name AS vendor_name \
      FROM assets a LEFT JOIN users u ON u.id = a.assigned_to_user_id \
-     LEFT JOIN vendors v ON v.id = a.vendor_id";
+     LEFT JOIN vendors v ON v.id = a.vendor_id \
+     LEFT JOIN locations l ON l.id = a.location_id";
 
 /// RETURNING clause mirroring ASSET_SELECT's columns (assigned_user_name is
 /// always NULL on a freshly inserted/updated row here).
@@ -35,7 +38,57 @@ const ASSET_RETURNING: &str = "RETURNING id, asset_tag, name, category, serial_n
      created_at, updated_at, NULL::text AS assigned_user_name, \
      ROUND((unit_cost * LEAST(1.0, GREATEST(0.0, \
         (CURRENT_DATE - COALESCE(purchase_date, expected_eol))::float8 / 1095.0)))::numeric, 2)::float8 \
-        AS current_value, vendor_id, NULL::text AS vendor_name";
+        AS current_value, vendor_id, NULL::text AS vendor_name, \
+     location_id, (SELECT concat_ws(' / ', NULLIF(site, ''), NULLIF(building, ''), NULLIF(floor, ''), NULLIF(room, '')) \
+        FROM locations WHERE id = location_id) AS location_name";
+
+/// #40: record a location move (fire-and-forget; never blocks the update).
+async fn log_location_move(
+    pool: &PgPool,
+    asset_id: Uuid,
+    from_location_id: Option<Uuid>,
+    to_location_id: Option<Uuid>,
+    actor_id: Option<Uuid>,
+    note: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO asset_moves (asset_id, from_location_id, to_location_id, actor_id, note)          VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(asset_id)
+    .bind(from_location_id)
+    .bind(to_location_id)
+    .bind(actor_id)
+    .bind(note)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// GET /assets/{id}/moves — move history (newest first, joined names).
+async fn asset_moves(
+    State(state): State<AppState>,
+    Path(asset_id): Path<Uuid>,
+) -> Result<Json<Vec<AssetMove>>, AppError> {
+    let rows = sqlx::query_as::<_, AssetMove>(
+        "SELECT m.id, m.asset_id, m.from_location_id, m.to_location_id, \
+         fl.site || CASE WHEN NULLIF(fl.building,'') IS NULL THEN '' ELSE ' / ' || fl.building END || \
+         CASE WHEN NULLIF(fl.floor,'') IS NULL THEN '' ELSE ' / ' || fl.floor END || \
+         CASE WHEN NULLIF(fl.room,'') IS NULL THEN '' ELSE ' / ' || fl.room END AS from_location_name, \
+         tl.site || CASE WHEN NULLIF(tl.building,'') IS NULL THEN '' ELSE ' / ' || tl.building END || \
+         CASE WHEN NULLIF(tl.floor,'') IS NULL THEN '' ELSE ' / ' || tl.floor END || \
+         CASE WHEN NULLIF(tl.room,'') IS NULL THEN '' ELSE ' / ' || tl.room END AS to_location_name, \
+         m.actor_id, u.name AS actor_name, m.note, m.created_at \
+         FROM asset_moves m \
+         LEFT JOIN locations fl ON fl.id = m.from_location_id \
+         LEFT JOIN locations tl ON tl.id = m.to_location_id \
+         LEFT JOIN users u ON u.id = m.actor_id \
+         WHERE m.asset_id = $1 ORDER BY m.created_at DESC",
+    )
+    .bind(asset_id)
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(rows))
+}
 
 pub fn router() -> Router<AppState> {
     // Reads: any authenticated user (assignee dropdowns, lists, exports).
@@ -44,6 +97,7 @@ pub fn router() -> Router<AppState> {
         .route("/alerts", get(warranty_alerts))
         .route("/{id}/lifecycle", get(asset_lifecycle))
         .route("/{id}/scan-audit", post(scan_audit))
+        .route("/{id}/moves", get(asset_moves))
         .route("/export", get(export_assets))
         // Mutations: ADMIN-only (security audit H1 — was open to every
         // authenticated role incl. EMPLOYEE; mass-delete/import/financial
@@ -73,6 +127,8 @@ pub struct AssetListParams {
     /// Comma-separated asset UUIDs — used by export to emit a selection.
     #[serde(default)]
     pub ids: Option<String>,
+    /// #40: filter to one location.
+    pub location_id: Option<uuid::Uuid>,
 }
 
 /// Whitelisted ORDER BY columns (never interpolate user input directly).
@@ -129,6 +185,15 @@ async fn list_assets(
         }
         qb.push("a.category = ").push_bind(category);
         cqb.push("a.category = ").push_bind(category);
+        any = true;
+    }
+    if let Some(location_id) = params.location_id {
+        if any {
+            qb.push(" AND ");
+            cqb.push(" AND ");
+        }
+        qb.push("a.location_id = ").push_bind(location_id);
+        cqb.push("a.location_id = ").push_bind(location_id);
         any = true;
     }
     if let Some(status) = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
@@ -332,6 +397,7 @@ async fn log_lifecycle_event(
 async fn update_asset(
     State(state): State<AppState>,
     Path(asset_id): Path<Uuid>,
+    Extension(uid): Extension<Uuid>,
     Json(body): Json<UpdateAssetRequest>,
 ) -> Result<Json<Asset>, AppError> {
     let current: Option<Asset> = sqlx::query_as::<_, Asset>(&format!("{ASSET_SELECT} WHERE a.id = $1"))
@@ -362,6 +428,13 @@ async fn update_asset(
             .bind(vid).fetch_one(&state.pool).await?;
         if !ok {
             return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "invalid vendor_id"));
+        }
+    }
+    if let Some(Some(lid)) = body.location_id {
+        let ok: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM locations WHERE id = $1)")
+            .bind(lid).fetch_one(&state.pool).await?;
+        if !ok {
+            return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "invalid location_id"));
         }
     }
 
@@ -414,6 +487,7 @@ async fn update_asset(
     colopt!("unit_cost", body.unit_cost, "::float8");
     colopt!("expected_eol", body.expected_eol, "::date");
     colopt!("vendor_id", body.vendor_id, "::uuid");
+    colopt!("location_id", body.location_id, "::uuid");
     // Nothing to update → no-op: return the asset unchanged (no invalid
     // `SET , updated_at` query).
     if binds.is_empty() {
@@ -434,6 +508,19 @@ async fn update_asset(
         if to != &current.status {
             log_lifecycle_event(&state.pool, asset_id, Some(&current.status), to, None).await?;
         }
+    }
+
+    // #40: location move (fire-and-forget log for traceability).
+    if updated.location_id != current.location_id {
+        log_location_move(
+            &state.pool,
+            asset_id,
+            current.location_id,
+            updated.location_id,
+            Some(uid),
+            "location updated",
+        )
+        .await?;
     }
 
     sqlx::query(
@@ -535,9 +622,16 @@ async fn insert_asset_with_tag_retry(
             .await?;
         let asset_tag = format!("AST-{:04}", count + 1);
 
+        if let Some(location_id) = body.location_id {
+            let ok: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM locations WHERE id = $1)")
+                .bind(location_id).fetch_one(pool).await?;
+            if !ok {
+                return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "invalid location_id"));
+            }
+        }
         let result = sqlx::query_as::<_, Asset>(&format!(
-            "INSERT INTO assets (asset_tag, name, category, serial_number, status, specs, purchase_date, warranty_expiry, unit_cost, expected_eol, vendor_id) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) {ASSET_RETURNING}"
+            "INSERT INTO assets (asset_tag, name, category, serial_number, status, specs, purchase_date, warranty_expiry, unit_cost, expected_eol, vendor_id, location_id) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) {ASSET_RETURNING}"
         ))
         .bind(&asset_tag)
         .bind(&body.name)
@@ -550,11 +644,25 @@ async fn insert_asset_with_tag_retry(
         .bind(body.unit_cost)
         .bind(body.expected_eol)
         .bind(body.vendor_id)
+        .bind(body.location_id)
         .fetch_one(pool)
         .await;
 
         match result {
-            Ok(asset) => return Ok(asset),
+            Ok(asset) => {
+                // #40: record the initial placement as the first move entry.
+                if let Some(loc) = body.location_id {
+                    sqlx::query(
+                        "INSERT INTO asset_moves (asset_id, from_location_id, to_location_id, actor_id, note) \
+                         VALUES ($1, NULL, $2, NULL, 'initial placement')",
+                    )
+                    .bind(asset.id)
+                    .bind(loc)
+                    .execute(pool)
+                    .await?;
+                }
+                return Ok(asset);
+            }
             Err(sqlx::Error::Database(db_err))
                 if db_err.is_unique_violation()
                     && db_err.constraint() == Some("assets_asset_tag_key")

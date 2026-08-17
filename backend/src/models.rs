@@ -62,6 +62,12 @@ pub struct Asset {
     pub vendor_id: Option<Uuid>,
     #[sqlx(default)]
     pub vendor_name: Option<String>,
+    /// #40: current location (NULL until placed); name is the formatted
+    /// "Site / Building / Floor / Room" path computed in SQL.
+    #[sqlx(default)]
+    pub location_id: Option<Uuid>,
+    #[sqlx(default)]
+    pub location_name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -180,6 +186,8 @@ pub struct CreateAssetRequest {
     pub expected_eol: Option<NaiveDate>,
     /// #39: vendor master link (validated against vendors table)
     pub vendor_id: Option<Uuid>,
+    /// #40: optional initial location
+    pub location_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -207,6 +215,9 @@ pub struct UpdateAssetRequest {
     /// #39: None = unchanged, Some(None) = clear the vendor link
     #[serde(default, deserialize_with = "double_option")]
     pub vendor_id: Option<Option<Uuid>>,
+    /// #40: None = unchanged, Some(None) = unplaced.
+    #[serde(default, deserialize_with = "double_option")]
+    pub location_id: Option<Option<Uuid>>,
 }
 
 /// serde does NOT distinguish `"field": null` (→ None, same as absent) in
@@ -618,5 +629,47 @@ pub struct Notification {
     pub ref_type: Option<String>,
     pub ref_id: Option<Uuid>,
     pub read_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+
+// ── #40 multi-location ───────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Location {
+    pub id: Uuid,
+    pub site: String,
+    pub building: String,
+    pub floor: String,
+    pub room: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LocationWithCount {
+    pub id: Uuid,
+    pub site: String,
+    pub building: String,
+    pub floor: String,
+    pub room: String,
+    pub created_at: DateTime<Utc>,
+    pub asset_count: i64,
+}
+
+/// One entry of an asset's move history (joined names for display).
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AssetMove {
+    pub id: Uuid,
+    pub asset_id: Uuid,
+    pub from_location_id: Option<Uuid>,
+    pub to_location_id: Option<Uuid>,
+    #[sqlx(default)]
+    pub from_location_name: Option<String>,
+    #[sqlx(default)]
+    pub to_location_name: Option<String>,
+    pub actor_id: Option<Uuid>,
+    #[sqlx(default)]
+    pub actor_name: Option<String>,
+    pub note: String,
     pub created_at: DateTime<Utc>,
 }
