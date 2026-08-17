@@ -11,6 +11,7 @@ import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 const PasswordFlow = lazy(() => import('@/views/PasswordFlow'));
 const Account = lazy(() => import('@/views/Account'));
 const KnowledgeBase = lazy(() => import('@/views/KnowledgeBase'));
+const Reports = lazy(() => import('@/views/Reports'));
 const Dashboard = lazy(() => import('@/views/Dashboard'));
 const Assets = lazy(() => import('@/views/Assets'));
 const Tickets = lazy(() => import('@/views/Tickets'));
@@ -112,6 +113,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/offline" element={<Offline />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/kb" element={<KnowledgeBase />} />
+                <Route path="/reports" element={<Reports />} />
               </Route>
             </Routes>
           </RouteErrorBoundary>

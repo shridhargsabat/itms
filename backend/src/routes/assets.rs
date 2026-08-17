@@ -24,8 +24,9 @@ const ASSET_SELECT: &str = "SELECT a.id, a.asset_tag, a.name, a.category, a.seri
      a.unit_cost, a.expected_eol, a.created_at, a.updated_at, u.name AS assigned_user_name, \
      ROUND((a.unit_cost * LEAST(1.0, GREATEST(0.0, \
         (CURRENT_DATE - COALESCE(a.purchase_date, a.expected_eol))::float8 / 1095.0)))::numeric, 2)::float8 \
-        AS current_value \
-     FROM assets a LEFT JOIN users u ON u.id = a.assigned_to_user_id";
+        AS current_value, a.vendor_id, v.name AS vendor_name \
+     FROM assets a LEFT JOIN users u ON u.id = a.assigned_to_user_id \
+     LEFT JOIN vendors v ON v.id = a.vendor_id";
 
 /// RETURNING clause mirroring ASSET_SELECT's columns (assigned_user_name is
 /// always NULL on a freshly inserted/updated row here).
@@ -34,7 +35,7 @@ const ASSET_RETURNING: &str = "RETURNING id, asset_tag, name, category, serial_n
      created_at, updated_at, NULL::text AS assigned_user_name, \
      ROUND((unit_cost * LEAST(1.0, GREATEST(0.0, \
         (CURRENT_DATE - COALESCE(purchase_date, expected_eol))::float8 / 1095.0)))::numeric, 2)::float8 \
-        AS current_value";
+        AS current_value, vendor_id, NULL::text AS vendor_name";
 
 pub fn router() -> Router<AppState> {
     // Reads: any authenticated user (assignee dropdowns, lists, exports).
@@ -355,6 +356,14 @@ async fn update_asset(
         }
     }
 
+    if let Some(Some(vid)) = body.vendor_id {
+        let ok: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM vendors WHERE id = $1)")
+            .bind(vid).fetch_one(&state.pool).await?;
+        if !ok {
+            return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "invalid vendor_id"));
+        }
+    }
+
     let new_status = body.status.as_deref().map(str::trim).map(str::to_uppercase);
     if let Some(status) = &new_status {
         if !can_transition(&current.status, status) {
@@ -403,6 +412,7 @@ async fn update_asset(
     colopt!("warranty_expiry", body.warranty_expiry, "::date");
     colopt!("unit_cost", body.unit_cost, "::float8");
     colopt!("expected_eol", body.expected_eol, "::date");
+    colopt!("vendor_id", body.vendor_id, "::uuid");
     // Nothing to update → no-op: return the asset unchanged (no invalid
     // `SET , updated_at` query).
     if binds.is_empty() {
@@ -525,8 +535,8 @@ async fn insert_asset_with_tag_retry(
         let asset_tag = format!("AST-{:04}", count + 1);
 
         let result = sqlx::query_as::<_, Asset>(&format!(
-            "INSERT INTO assets (asset_tag, name, category, serial_number, status, specs, purchase_date, warranty_expiry, unit_cost, expected_eol) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) {ASSET_RETURNING}"
+            "INSERT INTO assets (asset_tag, name, category, serial_number, status, specs, purchase_date, warranty_expiry, unit_cost, expected_eol, vendor_id) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) {ASSET_RETURNING}"
         ))
         .bind(&asset_tag)
         .bind(&body.name)
@@ -538,6 +548,7 @@ async fn insert_asset_with_tag_retry(
         .bind(body.warranty_expiry)
         .bind(body.unit_cost)
         .bind(body.expected_eol)
+        .bind(body.vendor_id)
         .fetch_one(pool)
         .await;
 

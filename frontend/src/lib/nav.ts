@@ -1,5 +1,6 @@
 import {
   BadgeCheck,
+  BarChart3,
   BookOpen,
   Boxes,
   ClipboardList,
@@ -38,6 +39,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/cmdb', label: 'CMDB', icon: Network },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/kb', label: 'Knowledge', icon: BookOpen },
+  { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/masters', label: 'Masters', icon: Database, admin: true },
 ];
 

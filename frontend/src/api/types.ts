@@ -122,6 +122,8 @@ export interface Asset {
   created_at: string;
   updated_at: string;
   current_value?: number | null;
+  vendor_id?: string | null;
+  vendor_name?: string | null;
 }
 
 export interface LifecycleEvent {
@@ -153,6 +155,7 @@ export interface UpdateAssetInput {
   warranty_expiry?: string | null;
   unit_cost?: number | null;
   expected_eol?: string | null;
+  vendor_id?: string | null;
 }
 
 export interface Ticket {
@@ -514,4 +517,63 @@ export interface TicketTemplate {
   created_at: string;
   updated_at: string;
   created_by_name?: string | null;
+}
+
+// ── Phase 2: vendors + claims (#39) ─────────────────────────────────────────
+
+export interface Vendor {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  support_link: string | null;
+  amc_expiry: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VendorClaim {
+  id: string;
+  vendor_id: string;
+  asset_id: string | null;
+  ticket_id: string | null;
+  issue: string;
+  outcome: string | null;
+  replacement: boolean;
+  created_at: string;
+  asset_tag: string | null;
+  asset_name: string | null;
+  ticket_number: string | null;
+  vendor_name: string | null;
+}
+
+export interface VendorInput {
+  name: string;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  support_link?: string | null;
+  amc_expiry?: string | null;
+}
+
+export interface ClaimInput {
+  vendor_id: string;
+  asset_id?: string | null;
+  ticket_id?: string | null;
+  issue: string;
+  outcome?: string | null;
+  replacement: boolean;
+}
+
+// ── Phase 2: repeat-incident report (#49) ───────────────────────────────────
+
+export interface RepeatIncident {
+  title: string;
+  ticket_type: string;
+  count: number;
+  last_at: string;
+  asset_tag: string | null;
+  asset_id: string | null;
+  ticket_numbers: string[];
 }

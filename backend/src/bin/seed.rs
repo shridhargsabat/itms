@@ -41,6 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let agent1_id = insert_user(&pool, "agent1@itms.local", "Support Lead", "AGENT", "IT").await?;
     let agent2_id = insert_user(&pool, "agent2@itms.local", "Support Lead", "AGENT", "IT").await?;
     let emp_id = insert_user(&pool, "emp@itms.local", "Finance Employee", "EMPLOYEE", "Finance").await?;
+    // demo login (#87) needs a real user — the endpoint looks it up by
+    // DEMO_LOGIN_EMAIL. Fresh seeds must include it or the demo button 404s.
+    insert_user(&pool, "demo@itms.local", "Demo User", "EMPLOYEE", "IT").await?;
 
     // ----------------------------------------------------------------- assets
     // 2 LAPTOP, 1 DESKTOP, 4 SERVER (2 physical + 2 app hosts for the CMDB

@@ -12,18 +12,26 @@ import {
   createMasterOption,
   createTemplate,
   createUser,
+  createClaim,
+  createVendor,
   deleteMasterOption,
   deleteTemplate,
+  deleteClaim,
+  deleteVendor,
   getMasters,
+  listClaims,
   listTemplates,
   listUsers,
+  listVendors,
   updateMasterOption,
   updateTemplate,
   updateUser,
+  updateVendor,
 } from '@/api/client';
-import type { LookupOption, MasterFamily, TicketTemplate, UserRecord } from '@/api/types';
+import type { LookupOption, MasterFamily, TicketTemplate, UserRecord, Vendor, VendorInput } from '@/api/types';
 
-const TABS: { id: MasterFamily | 'users' | 'templates'; label: string }[] = [
+const TABS: { id: MasterFamily | 'users' | 'templates' | 'vendors'; label: string }[] = [
+  { id: 'vendors', label: 'Vendors' },
   { id: 'users', label: 'Users' },
   { id: 'department', label: 'Departments' },
   { id: 'asset_category', label: 'Asset Categories' },
@@ -43,7 +51,7 @@ const ROLE_STYLE: Record<string, string> = {
 
 export default function Masters() {
   const me = getCachedUser();
-  const [tab, setTab] = useState<MasterFamily | 'users' | 'templates'>('users');
+  const [tab, setTab] = useState<MasterFamily | 'users' | 'templates' | 'vendors'>('users');
   const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
 
   if (me?.role !== 'ADMIN') {
@@ -85,6 +93,8 @@ export default function Masters() {
 
       {tab === 'users' ? (
         <UsersTab />
+      ) : tab === 'vendors' ? (
+        <VendorsTab />
       ) : tab === 'templates' ? (
         <TemplatesTab />
       ) : (
@@ -654,6 +664,202 @@ function TemplatesTab() {
         {templates.data?.length === 0 && (
           <p className="rounded-xl border border-dashed border-edge p-6 text-center text-sm text-muted">No templates yet.</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Phase 2 (#39): Vendor master tab ────────────────────────────────────────
+
+// Empty strings from the form must become null — the backend rejects "" for
+// Option<NaiveDate> (422) and stores blank text otherwise.
+function normalizeVendor(f: VendorInput): VendorInput {
+  return {
+    name: f.name,
+    contact_name: f.contact_name?.trim() ? f.contact_name.trim() : null,
+    contact_email: f.contact_email?.trim() ? f.contact_email.trim() : null,
+    contact_phone: f.contact_phone?.trim() ? f.contact_phone.trim() : null,
+    support_link: f.support_link?.trim() ? f.support_link.trim() : null,
+    amc_expiry: f.amc_expiry || null,
+  };
+}
+
+function VendorsTab() {
+  const qc = useQueryClient();
+  const me = getCachedUser();
+  const isAdmin = me?.role === 'ADMIN';
+  const vendors = useQuery({ queryKey: ['vendors'], queryFn: () => listVendors() });
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Vendor | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [form, setForm] = useState<VendorInput>({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' });
+  const [error, setError] = useState('');
+
+  const save = useMutation({
+    mutationFn: (v: { id?: string; input: VendorInput }) =>
+      v.id ? updateVendor(v.id, normalizeVendor(v.input)) : createVendor(normalizeVendor(v.input)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendors'] });
+      setOpen(false);
+      setEditing(null);
+      setForm({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteVendor(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vendors'] }),
+  });
+
+  const amcBadge = (v: Vendor) => {
+    if (!v.amc_expiry) return null;
+    const days = Math.round((new Date(v.amc_expiry).getTime() - Date.now()) / 86400000);
+    const cls = days < 0 ? 'bg-red-500/10 text-red-400 border-red-500/30'
+      : days <= 60 ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+    return <span className={`rounded-md border px-1.5 py-0.5 text-[11px] ${cls}`}>{days < 0 ? `AMC expired ${-days}d ago` : `AMC ${days}d`}</span>;
+  };
+
+  const startEdit = (v: Vendor) => {
+    setEditing(v);
+    setForm({ name: v.name, contact_name: v.contact_name ?? '', contact_email: v.contact_email ?? '', contact_phone: v.contact_phone ?? '', support_link: v.support_link ?? '', amc_expiry: v.amc_expiry ?? '' });
+    setError('');
+    setOpen(true);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted">Vendor records + AMC dates — asset detail shows the vendor and its claim/repair log</p>
+        <button onClick={() => { setEditing(null); setForm({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' }); setError(''); setOpen(true); }}
+          className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent/90">
+          <Plus className="h-4 w-4" /> Add vendor
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {vendors.data?.map((v) => (
+          <div key={v.id} className="rounded-xl border border-edge bg-surface/60">
+            <div className="flex items-center justify-between gap-3 p-3">
+              <button className="min-w-0 flex-1 text-left" onClick={() => setExpanded(expanded === v.id ? null : v.id)}>
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">{v.name}</span>
+                  {amcBadge(v)}
+                </div>
+                <div className="mt-0.5 truncate text-[11px] text-muted">
+                  {[v.contact_name, v.contact_email, v.contact_phone].filter(Boolean).join(' · ') || 'no contact info'}
+                </div>
+              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button onClick={() => startEdit(v)} className="rounded-lg p-2 text-muted hover:bg-elevated hover:text-accent" title="Edit"><Pencil className="h-4 w-4" /></button>
+                {isAdmin && (
+                  <button onClick={() => { if (confirm(`Delete vendor ${v.name}?`)) remove.mutate(v.id); }} className="rounded-lg p-2 text-muted hover:bg-red-500/10 hover:text-red-400" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                )}
+              </div>
+            </div>
+            {expanded === v.id && <VendorClaims vendorId={v.id} />}
+          </div>
+        ))}
+        {!vendors.isLoading && (vendors.data?.length ?? 0) === 0 && (
+          <div className="rounded-xl border border-dashed border-edge2 p-6 text-center text-xs text-muted">No vendors yet — add your first one.</div>
+        )}
+      </div>
+
+      {open && (
+        <Modal title={editing ? 'Edit vendor' : 'Add vendor'} onClose={() => setOpen(false)}>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(editing ? { id: editing.id, input: form } : { input: form }); }}>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-secondary">Name *</label>
+              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-secondary">Contact name</label>
+                <input value={form.contact_name ?? ''} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-secondary">Contact email</label>
+                <input type="email" value={form.contact_email ?? ''} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-secondary">Contact phone</label>
+                <input value={form.contact_phone ?? ''} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-secondary">Support link</label>
+                <input value={form.support_link ?? ''} onChange={(e) => setForm({ ...form, support_link: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-secondary">AMC / renewal date</label>
+              <input type="date" value={form.amc_expiry ?? ''} onChange={(e) => setForm({ ...form, amc_expiry: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+            </div>
+            {error && <p className="text-xs text-red-400">{error}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setOpen(false)} className="h-9 rounded-lg border border-edge2 px-4 text-xs text-secondary hover:bg-elevated">Cancel</button>
+              <button type="submit" disabled={save.isPending} className="h-9 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60">
+                {save.isPending ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function VendorClaims({ vendorId }: { vendorId: string }) {
+  const qc = useQueryClient();
+  const claims = useQuery({ queryKey: ['claims', vendorId], queryFn: () => listClaims({ vendor_id: vendorId }) });
+  const [adding, setAdding] = useState(false);
+  const [issue, setIssue] = useState('');
+  const [outcome, setOutcome] = useState('');
+  const [replacement, setReplacement] = useState(false);
+
+  const add = useMutation({
+    mutationFn: () => createClaim({ vendor_id: vendorId, issue, outcome: outcome || null, replacement }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['claims', vendorId] });
+      setAdding(false); setIssue(''); setOutcome(''); setReplacement(false);
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteClaim(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['claims', vendorId] }),
+  });
+
+  return (
+    <div className="border-t border-edge px-4 py-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[11px] font-medium text-secondary">Claim / repair log</span>
+        <button onClick={() => setAdding(!adding)} className="text-[11px] text-accent hover:underline">{adding ? 'Cancel' : '+ Add claim'}</button>
+      </div>
+      {adding && (
+        <form className="mb-3 space-y-2 rounded-lg border border-edge2 bg-base p-3" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
+          <textarea required placeholder="Issue / fault (e.g. 'Power port dead — sent for RMA')" value={issue} onChange={(e) => setIssue(e.target.value)} className="w-full rounded-lg border border-edge2 bg-base px-3 py-2 text-sm outline-none focus:border-accent" rows={2} />
+          <input placeholder="Outcome (optional — e.g. 'Motherboard replaced')" value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+          <label className="flex items-center gap-2 text-xs text-secondary">
+            <input type="checkbox" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} className="accent-indigo-500" /> Replacement unit provided
+          </label>
+          <button type="submit" disabled={add.isPending} className="h-8 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60">{add.isPending ? 'Saving…' : 'Log claim'}</button>
+        </form>
+      )}
+      <div className="space-y-1.5">
+        {claims.data?.map((c) => (
+          <div key={c.id} className="flex items-start justify-between gap-3 rounded-lg bg-elevated/50 px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-xs">{c.issue}</div>
+              <div className="mt-0.5 text-[11px] text-muted">
+                {[c.asset_tag ?? c.asset_name, c.ticket_number, c.outcome].filter(Boolean).join(' · ') || '—'}
+                {c.replacement && ' · replacement'}
+              </div>
+            </div>
+            <button onClick={() => remove.mutate(c.id)} className="shrink-0 rounded p-1 text-muted hover:text-red-400" title="Delete claim"><Trash2 className="h-3.5 w-3.5" /></button>
+          </div>
+        ))}
+        {(claims.data?.length ?? 0) === 0 && <p className="text-[11px] text-muted">No claims logged yet.</p>}
       </div>
     </div>
   );
