@@ -239,9 +239,17 @@ export default function Layout() {
               {!collapsed && <span>Install app</span>}
             </button>
           )}
-          <div className={cn('mt-1', !collapsed && 'px-2')}>
-            <ThemeToggle className={cn('w-full', collapsed ? 'h-9 w-9' : 'h-9')} />
-          </div>
+          {!collapsed && (
+            <div className="mt-3 border-t border-edge px-3 pb-1 pt-3">
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">Theme</p>
+              <ThemeToggle segmented className="w-full" />
+            </div>
+          )}
+          {collapsed && (
+            <div className="mt-1">
+              <ThemeToggle className="h-9 w-9" />
+            </div>
+          )}
           {!collapsed && (
             <p className="mt-2 px-2 text-center text-[10px] text-muted">build {__BUILD_SHA__}</p>
           )}
