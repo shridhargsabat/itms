@@ -577,3 +577,12 @@ export interface RepeatIncident {
   assetId: string | null;
   ticketNumbers: string[];
 }
+
+// ── Phase 2 (#65): QR scan audit ────────────────────────────────────────────
+
+export interface QrScanResult {
+  asset_tag: string;
+  name: string;
+  status: string;
+  serial_number: string;
+}

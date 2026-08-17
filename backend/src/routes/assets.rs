@@ -1,5 +1,5 @@
 use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use axum::extract::{DefaultBodyLimit, Extension, Path, Query, State};
 use axum::http::{header, StatusCode};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
@@ -43,6 +43,7 @@ pub fn router() -> Router<AppState> {
         .route("/", get(list_assets))
         .route("/alerts", get(warranty_alerts))
         .route("/{id}/lifecycle", get(asset_lifecycle))
+        .route("/{id}/scan-audit", post(scan_audit))
         .route("/export", get(export_assets))
         // Mutations: ADMIN-only (security audit H1 — was open to every
         // authenticated role incl. EMPLOYEE; mass-delete/import/financial
@@ -1020,6 +1021,49 @@ async fn export_assets(
 #[derive(Debug, Deserialize)]
 pub struct BulkIds {
     pub ids: Vec<Uuid>,
+}
+
+/// POST /assets/{id}/scan-audit — physical audit scan. ANY authed user may
+/// record one (factory-floor audits); each scan logs a lifecycle event +
+/// audit-log row. Returns the found-asset snapshot for scanner confirmation.
+#[derive(Debug, Serialize)]
+pub struct QrScanResult {
+    pub asset_tag: String,
+    pub name: String,
+    pub status: String,
+    pub serial_number: String,
+}
+
+pub async fn scan_audit(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Extension(uid): Extension<Uuid>,
+) -> Result<Json<QrScanResult>, AppError> {
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String)>(
+        "SELECT id, asset_tag, name, status, serial_number FROM assets WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found("asset not found"))?;
+
+    log_lifecycle_event(&state.pool, row.0, Some(&row.3), &row.3, Some("QR scan audit")).await?;
+    sqlx::query(
+        "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
+         VALUES ($1, 'ASSET_SCAN_AUDIT', 'asset', $2, $3)",
+    )
+    .bind(uid)
+    .bind(id)
+    .bind(json!({"tag": row.1, "name": row.2}))
+    .execute(&state.pool)
+    .await?;
+
+    Ok(Json(QrScanResult {
+        asset_tag: row.1,
+        name: row.2,
+        status: row.3,
+        serial_number: row.4,
+    }))
 }
 
 #[derive(Debug, Deserialize)]
