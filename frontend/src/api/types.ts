@@ -124,6 +124,8 @@ export interface Asset {
   current_value?: number | null;
   vendor_id?: string | null;
   vendor_name?: string | null;
+  location_id?: string | null;
+  location_name?: string | null;
 }
 
 export interface LifecycleEvent {
@@ -156,6 +158,7 @@ export interface UpdateAssetInput {
   unit_cost?: number | null;
   expected_eol?: string | null;
   vendor_id?: string | null;
+  location_id?: string | null;
 }
 
 export interface Ticket {
@@ -234,6 +237,8 @@ export interface CreateAssetInput {
   specs?: Record<string, unknown>;
   purchase_date?: string;
   warranty_expiry?: string;
+  vendor_id?: string | null;
+  location_id?: string | null;
 }
 
 export interface CreateTicketInput {
@@ -585,4 +590,40 @@ export interface QrScanResult {
   name: string;
   status: string;
   serial_number: string;
+}
+
+
+// ── Phase 2 (#40 multi-location) ────────────────────────────────────────────
+
+export interface Location {
+  id: string;
+  site: string;
+  building: string;
+  floor: string;
+  room: string;
+  created_at: string;
+}
+
+export interface LocationWithCount extends Location {
+  asset_count: number;
+}
+
+export interface AssetMove {
+  id: string;
+  asset_id: string;
+  from_location_id: string | null;
+  to_location_id: string | null;
+  from_location_name: string | null;
+  to_location_name: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  note: string;
+  created_at: string;
+}
+
+export interface LocationInput {
+  site: string;
+  building: string;
+  floor: string;
+  room: string;
 }

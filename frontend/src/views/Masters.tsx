@@ -14,12 +14,16 @@ import {
   createUser,
   createClaim,
   createVendor,
+  createLocation,
   deleteMasterOption,
   deleteTemplate,
   deleteClaim,
   deleteVendor,
+  deleteLocation,
   getMasters,
   listClaims,
+  listLocationAssets,
+  listLocations,
   listTemplates,
   listUsers,
   listVendors,
@@ -27,11 +31,13 @@ import {
   updateTemplate,
   updateUser,
   updateVendor,
+  updateLocation,
 } from '@/api/client';
-import type { LookupOption, MasterFamily, TicketTemplate, UserRecord, Vendor, VendorInput } from '@/api/types';
+import type { LookupOption, LocationWithCount, MasterFamily, TicketTemplate, UserRecord, Vendor, VendorInput } from '@/api/types';
 
-const TABS: { id: MasterFamily | 'users' | 'templates' | 'vendors'; label: string }[] = [
+const TABS: { id: MasterFamily | 'users' | 'templates' | 'vendors' | 'locations'; label: string }[] = [
   { id: 'vendors', label: 'Vendors' },
+  { id: 'locations', label: 'Locations' },
   { id: 'users', label: 'Users' },
   { id: 'department', label: 'Departments' },
   { id: 'asset_category', label: 'Asset Categories' },
@@ -51,7 +57,7 @@ const ROLE_STYLE: Record<string, string> = {
 
 export default function Masters() {
   const me = getCachedUser();
-  const [tab, setTab] = useState<MasterFamily | 'users' | 'templates' | 'vendors'>('users');
+  const [tab, setTab] = useState<MasterFamily | 'users' | 'templates' | 'vendors' | 'locations'>('users');
   const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
 
   if (me?.role !== 'ADMIN') {
@@ -95,6 +101,8 @@ export default function Masters() {
         <UsersTab />
       ) : tab === 'vendors' ? (
         <VendorsTab />
+      ) : tab === 'locations' ? (
+        <LocationsTab />
       ) : tab === 'templates' ? (
         <TemplatesTab />
       ) : (
@@ -861,6 +869,182 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
         ))}
         {(claims.data?.length ?? 0) === 0 && <p className="text-[11px] text-muted">No claims logged yet.</p>}
       </div>
+    </div>
+  );
+}
+
+
+// App-native two-step delete (no window.confirm — #77).
+function DeleteButton({ onConfirm, label }: { onConfirm: () => void; label: string }) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <button onClick={() => setConfirming(true)} className="ml-3 text-xs text-rose-400 hover:underline">Delete</button>
+    );
+  }
+  return (
+    <span className="ml-3 inline-flex items-center gap-1.5 text-[11px]">
+      <span className="text-muted">Delete “{label}”?</span>
+      <button onClick={() => { setConfirming(false); onConfirm(); }} className="font-semibold text-rose-400 hover:underline">Yes</button>
+      <button onClick={() => setConfirming(false)} className="text-secondary hover:underline">No</button>
+    </span>
+  );
+}
+
+// ── #40 Locations tab ───────────────────────────────────────────────────────
+
+interface LocationForm {
+  site: string;
+  building: string;
+  floor: string;
+  room: string;
+}
+
+const EMPTY_LOCATION: LocationForm = { site: '', building: '', floor: '', room: '' };
+
+function fmtLocation(l: { site: string; building: string; floor: string; room: string }): string {
+  return [l.site, l.building, l.floor, l.room].filter(Boolean).join(' / ');
+}
+
+function LocationsTab() {
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<LocationWithCount | null>(null);
+  const [form, setForm] = useState<LocationForm>(EMPTY_LOCATION);
+  const [error, setError] = useState('');
+  const [detail, setDetail] = useState<LocationWithCount | null>(null);
+
+  const qc = useQueryClient();
+  const locations = useQuery({ queryKey: ['locations', search], queryFn: () => listLocations(search || undefined) });
+  const detailAssets = useQuery({
+    queryKey: ['location-assets', detail?.id],
+    queryFn: () => (detail ? listLocationAssets(detail.id) : Promise.resolve([])),
+    enabled: !!detail,
+  });
+
+  const save = useMutation({
+    mutationFn: (v: { id?: string; input: LocationForm }) =>
+      v.id ? updateLocation(v.id, v.input) : createLocation(v.input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['locations'] });
+      setOpen(false);
+      setEditing(null);
+      setForm(EMPTY_LOCATION);
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteLocation(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['locations'] });
+      if (detail?.id) setDetail(null);
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const rows = locations.data ?? [];
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search site / building / floor / room…"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent"
+        />
+        <button
+          onClick={() => { setEditing(null); setForm(EMPTY_LOCATION); setError(''); setOpen(true); }}
+          className="h-9 shrink-0 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90"
+        >
+          + Add location
+        </button>
+      </div>
+
+      {error && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">{error}</p>}
+
+      <div className="overflow-hidden rounded-xl border border-edge">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-surface/80 text-[11px] uppercase tracking-wide text-muted">
+            <tr>
+              <th className="px-3 py-2">Location path</th>
+              <th className="px-3 py-2 text-right">Assets</th>
+              <th className="px-3 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-edge/60">
+            {rows.map((l) => (
+              <tr key={l.id} className="hover:bg-elevated/40">
+                <td className="px-3 py-2">
+                  <button className="text-left hover:text-accent" onClick={() => setDetail(l)}>
+                    {fmtLocation(l) || '—'}
+                  </button>
+                </td>
+                <td className="px-3 py-2 text-right text-xs text-secondary">{l.asset_count}</td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    onClick={() => { setEditing(l); setForm({ site: l.site, building: l.building, floor: l.floor, room: l.room }); setError(''); setOpen(true); }}
+                    className="text-xs text-accent hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <DeleteButton onConfirm={() => remove.mutate(l.id)} label={fmtLocation(l)} />
+                </td>
+              </tr>
+            ))}
+            {!locations.isLoading && rows.length === 0 && (
+              <tr><td colSpan={3} className="px-3 py-8 text-center text-xs text-muted">No locations yet — add your first site/building/floor/room.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {open && (
+        <Modal title={editing ? 'Edit location' : 'Add location'} onClose={() => setOpen(false)}>
+          <div className="space-y-3 p-4">
+            {(['site', 'building', 'floor', 'room'] as const).map((k) => (
+              <label key={k} className="block">
+                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-secondary">{k}</span>
+                <input
+                  value={form[k]}
+                  onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
+                  placeholder={`e.g. ${k === 'site' ? 'Main Plant' : k === 'building' ? 'Factory A' : k === 'floor' ? 'Floor 2' : 'Server Room'}`}
+                  autoFocus={k === 'site'}
+                  className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent"
+                />
+              </label>
+            ))}
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setOpen(false)} className="h-9 rounded-lg border border-edge2 px-4 text-xs text-secondary hover:bg-elevated">Cancel</button>
+              <button
+                onClick={() => save.mutate(editing ? { id: editing.id, input: form } : { input: form })}
+                disabled={save.isPending || !form.site && !form.building && !form.floor && !form.room}
+                className="h-9 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+              >
+                {editing ? 'Save' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {detail && (
+        <Modal title={fmtLocation(detail) || 'Location'} onClose={() => setDetail(null)}>
+          <div className="space-y-3 p-4">
+            <p className="text-xs text-secondary">{detail.asset_count} asset{detail.asset_count === 1 ? '' : 's'} at this location</p>
+            <div className="max-h-80 space-y-1 overflow-y-auto">
+              {detailAssets.data?.map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-lg bg-elevated/50 px-3 py-2 text-xs">
+                  <span className="font-mono">{a.asset_tag}</span>
+                  <span className="truncate px-2 text-secondary">{a.name}</span>
+                  <span className="text-secondary">{a.status}</span>
+                </div>
+              ))}
+              {detailAssets.isLoading && <p className="text-xs text-muted">Loading…</p>}
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
