@@ -570,10 +570,10 @@ export interface ClaimInput {
 
 export interface RepeatIncident {
   title: string;
-  ticket_type: string;
+  ticketType: string;
   count: number;
-  last_at: string;
-  asset_tag: string | null;
-  asset_id: string | null;
-  ticket_numbers: string[];
+  lastAt: string;
+  assetTag: string | null;
+  assetId: string | null;
+  ticketNumbers: string[];
 }

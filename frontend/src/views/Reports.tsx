@@ -57,7 +57,7 @@ export default function Reports() {
 
       <div className="space-y-2">
         {report.data?.map((r) => (
-          <div key={`${r.title}|${r.asset_tag ?? ''}`} className="rounded-xl border border-edge bg-surface/60 p-4">
+          <div key={`${r.title}|${r.assetTag ?? ''}`} className="rounded-xl border border-edge bg-surface/60 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -65,9 +65,9 @@ export default function Reports() {
                   <span className="truncate text-sm font-medium">{r.title}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                  <span className="rounded-md border border-edge2 px-1.5 py-0.5">{r.ticket_type}</span>
-                  {r.asset_tag && <span className="rounded-md border border-edge2 px-1.5 py-0.5">{r.asset_tag}</span>}
-                  <span>last: {new Date(r.last_at).toLocaleDateString()}</span>
+                  <span className="rounded-md border border-edge2 px-1.5 py-0.5">{r.ticketType}</span>
+                  {r.assetTag && <span className="rounded-md border border-edge2 px-1.5 py-0.5">{r.assetTag}</span>}
+                  <span>last: {new Date(r.lastAt).toLocaleDateString()}</span>
                 </div>
               </div>
               <div className="shrink-0 rounded-lg bg-red-500/10 px-2.5 py-1 text-right">
@@ -76,7 +76,7 @@ export default function Reports() {
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {r.ticket_numbers.map((n) => (
+              {r.ticketNumbers.map((n) => (
                 <span key={n} className="rounded bg-elevated/70 px-1.5 py-0.5 font-mono text-[10px] text-secondary">{n}</span>
               ))}
             </div>
