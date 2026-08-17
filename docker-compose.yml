@@ -19,8 +19,10 @@ services:
     networks: [itms-net]
     # #90: drop all capabilities, no privilege escalation, read-only rootfs
     # (data dir is the volume; socket/tmp dirs are tmpfs as PG requires).
-    # CAP_CHOWN is required by the official image's entrypoint (chowns the
-    # data dir for the postgres user on first init) — the minimal capability.
+    # CAP_CHOWN + DAC_OVERRIDE + SETUID/SETGID + FOWNER are required by the
+    # official image's entrypoint (chown data dir, traverse 0700 postgres dirs
+    # as root, switch to the postgres user) — the minimal set; everything else
+    # stays dropped.
     cap_drop: [ALL]
     cap_add: [CHOWN, SETUID, SETGID]
     security_opt: ["no-new-privileges:true"]
