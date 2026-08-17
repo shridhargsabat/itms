@@ -44,13 +44,12 @@ services:
       TZ: Asia/Kolkata
     volumes:
       - itms_uploads:/app/uploads
+    # #90: no chown init container needed — the image ships /app/uploads owned
+    # by uid 10001 (Dockerfile chown), and a fresh named volume inherits that
+    # ownership via copy-on-first-use. (uploads-owner service removed 2026-08-17)
     depends_on:
       db:
         condition: service_healthy
-      # #90: backend runs as uid 10001 — a fresh named volume is root-owned,
-      # so chown it once before the app can write attachments.
-      uploads-owner:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/healthz"]
       interval: 15s
@@ -104,14 +103,6 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.5", memory: 256M }
-
-  uploads-owner:
-    image: busybox:stable
-    container_name: itms-uploads-owner
-    command: ["sh", "-c", "chown -R 10001:10001 /app/uploads && echo uploads-owner-ok"]
-    volumes:
-      - itms_uploads:/app/uploads
-    restart: "no"
 
 volumes:
   itms_pgdata:
