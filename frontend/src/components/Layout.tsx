@@ -140,7 +140,10 @@ export default function Layout() {
             </span>
           )}
           {!collapsed && (
-            <NotificationsBell className="ml-auto" />
+            <div className="ml-auto flex items-center gap-1.5">
+              <NotificationsBell />
+              <ThemeToggle className="h-9 w-9 text-secondary hover:text-accent" />
+            </div>
           )}
         </div>
 
