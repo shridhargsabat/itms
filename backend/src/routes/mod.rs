@@ -5,6 +5,7 @@ pub mod audit;
 pub mod auth;
 pub mod password;
 pub mod kb;
+pub mod oauth;
 pub mod locations;
 pub mod templates;
 pub mod vendors;
@@ -77,13 +78,19 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .route("/claims", get(vendors::list_claims).post(vendors::create_claim))
         .route("/claims/{id}", delete(vendors::delete_claim))
         .route("/reports/repeat-incidents", get(reports::repeat_incidents))
+        // #53 Google SSO admin config (admin in-handler)
+        .route("/admin/oauth", get(oauth::admin_get).put(oauth::admin_put))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_auth));
 
     // intake is PUBLIC (token-gated inside the handler — the email cron has
     // no portal session, only the shared X-Intake-Token secret)
     let public = Router::new()
         .nest("/intake", intake::router())
-        .nest("/sla", sla::escalate_router());
+        .nest("/sla", sla::escalate_router())
+        // #53 Google SSO flow — no session needed (pre-login)
+        .route("/auth/oauth/status", get(oauth::status))
+        .route("/auth/oauth/start", get(oauth::start))
+        .route("/auth/oauth/callback", get(oauth::callback));
 
     Router::new()
         .route("/healthz", get(|| async { "ok" }))

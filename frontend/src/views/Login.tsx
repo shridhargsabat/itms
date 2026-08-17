@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowRight, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
+import { ArrowRight, KeyRound, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
 import AnimatedBackground from '@/components/AnimatedBackground';
-import { demoLogin as apiDemoLogin, login, setSession } from '@/api/client';
+import { demoLogin as apiDemoLogin, getOAuthStatus, login, setSession } from '@/api/client';
 
 /**
  * Real auth login (backend + DB). Any seeded user works: <email> / demo1234
@@ -15,6 +16,12 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [flash, setFlash] = useState('');
+  const oauth = useQuery({ queryKey: ['oauth-status'], queryFn: getOAuthStatus, retry: false });
+  useEffect(() => {
+    const err = new URLSearchParams(window.location.search).get('error');
+    if (err === 'sso_failed') setFlash('SSO sign-in failed — try again or use your password.');
+  }, []);
 
   const mutation = useMutation({
     mutationFn: ({ email: e, password: p }: { email: string; password: string }) =>
@@ -124,6 +131,24 @@ export default function Login() {
                 )}
               </button>
             </form>
+
+            {flash && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">{flash}</p>}
+
+            {oauth.data?.enabled && oauth.data.client_id_set && (
+              <>
+                <div className="flex items-center gap-2 text-[11px] text-muted">
+                  <span className="h-px flex-1 bg-edge2" />
+                  or
+                  <span className="h-px flex-1 bg-edge2" />
+                </div>
+                <a
+                  href="/api/v1/auth/oauth/start"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-edge2 bg-surface text-sm font-medium text-primary transition-colors hover:bg-elevated"
+                >
+                  <KeyRound className="h-4 w-4" /> Continue with Google
+                </a>
+              </>
+            )}
 
             <Link
               to="/forgot-password"

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Ticket,
   UserRoundCheck,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AuthUser } from '@/api/types';
@@ -45,6 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/scan', label: 'Scan', icon: QrCode },
   { to: '/labels', label: 'Labels', icon: Tags },
   { to: '/masters', label: 'Masters', icon: Database, admin: true },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon, admin: true },
 ];
 
 /** Role-filtered nav list — admin-only items visible to ADMIN role only. */

@@ -18,7 +18,7 @@ use crate::auth::{generate_token, hash_token, verify_password};
 use crate::db::AppState;
 use crate::routes::AppError;
 
-const SESSION_TTL: &str = "7 days";
+pub const SESSION_TTL: &str = "7 days";
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
