@@ -35,6 +35,7 @@
   --t-muted: #64748b;
   --t-accent: #4f46e5;
   --t-accent-strong: #4338ca;
+  color-scheme: light;
 }
 
 .dark {
@@ -50,6 +51,7 @@
   --t-muted: #8494ab;
   --t-accent: #818cf8;
   --t-accent-strong: #6366f1;
+  color-scheme: dark;
 }
 
 @layer base {
