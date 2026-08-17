@@ -7,11 +7,16 @@
       (function () {
         try {
           var m = localStorage.getItem('itms_theme') || 'system';
-          var dark =
-            m === 'dark' ||
-            (m !== 'light' &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches);
-          if (dark) document.documentElement.classList.add('dark');
+          var d = document.documentElement;
+          if (m === 'ledgerly') {
+            d.classList.add('dark', 'ledgerly-dark');
+          } else {
+            var dark =
+              m === 'dark' ||
+              (m !== 'light' &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (dark) d.classList.add('dark');
+          }
         } catch (e) {}
       })();
     </script>

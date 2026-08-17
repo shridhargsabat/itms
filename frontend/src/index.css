@@ -52,6 +52,23 @@
   --t-accent-strong: #6366f1;
 }
 
+/* Ledgerly dark ("warm paper") — palette copied verbatim from /root/money-management/frontend/src/styles.css [data-theme='dark'] */
+.ledgerly-dark {
+  color-scheme: dark;
+  --t-base: #141311;
+  --t-surface: #1d1b18;
+  --t-elevated: #26231f;
+  --t-elevated2: #221f1c;
+  --t-input: #1d1b18;
+  --t-edge: #2c2925;
+  --t-edge2: #44403a;
+  --t-primary: #f2efe9;
+  --t-secondary: #b8b2a6;
+  --t-muted: #98938a;
+  --t-accent: #2fb5a0;
+  --t-accent-strong: #3cc9b3;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;

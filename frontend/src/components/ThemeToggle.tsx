@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { applyTheme, getThemeMode, setThemeMode, watchSystemTheme, type ThemeMode } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
-const ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: Monitor };
-const NEXT: Record<ThemeMode, ThemeMode> = { light: 'dark', dark: 'system', system: 'light' };
+const ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, ledgerly: Palette, system: Monitor };
+const NEXT: Record<ThemeMode, ThemeMode> = { light: 'dark', dark: 'ledgerly', ledgerly: 'system', system: 'light' };
 
-/** Cycles light → dark → system. Resolves 'system' live (device setting). */
+/** Cycles light → dark → ledgerly → system. Resolves 'system' live (device setting). */
 export default function ThemeToggle({ className }: { className?: string }) {
   const [mode, setMode] = useState<ThemeMode>(getThemeMode());
 
