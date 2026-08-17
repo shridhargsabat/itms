@@ -39,6 +39,7 @@ import type {
   UpdateUserInput,
   UserRecord,
   WarrantyAlert,
+  QrScanResult,
   RepeatIncident,
   Vendor,
   VendorClaim,
@@ -597,3 +598,7 @@ export const getRepeatIncidents = (params?: { days?: number; min_count?: number;
   if (params?.ticket_type) q.set('ticket_type', params.ticket_type);
   return apiFetch<RepeatIncident[]>(`/reports/repeat-incidents${q.toString() ? `?${q}` : ''}`);
 };
+
+// ── Phase 2 (#65): QR scan audit ────────────────────────────────────────────
+export const scanAudit = (id: string) =>
+  apiFetch<QrScanResult>(`/assets/${id}/scan-audit`, { method: 'POST' });

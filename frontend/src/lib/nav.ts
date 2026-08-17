@@ -1,6 +1,8 @@
 import {
   BadgeCheck,
   BarChart3,
+  QrCode,
+  Tags,
   BookOpen,
   Boxes,
   ClipboardList,
@@ -40,6 +42,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/kb', label: 'Knowledge', icon: BookOpen },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/scan', label: 'Scan', icon: QrCode },
+  { to: '/labels', label: 'Labels', icon: Tags },
   { to: '/masters', label: 'Masters', icon: Database, admin: true },
 ];
 
