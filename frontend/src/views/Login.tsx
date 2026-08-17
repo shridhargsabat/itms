@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import ThemeToggle from '@/components/ThemeToggle';
 import { demoLogin as apiDemoLogin, login, setSession } from '@/api/client';
 
 /**
@@ -52,6 +53,11 @@ export default function Login() {
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-base px-4">
       <AnimatedBackground />
+
+      {/* theme control — visible before auth (login renders dark via FOUC) */}
+      <div className="fixed right-4 top-4 z-10">
+        <ThemeToggle className="h-10 w-10 rounded-xl border-edge/80 bg-surface/60 text-secondary backdrop-blur" />
+      </div>
 
       {/* glass card */}
       <div className="animate-fade-up relative w-full max-w-md">
