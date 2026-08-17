@@ -121,7 +121,7 @@ export default function Layout() {
       </header>
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-edge bg-surface/80 backdrop-blur transition-all duration-300 lg:flex',
+          'fixed inset-y-0 left-0 z-40 hidden flex-col overflow-y-auto border-r border-edge bg-surface/80 backdrop-blur transition-all duration-300 lg:flex',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
@@ -184,6 +184,13 @@ export default function Layout() {
           </div>
         )}
 
+        {!collapsed && (
+          <div className="mt-2 border-t border-edge px-3 pb-1 pt-3">
+            <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">Theme</p>
+            <ThemeToggle segmented className="w-full" />
+          </div>
+        )}
+
         <div className="p-2">
           <button
             type="button"
@@ -238,12 +245,6 @@ export default function Layout() {
               <Download className="h-4 w-4 shrink-0" />
               {!collapsed && <span>Install app</span>}
             </button>
-          )}
-          {!collapsed && (
-            <div className="mt-3 border-t border-edge px-3 pb-1 pt-3">
-              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">Theme</p>
-              <ThemeToggle segmented className="w-full" />
-            </div>
           )}
           {collapsed && (
             <div className="mt-1">
