@@ -24,7 +24,7 @@ services:
     # as root, switch to the postgres user) — the minimal set; everything else
     # stays dropped.
     cap_drop: [ALL]
-    cap_add: [CHOWN, SETUID, SETGID]
+    cap_add: [CHOWN, DAC_OVERRIDE, SETUID, SETGID, FOWNER]
     security_opt: ["no-new-privileges:true"]
     read_only: true
     tmpfs:
