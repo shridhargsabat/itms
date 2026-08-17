@@ -103,7 +103,7 @@ services:
       resources:
         limits: { cpus: "0.5", memory: 256M }
 
-uploads-owner:
+  uploads-owner:
     image: busybox:stable
     container_name: itms-uploads-owner
     command: ["sh", "-c", "chown -R 10001:10001 /app/uploads && echo uploads-owner-ok"]
