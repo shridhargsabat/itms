@@ -118,19 +118,15 @@ async fn list_users(
     }
     qb.push(", name ASC");
     // Optional pagination (client lists default to unlimited for now).
-    if let Some(limit) = q.limit {
-        qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
-        if let Some(offset) = q.offset {
-            qb.push(" OFFSET ").push_bind(offset.max(0));
-        }
-    }
+    let (limit, offset) = crate::pagination::page_params(q.limit, q.offset);
+    crate::pagination::push_pagination(&mut qb, limit, offset);
     let users = qb.build_query_as::<UserRow>().fetch_all(&state.pool).await?;
-    let total: i64 = if q.limit.is_some() {
+    let total: i64 = if limit.is_some() {
         cqb.build_query_scalar().fetch_one(&state.pool).await?
     } else {
         users.len() as i64
     };
-    Ok(([("x-total-count", total.to_string())], Json(users)))
+    Ok((crate::pagination::total_header(total), Json(users)))
 }
 
 async fn create_user(
