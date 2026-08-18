@@ -566,22 +566,21 @@ async fn asset_lifecycle(
 /// GET /api/v1/assets/alerts?scope=all|expired|expiring — warranty expiring
 /// within 90 days or already expired (excludes RETIRED). days_left < 0 =
 /// expired. Scope lets the UI fetch buckets separately so thousands of
-/// expired warranties cannot drown the expiring-soon list.
+/// expired warranties cannot drown the expiring-soon list. Accepts
+/// limit/offset and returns X-Total-Count (standard pagination contract).
 async fn warranty_alerts(
     State(state): State<AppState>,
     Query(params): Query<AlertParams>,
-) -> Result<Json<Vec<WarrantyAlert>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let scope = params.scope.as_deref().unwrap_or("all");
-    let mut q = String::from(
-        "SELECT id, asset_tag, name, status, warranty_expiry, \
-                (warranty_expiry - CURRENT_DATE)::bigint AS days_left \
-         FROM assets \
-         WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL \
+    // WHERE fragment (no FROM) — reused by the count and the data query.
+    let mut where_sql = String::from(
+        "WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL \
            AND warranty_expiry <= CURRENT_DATE + 90",
     );
     match scope {
-        "expired" => q.push_str(" AND warranty_expiry < CURRENT_DATE"),
-        "expiring" => q.push_str(" AND warranty_expiry >= CURRENT_DATE"),
+        "expired" => where_sql.push_str(" AND warranty_expiry < CURRENT_DATE"),
+        "expiring" => where_sql.push_str(" AND warranty_expiry >= CURRENT_DATE"),
         "all" => {}
         _ => {
             return Err(AppError::new(
@@ -590,17 +589,33 @@ async fn warranty_alerts(
             ));
         }
     }
-    q.push_str(" ORDER BY warranty_expiry ASC LIMIT 500");
+
+    let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM assets {where_sql}"))
+        .fetch_one(&state.pool)
+        .await?;
+
+    let mut q = String::from(
+        "SELECT id, asset_tag, name, status, warranty_expiry, \
+                (warranty_expiry - CURRENT_DATE)::bigint AS days_left \
+         FROM assets",
+    );
+    q.push_str(&format!(" {where_sql}"));
+    q.push_str(" ORDER BY warranty_expiry ASC");
+    let (limit, offset) = crate::pagination::page_params(params.limit, params.offset);
+    let limit = limit.unwrap_or(20);
+    q.push_str(&format!(" LIMIT {limit} OFFSET {offset}"));
 
     let alerts = sqlx::query_as::<_, WarrantyAlert>(&q)
         .fetch_all(&state.pool)
         .await?;
-    Ok(Json(alerts))
+    Ok((crate::pagination::total_header(total), Json(alerts)))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AlertParams {
     pub scope: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 /// Asset tag generation: `SELECT count(*) FROM assets` + 1 → `AST-{:04}`,

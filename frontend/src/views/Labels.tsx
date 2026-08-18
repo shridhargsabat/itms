@@ -67,8 +67,9 @@ export default function Labels() {
 
   const allRows: Asset[] = assets.data?.items ?? [];
   // Client-side pagination of the fetched list (batch-selection page — the
-  // full list is kept for the selection count below).
-  const { page, pageSize, setPage, setPageSize, pageRows } = useClientPagination(allRows, 50);
+  // full list is kept for the selection count below). 20/page matches the
+  // app-wide per-page default.
+  const { page, pageSize, setPage, setPageSize, pageRows } = useClientPagination(allRows, 20);
   const rows = pageRows;
   // Selection must span ALL fetched rows, not just the current page, or the
   // "Print labels (N)" / "Start audit run" counts silently drop off-page
