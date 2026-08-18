@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import QRCode from 'qrcode';
@@ -6,13 +7,26 @@ import { listAssets } from '@/api/client';
 import type { Asset } from '@/api/types';
 import { payloadFor } from '@/lib/qr';
 import Select from '@/components/Select';
+import Modal from '@/components/Modal';
+import { LabelPrinter, type LabelPrinterStage } from '@/components/LabelPrinter';
 
 /**
  * Phase 2 (#65): printable QR label sheets + audit-run target picker.
  * Labels carry the compact ITMS payload (see lib/qr.ts) so /scan can
  * look the asset up even when the payload is truncated to fit tiny labels.
+ *
+ * feat/label-printer: reuses the receipt-printer animation component
+ * (LabelPrinter) for a tactile single-label print flow — the printer feed
+ * animation plays, then window.print() sends just that label (see the
+ * .print-area isolation rules in index.css). Batch sheet print is unchanged.
  */
 const STATUS_OPTIONS = ['ALL', 'IN_STOCK', 'ASSIGNED', 'MAINTENANCE', 'RETIRED'];
+
+const PRINT_STATUS: Record<LabelPrinterStage, string> = {
+  processing: 'Generating QR label…',
+  printing: 'Printing label…',
+  complete: 'Label printed',
+};
 
 export default function Labels() {
   const [search, setSearch] = useState('');
@@ -20,6 +34,11 @@ export default function Labels() {
   const [status, setStatus] = useState('ALL');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [printing, setPrinting] = useState(false);
+  const [printAsset, setPrintAsset] = useState<Asset | null>(null);
+  const [printStage, setPrintStage] = useState<LabelPrinterStage>('processing');
+  /** Bumped on every print click — react-query returns the SAME asset object
+      ref for a cached row, so setPrintAsset alone wouldn't re-trigger the effect. */
+  const [printRun, setPrintRun] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
 
   const assets = useQuery({
@@ -46,12 +65,37 @@ export default function Labels() {
     });
   };
 
+  /* Single-label print: processing → printing (feed animation ~1.75s) →
+     complete → auto window.print(). Only the .print-area renders on paper.
+     printRun dep restarts the chain even for re-prints of the same asset. */
+  useEffect(() => {
+    if (!printAsset) return;
+    setPrintStage('processing');
+    const t1 = setTimeout(() => setPrintStage('printing'), 650);
+    const t2 = setTimeout(() => setPrintStage('complete'), 650 + 1750);
+    const t3 = setTimeout(() => window.print(), 650 + 1750 + 350);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [printAsset, printRun]);
+
+  const closePrint = () => {
+    setPrintAsset(null);
+    setPrintStage('processing');
+  };
+
   const startRun = () => {
-    const targets = rows.filter((a) => selected.has(a.id) && a.status !== 'RETIRED').map((a) => ({ id: a.id, tag: a.asset_tag, name: a.name }));
+    const targets = rows
+      .filter((a) => selected.has(a.id) && a.status !== 'RETIRED')
+      .map((a) => ({ id: a.id, tag: a.asset_tag, name: a.name }));
     try {
       localStorage.setItem('itms-audit-targets', JSON.stringify(targets));
       localStorage.removeItem('itms-audit-run');
-    } catch { /* storage unavailable */ }
+    } catch {
+      /* storage unavailable */
+    }
     window.location.href = '/scan';
   };
 
@@ -60,7 +104,7 @@ export default function Labels() {
       <div>
         <h1 className="text-xl font-semibold">QR Labels</h1>
         <p className="mt-0.5 text-xs text-muted">
-          Pick assets and print an A4 label sheet, or start an audit run for the factory floor. Labels embed tag + serial — scan them with the{' '}
+          Pick assets and print an A4 label sheet, start an audit run for the factory floor, or use the print icon on a row for an animated single-label print. Labels embed tag + serial — scan them with the{' '}
           <span className="text-accent">Scan</span> page.
         </p>
       </div>
@@ -96,6 +140,9 @@ export default function Labels() {
               <th className="px-3 py-2">Category</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2 text-right">Serial</th>
+              <th className="w-8 px-2 py-2">
+                <span className="sr-only">Print</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-edge/60">
@@ -109,10 +156,28 @@ export default function Labels() {
                 <td className="px-3 py-2 text-xs text-secondary">{a.category}</td>
                 <td className="px-3 py-2 text-xs text-secondary">{a.status}</td>
                 <td className="px-3 py-2 text-right font-mono text-[11px] text-muted">{a.serial_number ?? '—'}</td>
+                <td className="px-2 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrintAsset(a);
+                      setPrintRun((n) => n + 1);
+                    }}
+                    aria-label={`Print label for ${a.asset_tag}`}
+                    title="Animated single-label print"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:bg-elevated hover:text-primary"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                  </button>
+                </td>
               </tr>
             ))}
             {!assets.isLoading && rows.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-xs text-muted">No assets match — widen the filters.</td></tr>
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-xs text-muted">
+                  No assets match — widen the filters.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -142,8 +207,12 @@ export default function Labels() {
             <div className="mb-3 flex items-center justify-between print:hidden">
               <h2 className="text-sm font-semibold">Label sheet — {selectedRows.length} assets</h2>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="h-8 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent/90">Print</button>
-                <button onClick={() => setPrinting(false)} className="h-8 rounded-lg border border-edge2 px-3 text-xs text-secondary hover:bg-elevated">Close</button>
+                <button onClick={() => window.print()} className="h-8 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent/90">
+                  Print
+                </button>
+                <button onClick={() => setPrinting(false)} className="h-8 rounded-lg border border-edge2 px-3 text-xs text-secondary hover:bg-elevated">
+                  Close
+                </button>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2 print:gap-3">
@@ -154,12 +223,99 @@ export default function Labels() {
           </div>
         </div>
       )}
+
+      {printAsset && (
+        <Modal title={`Print label — ${printAsset.asset_tag}`} onClose={closePrint}>
+          <div className="flex flex-col items-center gap-4">
+            <LabelPrinter.Root stage={printStage}>
+              <LabelPrinter.Machine>
+                <LabelPrinter.Header>
+                  <span className="mt-1 font-mono text-[10px] uppercase tracking-widest text-secondary">
+                    ITMS · Label printer
+                  </span>
+                </LabelPrinter.Header>
+                <LabelPrinter.Screen>
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-slate-100">{printAsset.asset_tag}</p>
+                      <p className="truncate text-[10px] text-slate-400">{printAsset.name}</p>
+                    </div>
+                    <LabelPrinter.Status>{PRINT_STATUS[printStage]}</LabelPrinter.Status>
+                  </div>
+                </LabelPrinter.Screen>
+              </LabelPrinter.Machine>
+              <LabelPrinter.Output>
+                <LabelPrinter.Paper className="flex items-center gap-3">
+                  <QrCanvas asset={printAsset} width={112} className="h-16 w-16 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="truncate font-mono text-sm font-bold">{printAsset.asset_tag}</div>
+                    <div className="truncate text-[11px] text-slate-600">{printAsset.name}</div>
+                    {printAsset.serial_number ? (
+                      <div className="truncate font-mono text-[10px] text-slate-400">{printAsset.serial_number}</div>
+                    ) : null}
+                  </div>
+                </LabelPrinter.Paper>
+              </LabelPrinter.Output>
+            </LabelPrinter.Root>
+
+            <div className="flex items-center gap-2">
+              {printStage === 'complete' && (
+                <button
+                  onClick={() => window.print()}
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90"
+                >
+                  <Printer className="h-4 w-4" /> Print again
+                </button>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {printAsset &&
+        createPortal(
+          <div id="label-print-area" className="print-area hidden print:block">
+            <div className="flex items-center gap-3 p-2">
+              <QrCanvas asset={printAsset} width={92} className="h-[92px] w-[92px]" />
+              <div className="min-w-0">
+                <div className="font-mono text-sm font-bold">{printAsset.asset_tag}</div>
+                <div className="text-xs">{printAsset.name}</div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
 
 function getCategories(rows: Asset[]): string[] {
   return [...new Set(rows.map((r) => r.category))].sort();
+}
+
+/** Renders an asset's QR payload onto a canvas; CSS controls display size. */
+function QrCanvas({
+  asset,
+  width,
+  className,
+}: {
+  asset: Asset;
+  width: number;
+  className?: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      QRCode.toCanvas(canvasRef.current, payloadFor(asset), {
+        width,
+        margin: 1,
+        color: { dark: '#111827', light: '#ffffff' },
+      }).catch(() => {});
+    }
+  }, [asset, width]);
+
+  return <canvas ref={canvasRef} className={className} />;
 }
 
 function LabelCard({ asset }: { asset: Asset }) {
