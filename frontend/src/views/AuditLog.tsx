@@ -4,11 +4,11 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { getAuditLog } from '@/api/client';
 import DataTable, { type Column, type SortState } from '@/components/DataTable';
 import { formatDate } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
 import type { AuditLogEntry } from '@/api/types';
 
 export default function AuditLog() {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
   const [sort, setSort] = useState<SortState | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -16,7 +16,7 @@ export default function AuditLog() {
     queryFn: () =>
       getAuditLog({
         limit: pageSize,
-        offset: (page - 1) * pageSize,
+        offset,
         sort: sort?.key,
         order: sort?.dir,
       }),
@@ -94,14 +94,11 @@ export default function AuditLog() {
         page={page}
         pageSize={pageSize}
         onPageChange={setPage}
-        onPageSizeChange={(s) => {
-          setPageSize(s);
-          setPage(1);
-        }}
+        onPageSizeChange={setPageSize}
         sort={sort}
         onSortChange={(s) => {
           setSort(s);
-          setPage(1);
+          reset();
         }}
         loading={isLoading}
         emptyMessage="No audit entries yet."

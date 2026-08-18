@@ -22,6 +22,7 @@ import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import { inputCls } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
 
 type BulkAction = 'status' | 'assign' | 'delete' | null;
 
@@ -29,8 +30,7 @@ export default function Assets() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [selected, setSelected] = useState<Asset | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
   const [importOpen, setImportOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -156,12 +156,12 @@ export default function Assets() {
   };
   const { data, isLoading } = useQuery({
     queryKey: ['assets', filters, page, pageSize],
-    queryFn: () => listAssets({ ...filters, limit: pageSize, offset: (page - 1) * pageSize }),
+    queryFn: () => listAssets({ ...filters, limit: pageSize, offset }),
   });
 
   // any filter change resets to page 1 + clears row selection
   useEffect(() => {
-    setPage(1);
+    reset();
     setSelectedIds(new Set());
   }, [search, category, status, location, sort, order]);
 
@@ -358,10 +358,7 @@ export default function Assets() {
         page={page}
         pageSize={pageSize}
         onPageChange={setPage}
-        onPageSizeChange={(s) => {
-          setPageSize(s);
-          setPage(1);
-        }}
+        onPageSizeChange={setPageSize}
         sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
         onSortChange={onSortChange}
         loading={isLoading}

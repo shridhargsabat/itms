@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { ClipboardList, Database, LoaderCircle, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
 import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
@@ -123,8 +124,7 @@ function UsersTab() {
   const [editing, setEditing] = useState<UserRecord | null>(null);
   const [form, setForm] = useState({ name: '', email: '', role: 'EMPLOYEE', department: 'IT', password: '' });
   const [formError, setFormError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
 
   const search = params.get('search') ?? '';
   const role = params.get('role') ?? '';
@@ -140,13 +140,13 @@ function UsersTab() {
         role: role || undefined,
         department: department || undefined,
         limit: pageSize,
-        offset: (page - 1) * pageSize,
+        offset,
         sort: sort ?? undefined,
         order: order ?? undefined,
       }),
   });
   useEffect(() => {
-    setPage(1);
+    reset();
   }, [search, role, department, sort, order]);
   const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
   const departments = masters.data?.department ?? [];
@@ -302,10 +302,7 @@ function UsersTab() {
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
-          onPageSizeChange={(s) => {
-            setPageSize(s);
-            setPage(1);
-          }}
+          onPageSizeChange={setPageSize}
           sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
           onSortChange={(s) => {
             const next = new URLSearchParams(params);
