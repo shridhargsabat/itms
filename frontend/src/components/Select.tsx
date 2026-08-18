@@ -14,6 +14,11 @@ interface SelectProps {
   options: SelectOption[];
   placeholder?: string;
   className?: string;
+  /** Classes for the trigger BUTTON (size/typography overrides). The outer
+   *  wrapper is styled by `className`; the trigger is otherwise fixed by
+   *  inputCls + py-2.5, which is too tall for compact controls (e.g. the
+   *  DataTable pagination footer). */
+  triggerClassName?: string;
 }
 
 /**
@@ -27,6 +32,7 @@ export default function Select({
   options,
   placeholder = 'Select…',
   className,
+  triggerClassName,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<{ top: number; left: number; width: number; maxWidth: number } | null>(null);
@@ -125,7 +131,7 @@ export default function Select({
         onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={cn(inputCls, 'flex items-center justify-between gap-2 py-2.5 text-left')}
+        className={cn(inputCls, 'flex items-center justify-between gap-2 py-2.5 text-left', triggerClassName)}
       >
         <span className={cn('truncate', selected ? 'text-primary' : 'text-muted')}>
           {selected?.label ?? placeholder}
