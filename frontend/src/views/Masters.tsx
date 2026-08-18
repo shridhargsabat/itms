@@ -301,7 +301,6 @@ function UsersTab() {
           total={users.data?.total}
           page={page}
           pageSize={pageSize}
-          minWidth="min-w-[340px] sm:min-w-[640px]"
           onPageChange={setPage}
           onPageSizeChange={(s) => {
             setPageSize(s);

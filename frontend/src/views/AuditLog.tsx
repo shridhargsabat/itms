@@ -105,7 +105,6 @@ export default function AuditLog() {
         }}
         loading={isLoading}
         emptyMessage="No audit entries yet."
-        minWidth="min-w-[680px]"
         renderExpanded={(e) => (
           <pre className="max-h-72 overflow-auto rounded-lg bg-base p-3 font-mono text-xs leading-relaxed text-secondary">
             {JSON.stringify(e.diff, null, 2)}
