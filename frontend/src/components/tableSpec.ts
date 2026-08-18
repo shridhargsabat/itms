@@ -3,10 +3,13 @@
  *  rounded-xl border, min-w-[640px] + ScrollX for consistent mobile behavior. */
 export const TABLE_SPEC = {
   shell: 'rounded-xl border border-edge',
-  /* Vertical scroll lives on the shell so the sticky header pins to this box's top
-     (top:0 always — no dependency on the mobile top bar / per-view sticky action rows).
+  /* Vertical scroll lives on the ScrollX INNER container (the same element that does
+     overflow-x) so the sticky header pins to that box's top (top:0 always). It MUST
+     be on the single scrolling element — if the vertical scroll sat on an outer shell
+     while an inner overflow-x div sat between it and thead, that inner div becomes the
+     nearest scroll container and captures (breaks) the sticky pinning (react-spa-ui-pitfalls §1).
      NOTE: do NOT add transform/filter/will-change here — they create a containing block
-     that breaks position:sticky on th (see react-spa-ui-pitfalls §1). */
+     that breaks position:sticky on th. */
   tableScroll: 'max-h-[55vh] overflow-y-auto lg:max-h-[62vh]',
   emptyShell: 'rounded-xl border border-dashed border-edge p-10 text-center text-sm text-muted',
   head: 'bg-surface text-xs uppercase tracking-wide text-secondary',

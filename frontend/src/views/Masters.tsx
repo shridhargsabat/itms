@@ -437,7 +437,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
 
   return (
     <div className="space-y-3">
-      <ScrollX className="max-h-[55vh] overflow-y-auto rounded-xl border border-edge">
+      <ScrollX className="rounded-xl border border-edge" innerClassName="max-h-[55vh] overflow-y-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b border-edge bg-surface text-[11px] uppercase tracking-wide text-muted">
             <tr>

@@ -154,7 +154,7 @@ export default function DataTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <ScrollX className={cn(TABLE_SPEC.shell, TABLE_SPEC.tableScroll)}>
+      <ScrollX className={TABLE_SPEC.shell} innerClassName={TABLE_SPEC.tableScroll}>
         <table className={cn(TABLE_SPEC.table, minWidth)}>
           {head}
           <tbody className={TABLE_SPEC.tbody}>
@@ -201,8 +201,8 @@ export default function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className={cn(TABLE_SPEC.shell, TABLE_SPEC.tableScroll)}>
-      <ScrollX>
+    <div className={TABLE_SPEC.shell}>
+      <ScrollX innerClassName={TABLE_SPEC.tableScroll}>
         <table className={cn(TABLE_SPEC.table, minWidth)}>
           {head}
           <tbody className={TABLE_SPEC.tbody}>
