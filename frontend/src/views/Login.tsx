@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, KeyRound, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { demoLogin as apiDemoLogin, getOAuthStatus, login, setSession } from '@/api/client';
+import { hydrateThemeFromUser } from '@/lib/theme';
 
 /**
  * Real auth login (backend + DB). Any seeded user works: <email> / demo1234
@@ -28,6 +29,8 @@ export default function Login() {
       login(e, p),
     onSuccess: (res) => {
       setSession(res.token, res.user);
+      // Server pref wins (cross-device sync)
+      hydrateThemeFromUser(res.user);
       if ('startViewTransition' in document) {
         document.startViewTransition(() => navigate('/', { replace: true }));
       } else {
@@ -47,6 +50,8 @@ export default function Login() {
     mutationFn: () => apiDemoLogin(),
     onSuccess: (res) => {
       setSession(res.token, res.user);
+      // Server pref wins (cross-device sync)
+      hydrateThemeFromUser(res.user);
       if ('startViewTransition' in document) {
         document.startViewTransition(() => navigate('/', { replace: true }));
       } else {

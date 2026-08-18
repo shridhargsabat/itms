@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { LoaderCircle } from 'lucide-react';
+import { useEffect } from 'react';
 import './index.css';
 import Layout from '@/components/Layout';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
@@ -31,6 +32,7 @@ const Requests = lazy(() => import('@/views/Requests'));
 const Licenses = lazy(() => import('@/views/Licenses'));
 import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
 import { ApiError, clearSession, getCachedUser, getToken, me } from '@/api/client';
+import { hydrateThemeFromUser } from '@/lib/theme';
 
 captureInstallPrompt();
 initSwUpdateHandling();
@@ -51,12 +53,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const token = getToken();
   const cached = getCachedUser();
   const location = useLocation();
-  const { isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['me'],
     queryFn: me,
     enabled: !!token,
     retry: false,
   });
+
+  // Theme manager: the authenticated user's server pref is authoritative —
+  // every app load re-syncs (device B picks up device A's theme change).
+  useEffect(() => {
+    if (data) hydrateThemeFromUser(data);
+  }, [data]);
 
   if (!token) return <Navigate to="/login" replace />;
   if (isLoading) {

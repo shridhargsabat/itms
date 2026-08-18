@@ -48,6 +48,7 @@ pub fn api_router(state: AppState) -> Router<AppState> {
     let protected = Router::new()
         .route("/auth/logout", post(auth::logout))
         .route("/auth/me", get(auth::me))
+        .route("/auth/theme", put(auth::set_theme))
         .route("/auth/change-password", post(password::change_password))
         .nest("/dashboard", dashboard::router())
         .nest("/assets", assets::router())

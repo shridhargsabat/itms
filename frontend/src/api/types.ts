@@ -16,6 +16,8 @@ export interface AuthUser {
   name: string;
   role: string;
   department: string;
+  /** Per-user theme pref (theme manager): light | dark | ledgerly | system. */
+  theme?: string;
 }
 
 /** Master lookup option (lookup_options row from the API). */

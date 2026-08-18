@@ -257,13 +257,13 @@ pub async fn callback(
     }
 
     // account linking: only existing, active users
-    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, bool)>(
-        "SELECT id, email, name, role, department, active FROM users WHERE email = $1",
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String, bool)>(
+        "SELECT id, email, name, role, department, theme, active FROM users WHERE email = $1",
     )
     .bind(&email)
     .fetch_optional(&state.pool)
     .await?;
-    let (id, _, name, role, department, active) = match row {
+    let (id, _, name, role, department, theme, active) = match row {
         Some(r) => r,
         None => {
             return Err(AppError::new(
@@ -296,7 +296,7 @@ pub async fn callback(
         "{base}/oauth/callback?token={}&expires_at={}&user={}",
         token,
         expires_at.to_rfc3339(),
-        urlencode(&format!("{role}|{name}|{department}|{id}|{email}")),
+        urlencode(&format!("{role}|{name}|{department}|{id}|{email}|{theme}")),
     );
     Ok(axum::response::Redirect::temporary(&dest))
 }

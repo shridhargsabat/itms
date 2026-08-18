@@ -223,6 +223,13 @@ export const logout = () =>
 
 export const me = () => apiFetch<AuthUser>('/auth/me');
 
+/** Theme manager: persist the caller's theme pref (syncs across devices). */
+export const setThemePref = (theme: string) =>
+  apiFetch<{ ok: boolean; theme: string }>('/auth/theme', {
+    method: 'PUT',
+    body: JSON.stringify({ theme }),
+  });
+
 // ---- dashboard ----
 export const getDashboardMetrics = () => apiFetch<DashboardMetrics>('/dashboard/metrics');
 export const getAuditLog = (params?: {

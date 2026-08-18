@@ -1,6 +1,6 @@
 //! /auth/* routes + the Bearer-token guard used on every protected route.
 
-use axum::extract::{Request, State};
+use axum::extract::{Extension, Request, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::Response;
@@ -33,6 +33,7 @@ pub struct AuthUser {
     pub name: String,
     pub role: String,
     pub department: String,
+    pub theme: String,
 }
 
 /// POST /auth/login — verify credentials, mint an opaque session token.
@@ -42,14 +43,14 @@ pub async fn login(
     Json(body): Json<LoginRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let ip = client_ip_public(&headers);
-    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, Option<String>, bool)>(
-        "SELECT id, email, name, role, department, password_hash, active FROM users WHERE email = $1",
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String, Option<String>, bool)>(
+        "SELECT id, email, name, role, department, theme, password_hash, active FROM users WHERE email = $1",
     )
     .bind(body.email.trim().to_lowercase())
     .fetch_optional(&state.pool)
     .await?;
 
-    let (id, email, name, role, department, password_hash, active) = match row {
+    let (id, email, name, role, department, theme, password_hash, active) = match row {
         Some(r) => r,
         None => {
             // #95: burn a full argon2 verify so unknown/known emails are
@@ -93,7 +94,7 @@ pub async fn login(
     Ok(Json(json!({
         "token": token,
         "expires_at": expires_at,
-        "user": { "id": id, "email": email, "name": name, "role": role, "department": department },
+        "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme },
     })))
 }
 
@@ -116,6 +117,36 @@ pub async fn me(
     headers: HeaderMap,
 ) -> Result<Json<AuthUser>, AppError> {
     Ok(Json(current_user(&state.pool, &headers).await?))
+}
+
+/// PUT /auth/theme — persist the caller's theme preference (theme manager).
+/// Per-user: change it on one device, every device picks it up at next login
+/// or /auth/me. Values validated server-side; no free-form strings.
+#[derive(Deserialize)]
+pub struct ThemeRequest {
+    pub theme: String,
+}
+
+const VALID_THEMES: [&str; 4] = ["light", "dark", "ledgerly", "system"];
+
+pub async fn set_theme(
+    State(state): State<AppState>,
+    Extension(uid): Extension<Uuid>,
+    Json(body): Json<ThemeRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let theme = body.theme.trim().to_lowercase();
+    if !VALID_THEMES.contains(&theme.as_str()) {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "theme must be one of: light, dark, ledgerly, system",
+        ));
+    }
+    sqlx::query("UPDATE users SET theme = $1 WHERE id = $2")
+        .bind(&theme)
+        .bind(uid)
+        .execute(&state.pool)
+        .await?;
+    Ok(Json(json!({ "ok": true, "theme": theme })))
 }
 
 /// Axum middleware: 401 unless a valid Bearer session is presented.
@@ -166,7 +197,7 @@ fn bearer_token(headers: &HeaderMap) -> Result<String, AppError> {
 async fn current_user(pool: &PgPool, headers: &HeaderMap) -> Result<AuthUser, AppError> {
     let token = bearer_token(headers)?;
     sqlx::query_as::<_, AuthUser>(
-        "SELECT u.id, u.email, u.name, u.role, u.department
+        "SELECT u.id, u.email, u.name, u.role, u.department, u.theme
          FROM sessions s
          JOIN users u ON u.id = s.user_id
          WHERE s.token_hash = $1 AND s.expires_at > NOW() AND u.active = TRUE",
@@ -248,14 +279,14 @@ pub async fn demo_login(
     let email = std::env::var("DEMO_LOGIN_EMAIL")
         .unwrap_or_else(|_| "demo@itms.local".into())
         .to_lowercase();
-    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, bool)>(
-        "SELECT id, email, name, role, department, active FROM users WHERE email = $1",
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String, bool)>(
+        "SELECT id, email, name, role, department, theme, active FROM users WHERE email = $1",
     )
     .bind(&email)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::new(StatusCode::NOT_FOUND, "demo login disabled"))?;
-    let (id, email, name, role, department, active) = row;
+    let (id, email, name, role, department, theme, active) = row;
     if !active {
         return Err(AppError::new(StatusCode::NOT_FOUND, "demo login disabled"));
     }
@@ -263,6 +294,6 @@ pub async fn demo_login(
     Ok(Json(serde_json::json!({
         "token": token,
         "expires_at": expires_at,
-        "user": { "id": id, "email": email, "name": name, "role": role, "department": department }
+        "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme }
     })))
 }
