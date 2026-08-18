@@ -291,3 +291,23 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Single-label print isolation (Labels.tsx .print-area):
+   When a .print-area exists on the page, printing renders ONLY that
+   area — the rest of the app (including modals/overlays) is hidden via
+   the visibility pattern. Batch sheet print is unaffected (no .print-area
+   is rendered for it). */
+@media print {
+  body:has(.print-area) * {
+    visibility: hidden;
+  }
+  body:has(.print-area) .print-area,
+  body:has(.print-area) .print-area * {
+    visibility: visible;
+  }
+  body:has(.print-area) .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}
