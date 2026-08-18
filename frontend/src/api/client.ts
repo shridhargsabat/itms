@@ -282,8 +282,11 @@ export const updateAsset = (assetId: string, input: UpdateAssetInput) =>
   apiFetch<Asset>(`/assets/${assetId}`, { method: 'PATCH', body: JSON.stringify(input) });
 export const getAssetLifecycle = (assetId: string) =>
   apiFetch<LifecycleEvent[]>(`/assets/${assetId}/lifecycle`);
+// Warranty alerts: fetch the full bounded bucket list (≤500/server cap); the
+// Warranty view client-paginates each bucket. Pass a generous limit so the
+// whole scope arrives in one call.
 export const getWarrantyAlerts = (scope?: 'all' | 'expired' | 'expiring') =>
-  apiFetch<WarrantyAlert[]>(`/assets/alerts${scope ? `?scope=${scope}` : ''}`);
+  apiFetch<WarrantyAlert[]>(`/assets/alerts${scope ? `?scope=${scope}&limit=500` : '?limit=500'}`);
 
 // ---- bulk asset actions ----
 export interface BulkResult {
