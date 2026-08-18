@@ -12,7 +12,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
+import PaginationFooter from '@/components/PaginationFooter';
 import Select from '@/components/Select';
 import { getCachedUser } from '@/api/client';
 import {
@@ -59,19 +61,30 @@ export default function Requests() {
   const [creating, setCreating] = useState(false);
   const qc = useQueryClient();
 
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
+
   const requests = useQuery({
-    queryKey: ['requests', tab],
+    queryKey: ['requests', tab, page, pageSize],
     queryFn: () => {
-      if (tab === 'mine') return getRequests({ mine: true });
-      if (tab === 'pending') return getRequests({ pending: true });
-      return getRequests({});
+      if (tab === 'mine') return getRequests({ mine: true, limit: pageSize, offset });
+      if (tab === 'pending') return getRequests({ pending: true, limit: pageSize, offset });
+      return getRequests({ limit: pageSize, offset });
     },
   });
+
+  // Approval badge must not depend on the current page — one row is enough
+  // to read X-Total-Count for the filtered pending queue.
+  const pendingQ = useQuery({
+    queryKey: ['requests-pending-count'],
+    queryFn: () => getRequests({ pending: true, limit: 1 }),
+  });
+  const pendingCount = pendingQ.data?.total ?? 0;
 
   const setTab = (t: Tab) => {
     const p = new URLSearchParams(params);
     p.set('tab', t);
     setParams(p, { replace: true });
+    reset();
   };
 
   const mutate = useMutation({
@@ -88,11 +101,7 @@ export default function Requests() {
     },
   });
 
-  const list = useMemo(() => requests.data ?? [], [requests.data]);
-  const pendingCount = useMemo(
-    () => list.filter((r) => r.status === 'SUBMITTED').length,
-    [list],
-  );
+  const list = useMemo(() => requests.data?.items ?? [], [requests.data]);
 
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: 'mine', label: 'My Requests' },
@@ -159,6 +168,15 @@ export default function Requests() {
           />
         ))}
       </div>
+
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        total={requests.data?.total}
+        rowsLength={list.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {creating && (
         <CreateRequestModal

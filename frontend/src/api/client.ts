@@ -170,12 +170,14 @@ export const resetPassword = (body: { token: string; new_password: string }) =>
     body: JSON.stringify(body),
   });
 
-export const listKbArticles = (params?: { ticket_type?: string; search?: string; limit?: number }) => {
+export const listKbArticles = (params?: { ticket_type?: string; search?: string; limit?: number; offset?: number }) => {
   const q = new URLSearchParams();
   if (params?.ticket_type) q.set('ticket_type', params.ticket_type);
   if (params?.search) q.set('search', params.search);
   if (params?.limit) q.set('limit', String(params.limit));
-  return apiFetch<KbArticle[]>(`/kb/articles?${q.toString()}`);
+  if (params?.offset) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return apiFetchCount<KbArticle>(`/kb/articles${qs ? `?${qs}` : ''}`);
 };
 
 export const getKbArticle = (id: string) => apiFetch<KbArticle>(`/kb/articles/${id}`);
@@ -428,13 +430,17 @@ export const getOnboardingEvents = (params?: {
   type?: 'ONBOARDING' | 'OFFBOARDING';
   status?: 'OPEN' | 'CLOSED';
   search?: string;
+  limit?: number;
+  offset?: number;
 }) => {
   const q = new URLSearchParams();
   if (params?.type) q.set('type', params.type);
   if (params?.status) q.set('status', params.status);
   if (params?.search) q.set('search', params.search);
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return apiFetch<OnboardingEvent[]>(`/onboarding${qs ? `?${qs}` : ''}`);
+  return apiFetchCount<OnboardingEvent>(`/onboarding${qs ? `?${qs}` : ''}`);
 };
 
 export const getOnboardingDetail = (id: string) => apiFetch<OnboardingDetail>(`/onboarding/${id}`);
@@ -469,6 +475,8 @@ export const getRequests = (params?: {
   status?: string;
   assignee?: string;
   search?: string;
+  limit?: number;
+  offset?: number;
 }) => {
   const q = new URLSearchParams();
   if (params?.mine) q.set('mine', 'true');
@@ -476,8 +484,10 @@ export const getRequests = (params?: {
   if (params?.status) q.set('status', params.status);
   if (params?.assignee) q.set('assignee', params.assignee);
   if (params?.search) q.set('search', params.search);
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return apiFetch<ServiceRequest[]>(`/requests${qs ? `?${qs}` : ''}`);
+  return apiFetchCount<ServiceRequest>(`/requests${qs ? `?${qs}` : ''}`);
 };
 
 export const createRequest = (input: CreateRequestInput) =>
@@ -494,13 +504,14 @@ export const rejectRequest = (id: string) =>
 
 // ── License register (P0-2) ─────────────────────────────────────────────────
 
-export const getLicenses = (params?: { search?: string; scope?: string; limit?: number }) => {
+export const getLicenses = (params?: { search?: string; scope?: string; limit?: number; offset?: number }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
   if (params?.scope) q.set('scope', params.scope);
   if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return apiFetch<License[]>(`/licenses${qs ? `?${qs}` : ''}`);
+  return apiFetchCount<License>(`/licenses${qs ? `?${qs}` : ''}`);
 };
 
 export const getLicenseAlerts = (scope?: 'all' | 'expired' | 'expiring') =>
@@ -570,8 +581,14 @@ export const downloadTicketAttachment = async (attachmentId: string) => {
 
 // ── Notifications (P1-2) ────────────────────────────────────────────────────
 
-export const getNotifications = (limit = 50) =>
-  apiFetch<Notification[]>(`/notifications?limit=${limit}`);
+export const getNotifications = (params?: { limit?: number; offset?: number; unread?: boolean }) => {
+  const q = new URLSearchParams();
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
+  if (params?.unread) q.set('unread', 'true');
+  const qs = q.toString();
+  return apiFetchCount<Notification>(`/notifications${qs ? `?${qs}` : ''}`);
+};
 
 export const getUnreadCount = () =>
   apiFetch<{ unread: number }>('/notifications/unread-count');

@@ -26,6 +26,8 @@ import {
   revokeSeat,
   updateLicense,
 } from '@/api/client';
+import { useServerPagination } from '@/lib/usePagination';
+import PaginationFooter from '@/components/PaginationFooter';
 import type { License, LicenseType } from '@/api/types';
 
 const TYPE_STYLE: Record<LicenseType, string> = {
@@ -58,13 +60,22 @@ export default function Licenses() {
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const qc = useQueryClient();
 
-  const all = useQuery({ queryKey: ['licenses', 'all'], queryFn: () => getLicenses({ limit: 500 }) });
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
+  // Full register in the background — the utilization/wasted summary must be
+  // independent of the current page. The visible list is server-paginated.
+  const all = useQuery({ queryKey: ['licenses', 'summary'], queryFn: () => getLicenses({ limit: 500 }) });
+  const pageQ = useQuery({
+    queryKey: ['licenses', 'page', tab, page, pageSize],
+    queryFn: () =>
+      getLicenses({ scope: tab === 'all' ? undefined : tab, limit: pageSize, offset }),
+  });
   const alerts = useQuery({ queryKey: ['licenses', 'alerts'], queryFn: () => getLicenseAlerts() });
 
   const setTab = (t: Tab) => {
     const p = new URLSearchParams(params);
     p.set('tab', t);
     setParams(p, { replace: true });
+    reset();
   };
 
   const refresh = () => {
@@ -78,17 +89,18 @@ export default function Licenses() {
   });
 
   // utilization summary
-  const totalSeats = useMemo(() => all.data?.reduce((a, l) => a + l.seats_total, 0) ?? 0, [all.data]);
-  const usedSeats = useMemo(() => all.data?.reduce((a, l) => a + l.seats_used, 0) ?? 0, [all.data]);
+  const allItems = all.data?.items ?? [];
+  const totalSeats = useMemo(() => allItems.reduce((a, l) => a + l.seats_total, 0), [allItems]);
+  const usedSeats = useMemo(() => allItems.reduce((a, l) => a + l.seats_used, 0), [allItems]);
   const utilPct = totalSeats > 0 ? Math.round((usedSeats / totalSeats) * 100) : 0;
   // wasted cost: (seats_total - seats_used) * cost_per_seat for paid subs
   const wasted = useMemo(
     () =>
-      (all.data ?? []).reduce(
+      allItems.reduce(
         (a, l) => a + (l.cost_per_seat ? (l.seats_total - l.seats_used) * l.cost_per_seat : 0),
         0,
       ),
-    [all.data],
+    [allItems],
   );
 
   const list =
@@ -96,7 +108,8 @@ export default function Licenses() {
       ? (alerts.data?.expiring_90 ?? [])
       : tab === 'expired'
         ? (alerts.data?.expired ?? [])
-        : (all.data ?? []);
+        : (pageQ.data?.items ?? []);
+  const total = tab === 'all' ? (pageQ.data?.total ?? 0) : list.length;
   const alertCount = (alerts.data?.expired.length ?? 0) + (alerts.data?.expiring_90.length ?? 0);
 
   return (
@@ -167,12 +180,12 @@ export default function Licenses() {
 
       {/* list */}
       <div className="flex flex-col gap-3">
-        {all.isLoading && (
+        {pageQ.isLoading && (
           <div className="flex justify-center py-10">
             <LoaderCircle className="h-6 w-6 animate-spin text-muted" />
           </div>
         )}
-        {!all.isLoading && list.length === 0 && (
+        {!pageQ.isLoading && list.length === 0 && (
           <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-secondary">
             {tab === 'expired' ? 'No expired licenses. 🎉' : tab === 'expiring' ? 'Nothing expiring in the next 90 days. 🎉' : 'No licenses registered yet.'}
           </div>
@@ -189,6 +202,15 @@ export default function Licenses() {
             setConfirmDel={(v) => setConfirmDel(v ? l.id : null)}
           />
         ))}
+
+        <PaginationFooter
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          rowsLength={list.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {/* detail modal */}

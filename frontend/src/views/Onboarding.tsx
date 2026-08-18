@@ -12,7 +12,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn, formatDateOnly, inputCls, labelCls } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
+import PaginationFooter from '@/components/PaginationFooter';
 import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import { getCachedUser } from '@/api/client';
@@ -94,9 +96,17 @@ export default function Onboarding() {
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const qc = useQueryClient();
 
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
+
   const events = useQuery({
-    queryKey: ['onboarding', tab],
-    queryFn: () => getOnboardingEvents({ type: tab }),
+    queryKey: ['onboarding', tab, page, pageSize],
+    queryFn: () => getOnboardingEvents({ type: tab, limit: pageSize, offset }),
+  });
+
+  // Full list in the background — overdue badge must not depend on the page.
+  const summary = useQuery({
+    queryKey: ['onboarding-summary', tab],
+    queryFn: () => getOnboardingEvents({ type: tab, limit: 500 }),
   });
 
   const detail = useQuery({
@@ -109,6 +119,7 @@ export default function Onboarding() {
     const p = new URLSearchParams(params);
     p.set('tab', t);
     setParams(p, { replace: true });
+    reset();
   };
 
   const doneMutation = useMutation({
@@ -144,8 +155,11 @@ export default function Onboarding() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding-detail'] }),
   });
 
-  const list = useMemo(() => events.data ?? [], [events.data]);
-  const overdueTotal = useMemo(() => list.reduce((s, e) => s + e.overdue_tasks, 0), [list]);
+  const list = useMemo(() => events.data?.items ?? [], [events.data]);
+  const overdueTotal = useMemo(
+    () => (summary.data?.items ?? []).reduce((s, e) => s + e.overdue_tasks, 0),
+    [summary.data],
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -241,6 +255,15 @@ export default function Onboarding() {
           </button>
         ))}
       </div>
+
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        total={events.data?.total}
+        rowsLength={list.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {/* Create modal */}
       {creating && (
