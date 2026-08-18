@@ -437,15 +437,15 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
 
   return (
     <div className="space-y-3">
-      <ScrollX className="rounded-xl border border-edge">
+      <ScrollX className="max-h-[55vh] overflow-y-auto rounded-xl border border-edge">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="border-b border-edge bg-surface/60 text-[11px] uppercase tracking-wide text-muted">
+          <thead className="border-b border-edge bg-surface text-[11px] uppercase tracking-wide text-muted">
             <tr>
-              <th className="px-4 py-3 font-medium">Label</th>
-              <th className="px-4 py-3 font-medium">Code</th>
-              <th className="w-24 px-4 py-3 font-medium">Order</th>
-              <th className="w-24 px-4 py-3 font-medium">Active</th>
-              <th className="w-32 px-4 py-3 font-medium" />
+              <th className="sticky top-0 z-10 bg-surface px-4 py-3 font-medium">Label</th>
+              <th className="sticky top-0 z-10 bg-surface px-4 py-3 font-medium">Code</th>
+              <th className="sticky top-0 z-10 w-24 bg-surface px-4 py-3 font-medium">Order</th>
+              <th className="sticky top-0 z-10 w-24 bg-surface px-4 py-3 font-medium">Active</th>
+              <th className="sticky top-0 z-10 w-32 bg-surface px-4 py-3 font-medium" />
             </tr>
           </thead>
           <tbody className="divide-y divide-edge bg-base">
@@ -962,13 +962,13 @@ function LocationsTab() {
 
       {error && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">{error}</p>}
 
-      <div className="overflow-hidden rounded-xl border border-edge">
+      <div className="max-h-[55vh] overflow-x-auto overflow-y-auto rounded-xl border border-edge">
         <table className="w-full text-left text-sm">
-          <thead className="bg-surface/80 text-[11px] uppercase tracking-wide text-muted">
+          <thead className="bg-surface text-[11px] uppercase tracking-wide text-muted">
             <tr>
-              <th className="px-3 py-2">Location path</th>
-              <th className="px-3 py-2 text-right">Assets</th>
-              <th className="px-3 py-2 text-right">Actions</th>
+              <th className="sticky top-0 z-10 bg-surface px-3 py-2">Location path</th>
+              <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">Assets</th>
+              <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-edge/60">
