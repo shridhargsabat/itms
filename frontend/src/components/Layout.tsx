@@ -156,7 +156,7 @@ export default function Layout() {
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                   collapsed && 'justify-center px-0',
                   isActive
-                    ? 'bg-elevated text-primary'
+                    ? 'bg-elevated text-primary ledgerly:bg-accent/15 ledgerly:text-accent'
                     : 'text-secondary hover:bg-elevated/60 hover:text-primary',
                 )
               }

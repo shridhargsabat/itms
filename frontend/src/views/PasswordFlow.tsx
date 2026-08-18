@@ -33,7 +33,7 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
             reset link is now in your in-app notifications (and will be emailed once SMTP is
             configured).
           </p>
-          <Link to="/login" className={`mt-6 ${'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}`}>Back to sign in</Link>
+          <Link to="/login" className={`mt-6 ${'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 ledgerly:from-accent ledgerly:to-accent-strong text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}`}>Back to sign in</Link>
         </div>
       </div>
     );
@@ -65,7 +65,7 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
               autoFocus
             />
           </label>
-          <button type="submit" disabled={mutation.isPending} className={'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}>
+          <button type="submit" disabled={mutation.isPending} className={'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 ledgerly:from-accent ledgerly:to-accent-strong text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}>
             {mutation.isPending ? 'Sending…' : 'Send reset link'}
           </button>
           {mutation.isError && (
@@ -134,7 +134,7 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
               onChange={(e) => setPw2(e.target.value)} />
           </label>
           {err && <p className="text-sm text-red-500">{err}</p>}
-          <button type="submit" disabled={mutation.isPending} className={'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}>
+          <button type="submit" disabled={mutation.isPending} className={'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 ledgerly:from-accent ledgerly:to-accent-strong text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}>
             {mutation.isPending ? 'Saving…' : 'Update password'}
           </button>
         </form>

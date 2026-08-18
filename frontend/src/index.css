@@ -4,6 +4,10 @@
    Default: follow the device (theme.ts applies .dark from prefers-color-scheme). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Ledgerly-only variant (60-30-10 color treatment): every `ledgerly:` utility
+   applies ONLY inside .ledgerly-dark, so light/dark themes stay untouched. */
+@custom-variant ledgerly (&:where(.ledgerly-dark, .ledgerly-dark *));
+
 /* Semantic theme tokens — components use bg-base/bg-surface/bg-elevated/
    text-primary/text-secondary/text-muted/border-edge/bg-input/accent so one
    palette swap themes the whole app. Dark values = the original slate design. */
@@ -52,16 +56,19 @@
   --t-accent-strong: #6366f1;
 }
 
-/* Ledgerly dark ("warm paper") — palette copied verbatim from /root/money-management/frontend/src/styles.css [data-theme='dark'] */
+/* Ledgerly dark ("warm paper") — 60-30-10 treatment: warm #141311 stays the
+   60% base; surface/elevated/edge shift to teal-tinted darks so panels form a
+   distinct cool-green CONTENT layer (the 30%) against the warm backdrop; the
+   teal accent (#2fb5a0) is the 10% brand color. */
 .ledgerly-dark {
   color-scheme: dark;
   --t-base: #141311;
-  --t-surface: #1d1b18;
-  --t-elevated: #26231f;
-  --t-elevated2: #221f1c;
-  --t-input: #1d1b18;
-  --t-edge: #2c2925;
-  --t-edge2: #44403a;
+  --t-surface: #1a211e;
+  --t-elevated: #22302b;
+  --t-elevated2: #202c28;
+  --t-input: #1a211e;
+  --t-edge: #2b3a35;
+  --t-edge2: #3f524c;
   --t-primary: #f2efe9;
   --t-secondary: #b8b2a6;
   --t-muted: #98938a;

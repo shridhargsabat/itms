@@ -61,7 +61,7 @@ export default class RouteErrorBoundary extends Component<Props, State> {
           <button
             type="button"
             onClick={this.retry}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 ledgerly:bg-accent ledgerly:hover:bg-accent-strong"
           >
             <RefreshCcw className="h-3.5 w-3.5" /> Retry
           </button>

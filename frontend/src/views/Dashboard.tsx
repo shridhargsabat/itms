@@ -446,7 +446,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-all duration-150 hover:bg-blue-500 active:scale-[0.97]"
+            className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-all duration-150 hover:bg-blue-500 ledgerly:bg-accent ledgerly:hover:bg-accent-strong active:scale-[0.97]"
           >
             <Plus className="h-4 w-4" /> New Ticket
           </button>
@@ -481,14 +481,14 @@ export default function Dashboard() {
             <p className="truncate text-[11px] font-medium uppercase tracking-wide text-secondary lg:text-xs">
               Open Tickets
             </p>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 sm:h-9 sm:w-9">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 ledgerly:bg-accent/10 ledgerly:text-accent sm:h-9 sm:w-9">
               <Ticket className="h-4 w-4 sm:h-5 sm:w-5" />
             </span>
           </div>
           {metrics.isLoading ? (
             <div className="mt-4 h-10 w-28 animate-pulse rounded bg-elevated" />
           ) : (
-            <p className="mt-2 text-3xl font-semibold text-primary" data-testid="hero-open-count">
+            <p className="mt-2 text-3xl font-semibold text-primary ledgerly:text-accent" data-testid="hero-open-count">
               <CountUp value={metrics.data?.open_tickets ?? 0} />
             </p>
           )}
@@ -527,7 +527,7 @@ export default function Dashboard() {
           {metrics.isLoading ? (
             <div className="mt-4 h-10 w-24 animate-pulse rounded bg-elevated" />
           ) : (
-            <p className="mt-2 text-3xl font-semibold text-primary" data-testid="asset-total-count">
+            <p className="mt-2 text-3xl font-semibold text-primary ledgerly:text-accent" data-testid="asset-total-count">
               <CountUp value={metrics.data?.asset_count ?? 0} />
             </p>
           )}
@@ -570,7 +570,7 @@ export default function Dashboard() {
               <div className="mt-3 h-8 w-16 animate-pulse rounded bg-elevated" />
             ) : (
               <div className="mt-2 flex items-baseline justify-between gap-2">
-                <p className="text-3xl font-semibold text-primary">
+                <p className="text-3xl font-semibold text-primary ledgerly:text-accent">
                   <CountUp value={metrics.data?.[key] ?? 0} />
                 </p>
                 <ChevronRight className="h-4 w-4 shrink-0 translate-x-[-4px] text-muted opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:text-secondary group-hover:opacity-100" />

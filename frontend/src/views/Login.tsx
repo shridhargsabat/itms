@@ -72,12 +72,12 @@ export default function Login() {
             <div className="mb-7 flex flex-col items-center gap-3">
               <div className="relative">
                 <span className="animate-ping-slow absolute inset-0 rounded-2xl bg-accent/30" />
-                <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/30">
+                <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/30 ledgerly:from-accent ledgerly:to-accent-strong ledgerly:shadow-accent/30">
                   <Network className="h-7 w-7 text-white" />
                 </span>
               </div>
               <div className="text-center">
-                <h1 className="animate-shimmer bg-gradient-to-r from-indigo-300 via-white to-indigo-300 bg-[length:200%_auto] bg-clip-text text-2xl font-bold tracking-tight text-transparent">
+                <h1 className="animate-shimmer bg-gradient-to-r from-indigo-300 via-white to-indigo-300 bg-[length:200%_auto] bg-clip-text text-2xl font-bold tracking-tight text-transparent ledgerly:from-teal-300 ledgerly:via-white ledgerly:to-teal-300">
                   ITMS
                 </h1>
                 <p className="mt-1 text-xs text-secondary">IT Management System · Prototype</p>
@@ -104,7 +104,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="w-full rounded-lg border border-edge2 bg-base/70 px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-edge2 bg-base/70 px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ledgerly:focus:border-accent ledgerly:focus:ring-accent"
                 />
               </div>
               <div>
@@ -118,13 +118,13 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-lg border border-edge2 bg-base/70 px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-edge2 bg-base/70 px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ledgerly:focus:border-accent ledgerly:focus:ring-accent"
                 />
               </div>
               <button
                 type="submit"
                 disabled={mutation.isPending}
-                className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60"
+                className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 ledgerly:from-accent ledgerly:to-accent-strong text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60"
               >
                 {mutation.isPending ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />

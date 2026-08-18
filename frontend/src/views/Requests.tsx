@@ -256,7 +256,7 @@ function RequestCard({
           {isAgent && r.status === 'APPROVED' && (
             <button
               onClick={() => onAction('progress')}
-              className="inline-flex items-center gap-1 rounded-lg bg-blue-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:opacity-90"
+              className="inline-flex items-center gap-1 rounded-lg bg-blue-500 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:opacity-90 ledgerly:bg-accent"
             >
               <Clock className="h-3.5 w-3.5" /> Start work
             </button>

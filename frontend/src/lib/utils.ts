@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const inputCls =
-  'w-full rounded-lg border border-edge2 bg-input px-3 py-2 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500';
+  'w-full rounded-lg border border-edge2 bg-input px-3 py-2 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ledgerly:focus:border-accent ledgerly:focus:ring-accent';
 
 export const labelCls = 'mb-1.5 block text-xs font-medium uppercase tracking-wide text-secondary';
 

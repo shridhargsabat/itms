@@ -476,7 +476,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
               <button
                 type="submit"
                 disabled={assign.isPending}
-                className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+                className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 ledgerly:bg-accent ledgerly:hover:bg-accent-strong disabled:opacity-60"
               >
                 {assign.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : asset.assigned_to_user_id ? 'Reassign' : 'Assign'}
               </button>

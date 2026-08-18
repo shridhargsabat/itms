@@ -285,7 +285,7 @@ function UsersTab() {
         <button
           type="button"
           onClick={openCreate}
-          className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+          className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 ledgerly:bg-accent px-3.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
         >
           <Plus className="h-4 w-4" /> New User
         </button>
@@ -389,7 +389,7 @@ function UsersTab() {
               <button
                 type="submit"
                 disabled={mutation.isPending}
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 ledgerly:bg-accent px-4 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-60"
               >
                 {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 {editing ? 'Save changes' : 'Create user'}
@@ -559,7 +559,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
           type="button"
           disabled={!newRow.label.trim() || !newRow.code.trim() || createMut.isPending}
           onClick={() => createMut.mutate()}
-          className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
+          className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 ledgerly:bg-accent px-3.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
         >
           {createMut.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           Add option
@@ -630,7 +630,7 @@ function TemplatesTab() {
             type="button"
             disabled={!name.trim() || create.isPending || save.isPending}
             onClick={() => (editing ? save.mutate() : create.mutate())}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 ledgerly:from-accent ledgerly:to-accent-strong px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" /> {editing ? 'Save changes' : 'Create template'}
           </button>

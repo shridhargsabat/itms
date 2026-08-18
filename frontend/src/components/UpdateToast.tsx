@@ -10,7 +10,7 @@ export default function UpdateToast() {
       <span className="text-sm text-primary">A new version is available.</span>
       <button
         onClick={reload}
-        className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-400"
+        className="flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-400 ledgerly:bg-accent ledgerly:hover:bg-accent-strong"
       >
         <RefreshCw className="h-3.5 w-3.5" />
         Reload
