@@ -45,26 +45,34 @@ export const THEMES: ThemeMeta[] = [
 ];
 
 /**
- * Live theme preview: a miniature dashboard rendered INSIDE a wrapper that
- * carries the theme's token classes (`.dark`, `.ledgerly-dark`). Because every
- * ITMS utility resolves to `var(--t-*)`, the tokens cascade into the mock —
- * so the preview shows the REAL palette, not hardcoded swatches.
+ * Live theme preview: a miniature dashboard rendered inside a wrapper that
+ * carries the theme's token classes (`.dark`, `.ledgerly-dark`). Colors are
+ * applied via inline `var(--t-*)` styles — they resolve live against the
+ * WRAPPER's tokens, so the preview shows the REAL palette. (Tailwind's
+ * `bg-surface` &co. go through `--color-*`, which Tailwind v4 resolves at the
+ * html root against the CURRENT theme, so token utilities can't be used here.)
  */
 function ThemePreview({ theme }: { theme: ThemeMeta }) {
   return (
-    <div className={cn('rounded-lg border border-edge/60 p-2.5', theme.wrapperClass)}>
-      <div className="rounded-md border border-edge bg-surface p-2">
+    <div
+      className={cn('rounded-lg border p-2.5', theme.wrapperClass)}
+      style={{ borderColor: 'var(--t-edge)', backgroundColor: 'var(--t-base)' }}
+    >
+      <div className="rounded-md border p-2" style={{ borderColor: 'var(--t-edge)', backgroundColor: 'var(--t-surface)' }}>
         <div className="flex items-center justify-between">
-          <div className="h-1.5 w-12 rounded-full bg-elevated2" />
-          <div className="grid h-4 w-4 place-items-center rounded bg-accent text-white">
+          <div className="h-1.5 w-12 rounded-full" style={{ backgroundColor: 'var(--t-elevated2)' }} />
+          <div
+            className="grid h-4 w-4 place-items-center rounded"
+            style={{ backgroundColor: 'var(--t-accent)', color: '#ffffff' }}
+          >
             <Check className="h-2.5 w-2.5" strokeWidth={3} />
           </div>
         </div>
-        <div className="mt-2 h-2 w-3/4 rounded-full bg-elevated2" />
-        <div className="mt-1 h-2 w-1/2 rounded-full bg-elevated2" />
+        <div className="mt-2 h-2 w-3/4 rounded-full" style={{ backgroundColor: 'var(--t-elevated2)' }} />
+        <div className="mt-1 h-2 w-1/2 rounded-full" style={{ backgroundColor: 'var(--t-elevated2)' }} />
         <div className="mt-2.5 flex items-center gap-1.5">
-          <div className="h-5 flex-1 rounded bg-accent" />
-          <div className="h-5 flex-1 rounded border border-edge2" />
+          <div className="h-5 flex-1 rounded" style={{ backgroundColor: 'var(--t-accent)' }} />
+          <div className="h-5 flex-1 rounded border" style={{ borderColor: 'var(--t-edge2)', backgroundColor: 'var(--t-surface)' }} />
         </div>
       </div>
     </div>
