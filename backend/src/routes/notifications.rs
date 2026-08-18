@@ -97,24 +97,31 @@ async fn list_notifications(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
     Query(q): Query<NotificationQuery>,
-) -> Result<Json<Vec<Notification>>, AppError> {
-    let limit = q.limit.unwrap_or(50).clamp(1, 100);
-    let offset = q.offset.unwrap_or(0).max(0);
+) -> Result<impl axum::response::IntoResponse, AppError> {
+    let mut where_sql = String::from(" WHERE n.user_id = $1");
+    if q.unread == Some(true) {
+        where_sql.push_str(" AND n.read_at IS NULL");
+    }
+    let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM notifications n{where_sql}"))
+        .bind(actor_id)
+        .fetch_one(&state.pool)
+        .await?;
+
     let mut sql = String::from(
         "SELECT n.id, n.user_id, n.kind, n.title, n.body, n.ref_type, n.ref_id, n.read_at, n.created_at \
-         FROM notifications n WHERE n.user_id = $1",
+         FROM notifications n",
     );
-    if q.unread == Some(true) {
-        sql.push_str(" AND n.read_at IS NULL");
-    }
+    sql.push_str(&where_sql);
     sql.push_str(" ORDER BY n.created_at DESC LIMIT $2 OFFSET $3");
+    let (limit, offset) = crate::pagination::page_params(q.limit, q.offset);
+    let limit = limit.unwrap_or(50);
     let rows = sqlx::query_as::<_, Notification>(&sql)
         .bind(actor_id)
         .bind(limit)
         .bind(offset)
         .fetch_all(&state.pool)
         .await?;
-    Ok(Json(rows))
+    Ok((crate::pagination::total_header(total), Json(rows)))
 }
 
 async fn unread_count(

@@ -58,19 +58,19 @@ fn require_staff(role: &str) -> Result<(), AppError> {
 }
 
 // ---------------------------------------------------------------------------
-// GET /kb/articles?ticket_type=&search=&limit=
+// GET /kb/articles?ticket_type=&search=&limit=&offset=
 #[derive(Deserialize)]
 pub struct ArticleListQuery {
     pub ticket_type: Option<String>,
     pub search: Option<String>,
     pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 pub async fn list_articles(
     State(state): State<AppState>,
     Query(q): Query<ArticleListQuery>,
-) -> Result<Json<Vec<KbArticle>>, AppError> {
-    let mut sql = String::from(ARTICLE_SELECT);
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let mut conds: Vec<String> = vec![];
     if let Some(tt) = q.ticket_type.as_deref().filter(|s| !s.is_empty() && *s != "ALL") {
         conds.push(format!("a.ticket_type = '{}'", tt.replace('\'', "''")));
@@ -81,17 +81,28 @@ pub async fn list_articles(
             "(a.title ILIKE '%{esc}%' OR a.body ILIKE '%{esc}%')"
         ));
     }
-    if !conds.is_empty() {
-        sql.push_str(" WHERE ");
-        sql.push_str(&conds.join(" AND "));
-    }
-    sql.push_str(" ORDER BY a.updated_at DESC LIMIT ");
-    sql.push_str(&q.limit.unwrap_or(50).clamp(1, 200).to_string());
+    let where_sql = if conds.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", conds.join(" AND "))
+    };
+
+    // Count query mirrors the same WHERE (joins are 1:1, COUNT(*) is exact).
+    let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM kb_articles a{where_sql}"))
+        .fetch_one(&state.pool)
+        .await?;
+
+    let mut sql = String::from(ARTICLE_SELECT);
+    sql.push_str(&where_sql);
+    sql.push_str(" ORDER BY a.updated_at DESC");
+    let (limit, offset) = crate::pagination::page_params(q.limit, q.offset);
+    let limit = limit.unwrap_or(50);
+    sql.push_str(&format!(" LIMIT {limit} OFFSET {offset}"));
 
     let rows = sqlx::query_as::<_, KbArticle>(&sql)
         .fetch_all(&state.pool)
         .await?;
-    Ok(Json(rows))
+    Ok((crate::pagination::total_header(total), Json(rows)))
 }
 
 // GET /kb/articles/{id}

@@ -48,6 +48,8 @@ pub fn router() -> Router<AppState> {
 }
 
 /// GET /api/v1/masters -> grouped map of all families:
+/// Intentionally unpaginated: small master data (lookup options), fetched
+/// whole for dropdowns and filters.
 /// `{ "department": [...], "asset_category": [...], ... }`
 async fn list_masters(State(state): State<AppState>) -> Result<Json<Map<String, serde_json::Value>>, AppError> {
     let rows = sqlx::query_as::<_, LookupOption>(

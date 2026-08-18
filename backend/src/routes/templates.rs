@@ -41,6 +41,8 @@ pub struct TemplateListQuery {
     pub active_only: Option<String>,
 }
 
+/// GET /templates — all ticket templates.
+/// Intentionally unpaginated: small master data, fetched whole.
 pub async fn list_templates(
     State(state): State<AppState>,
     Query(q): Query<TemplateListQuery>,

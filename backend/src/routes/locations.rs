@@ -33,6 +33,7 @@ pub struct LocationListParams {
 }
 
 /// GET /locations — flat list with per-location asset counts.
+/// Intentionally unpaginated: small master data, fetched whole for dropdowns.
 pub async fn list_locations(
     State(state): State<super::AppState>,
     Query(params): Query<LocationListParams>,

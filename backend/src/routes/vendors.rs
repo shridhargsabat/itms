@@ -87,7 +87,9 @@ fn validate(v: &VendorInput) -> Result<(), AppError> {
     Ok(())
 }
 
-/// GET /vendors — all vendors (any authed user; asset detail needs the name)
+/// GET /vendors — all vendors (any authed user; asset detail needs the name).
+/// Intentionally unpaginated: small master data (<100 rows), fetched whole
+/// for dropdowns and asset-detail lookups.
 pub async fn list_vendors(
     State(state): State<AppState>,
     _: (),
@@ -195,31 +197,47 @@ pub struct ClaimListParams {
     vendor_id: Option<Uuid>,
     asset_id: Option<Uuid>,
     limit: Option<i64>,
+    offset: Option<i64>,
 }
 
 /// GET /claims?vendor_id=&asset_id= — any authed user
 pub async fn list_claims(
     State(state): State<AppState>,
     Query(params): Query<ClaimListParams>,
-) -> Result<Json<Vec<Claim>>, AppError> {
-    let limit = params.limit.unwrap_or(50).clamp(1, 200);
+) -> Result<impl axum::response::IntoResponse, AppError> {
+    let mut cqb = QueryBuilder::new(
+        "SELECT COUNT(*) FROM vendor_claims c \
+         LEFT JOIN assets a ON a.id = c.asset_id \
+         LEFT JOIN tickets t ON t.id = c.ticket_id LEFT JOIN vendors v ON v.id = c.vendor_id",
+    );
     let mut qb = QueryBuilder::new(CLAIM_SELECT);
     let mut any = false;
     if let Some(v) = params.vendor_id {
         any = true;
         qb.push(" WHERE c.vendor_id = ").push_bind(v);
+        cqb.push(" WHERE c.vendor_id = ").push_bind(v);
     }
     if let Some(a) = params.asset_id {
         if any {
             qb.push(" AND ");
+            cqb.push(" AND ");
         } else {
             qb.push(" WHERE ");
+            cqb.push(" WHERE ");
         }
         qb.push("c.asset_id = ").push_bind(a);
+        cqb.push("c.asset_id = ").push_bind(a);
     }
+    let total: i64 = cqb.build_query_scalar().fetch_one(&state.pool).await?;
+
+    let (limit, offset) = crate::pagination::page_params(params.limit, params.offset);
+    let limit = limit.unwrap_or(50);
     qb.push(" ORDER BY c.created_at DESC LIMIT ").push_bind(limit);
+    if offset > 0 {
+        qb.push(" OFFSET ").push_bind(offset);
+    }
     let rows = qb.build_query_as::<Claim>().fetch_all(&state.pool).await?;
-    Ok(Json(rows))
+    Ok((crate::pagination::total_header(total), Json(rows)))
 }
 
 #[derive(Deserialize)]
