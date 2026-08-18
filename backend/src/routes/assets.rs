@@ -216,20 +216,16 @@ async fn list_assets(
     } else {
         qb.push(" DESC");
     }
-    if let Some(limit) = params.limit {
-        qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
-        if let Some(offset) = params.offset {
-            qb.push(" OFFSET ").push_bind(offset.max(0));
-        }
-    }
+    let (limit, offset) = crate::pagination::page_params(params.limit, params.offset);
+    crate::pagination::push_pagination(&mut qb, limit, offset);
 
     let assets = qb.build_query_as::<Asset>().fetch_all(&state.pool).await?;
-    let total: i64 = if params.limit.is_some() {
+    let total: i64 = if limit.is_some() {
         cqb.build_query_scalar().fetch_one(&state.pool).await?
     } else {
         assets.len() as i64
     };
-    Ok(([("x-total-count", total.to_string())], Json(assets)))
+    Ok((crate::pagination::total_header(total), Json(assets)))
 }
 
 /// POST /api/v1/assets → 201 with auto-generated AST-XXXX tag + audit row.

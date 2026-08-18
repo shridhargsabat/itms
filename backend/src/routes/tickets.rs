@@ -116,20 +116,16 @@ async fn list_tickets(
         qb.push(" DESC");
     }
     qb.push(", t.created_at DESC");
-    if let Some(limit) = params.limit {
-        qb.push(" LIMIT ").push_bind(limit.clamp(1, 1000));
-        if let Some(offset) = params.offset {
-            qb.push(" OFFSET ").push_bind(offset.max(0));
-        }
-    }
+    let (limit, offset) = crate::pagination::page_params(params.limit, params.offset);
+    crate::pagination::push_pagination(&mut qb, limit, offset);
 
     let tickets = qb.build_query_as::<Ticket>().fetch_all(&state.pool).await?;
-    let total: i64 = if params.limit.is_some() {
+    let total: i64 = if limit.is_some() {
         cqb.build_query_scalar().fetch_one(&state.pool).await?
     } else {
         tickets.len() as i64
     };
-    Ok(([("x-total-count", total.to_string())], Json(tickets)))
+    Ok((crate::pagination::total_header(total), Json(tickets)))
 }
 
 /// POST /api/v1/tickets → 201 with auto-generated INC-XXXX tag + audit row.

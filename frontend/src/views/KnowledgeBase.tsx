@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +9,8 @@ import {
 } from '@/api/client';
 import { getCachedUser } from '@/api/client';
 import { cn, formatDate, inputCls } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
+import PaginationFooter from '@/components/PaginationFooter';
 import type { KbArticle } from '@/api/types';
 
 // P1-7 (issue #48): lite knowledge base — articles by ticket type + canned
@@ -30,10 +33,17 @@ export default function KnowledgeBase() {
   const [params] = useSearchParams();
   const openId = params.get('open');
 
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
+
   const articles = useQuery({
-    queryKey: ['kb-articles', typeFilter, search],
-    queryFn: () => listKbArticles({ ticket_type: typeFilter, search: search || undefined, limit: 100 }),
+    queryKey: ['kb-articles', typeFilter, search, page, pageSize],
+    queryFn: () =>
+      listKbArticles({ ticket_type: typeFilter, search: search || undefined, limit: pageSize, offset }),
   });
+  // Any type filter or search change resets to page 1.
+  useEffect(() => {
+    reset();
+  }, [typeFilter, search]);
   const canned = useQuery({ queryKey: ['kb-canned'], queryFn: () => listCanned() });
 
   const delArticle = useMutation({
@@ -120,12 +130,12 @@ export default function KnowledgeBase() {
         {tab === 'articles' ? (
           <div className="space-y-2">
             {articles.isLoading && <p className="text-sm text-muted">Loading…</p>}
-            {articles.data?.length === 0 && (
+            {!articles.isLoading && (articles.data?.items.length ?? 0) === 0 && (
               <p className="rounded-xl border border-dashed border-edge p-8 text-center text-sm text-muted">
                 No articles yet{isStaff ? ' — capture your first resolved ticket via “Convert to article”' : ''}.
               </p>
             )}
-            {articles.data?.map((a) => (
+            {articles.data?.items.map((a) => (
               <div key={a.id} className={cn(
                 'rounded-xl border bg-surface/60 p-4',
                 a.id === openId ? 'border-indigo-500/60 ring-1 ring-indigo-500/40' : 'border-edge',
@@ -162,6 +172,14 @@ export default function KnowledgeBase() {
                 </div>
               </div>
             ))}
+            <PaginationFooter
+              page={page}
+              pageSize={pageSize}
+              total={articles.data?.total}
+              rowsLength={articles.data?.items.length ?? 0}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         ) : (
           <div className="space-y-2">

@@ -42,6 +42,7 @@ import Select from '@/components/Select';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
 import SlaChip, { SlaBar } from '@/components/SlaChip';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
 
 const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
@@ -178,8 +179,7 @@ export default function Tickets() {
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
 
   const status = params.get('status') ?? '';
   const priority = params.get('priority') ?? '';
@@ -199,7 +199,7 @@ export default function Tickets() {
     queryKey: ['tickets', filters, view === 'table' ? { page, pageSize } : 'all'],
     queryFn: () =>
       view === 'table'
-        ? listTickets({ ...filters, limit: pageSize, offset: (page - 1) * pageSize })
+        ? listTickets({ ...filters, limit: pageSize, offset })
         : listTickets(filters),
   });
   const rows = data?.items ?? [];
@@ -207,7 +207,7 @@ export default function Tickets() {
 
   // any filter change or view switch resets to page 1
   useEffect(() => {
-    setPage(1);
+    reset();
   }, [status, priority, type, view, sort, order]);
 
   const onSortChange = (s: { key: string; dir: 'asc' | 'desc' } | null) => {
@@ -385,10 +385,7 @@ export default function Tickets() {
               page={page}
               pageSize={pageSize}
               onPageChange={setPage}
-              onPageSizeChange={(s) => {
-                setPageSize(s);
-                setPage(1);
-              }}
+              onPageSizeChange={setPageSize}
               sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
               onSortChange={onSortChange}
               loading={isLoading}

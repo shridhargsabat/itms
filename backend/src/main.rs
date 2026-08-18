@@ -2,6 +2,7 @@ mod audit;
 mod auth;
 mod db;
 mod models;
+mod pagination;
 mod routes;
 
 use axum::http::{HeaderValue, Method};

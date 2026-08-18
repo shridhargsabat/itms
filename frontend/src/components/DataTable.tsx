@@ -1,26 +1,10 @@
 import { Fragment, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Select from '@/components/Select';
+import PaginationFooter from '@/components/PaginationFooter';
+import { TABLE_SPEC } from '@/components/tableSpec';
 import ScrollX from '@/components/ScrollX';
-
-/** Canonical table geometry — the ONE spec every ITMS table renders with.
- *  Header text-xs uppercase on bg-surface, cells py-3/px-4 text-sm, shell
- *  rounded-xl border, min-w-[640px] + ScrollX for consistent mobile behavior. */
-export const TABLE_SPEC = {
-  shell: 'rounded-xl border border-edge',
-  emptyShell: 'rounded-xl border border-dashed border-edge p-10 text-center text-sm text-muted',
-  head: 'bg-surface text-xs uppercase tracking-wide text-secondary',
-  th: 'px-4 py-3 font-medium',
-  td: 'px-4 py-3',
-  table: 'w-full text-left text-sm',
-  tbody: 'divide-y divide-edge bg-base',
-  checkboxCell: 'px-3 py-3',
-  footer:
-    'sticky bottom-[3.5rem] z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-edge bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur lg:bottom-0',
-  minWidth: 'min-w-[640px]',
-} as const;
 
 export interface Column<T> {
   key: string;
@@ -190,56 +174,15 @@ export default function DataTable<T extends { id: string }>({
   }
 
   const paginated = onPageChange !== undefined;
-  const pages = total !== undefined && total > 0 ? Math.ceil(total / pageSize) : 0;
-  // Clamp `from` to total so a stale page (data shrank while sitting on a
-  // page past the last one) never renders a range like "Showing 81–45 of 45".
-  const from = total !== undefined && total > 0 ? Math.min((page - 1) * pageSize + 1, total) : 0;
-  const to = total !== undefined ? Math.min(page * pageSize, total) : rows.length;
-  const navBtn =
-    'flex h-8 w-8 items-center justify-center rounded-lg border border-edge2 text-secondary transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
-
   const footer = paginated && (
-    <div className={TABLE_SPEC.footer}>
-      <span>
-        {total !== undefined && total > 0 && rows.length > 0
-          ? `Showing ${from}–${to} of ${total}`
-          : `${rows.length} row${rows.length === 1 ? '' : 's'}`}
-      </span>
-      <div className="flex items-center gap-2">
-        <Select
-          className="w-auto"
-          triggerClassName="h-8 px-2.5 py-0 text-xs"
-          value={String(pageSize)}
-          onChange={(v) => onPageSizeChange?.(Number(v))}
-          options={[
-            { value: '10', label: '10 / page' },
-            { value: '20', label: '20 / page' },
-            { value: '50', label: '50 / page' },
-          ]}
-        />
-        <button
-          type="button"
-          aria-label="Previous page"
-          className={navBtn}
-          disabled={page <= 1}
-          onClick={() => onPageChange?.(page - 1)}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span className="min-w-[76px] text-center tabular-nums">
-          {pages > 0 ? `Page ${page} of ${pages}` : ''}
-        </span>
-        <button
-          type="button"
-          aria-label="Next page"
-          className={navBtn}
-          disabled={pages === 0 || page >= pages}
-          onClick={() => onPageChange?.(page + 1)}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
+    <PaginationFooter
+      page={page}
+      pageSize={pageSize}
+      total={total}
+      rowsLength={rows.length}
+      onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
+    />
   );
 
   if (rows.length === 0) {

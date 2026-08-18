@@ -49,32 +49,40 @@ pub struct LicenseQuery {
 async fn list_licenses(
     State(state): State<AppState>,
     Query(q): Query<LicenseQuery>,
-) -> Result<Json<Vec<License>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let pool = &state.pool;
-    let limit = q.limit.unwrap_or(100).clamp(1, 500);
-    let offset = q.offset.unwrap_or(0).max(0);
 
-    let mut sql = String::from(LICENSE_SELECT);
-    sql.push_str(" WHERE 1 = 1");
+    // WHERE fragment is shared by the data query and the count query so the
+    // X-Total-Count header always matches the filtered result set.
+    let mut where_sql = String::from(" WHERE 1 = 1");
     if q.include_inactive != Some(true) {
-        sql.push_str(" AND l.active = TRUE");
+        where_sql.push_str(" AND l.active = TRUE");
     }
     if let Some(s) = q.search.as_deref() {
         let pat = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
-        sql.push_str(&format!(
+        where_sql.push_str(&format!(
             " AND (l.name ILIKE '%{pat}%' ESCAPE '\\' OR COALESCE(l.vendor, '') ILIKE '%{pat}%' ESCAPE '\\')"
         ));
     }
     match q.scope.as_deref() {
-        Some("expired") => sql.push_str(" AND l.expiry_date IS NOT NULL AND l.expiry_date < CURRENT_DATE"),
-        Some("expiring") => sql.push_str(
+        Some("expired") => where_sql.push_str(" AND l.expiry_date IS NOT NULL AND l.expiry_date < CURRENT_DATE"),
+        Some("expiring") => where_sql.push_str(
             " AND l.expiry_date IS NOT NULL AND l.expiry_date >= CURRENT_DATE \
                AND l.expiry_date <= CURRENT_DATE + 90",
         ),
         Some("all") | None => {}
         Some(_) => return Err(AppError::new(StatusCode::BAD_REQUEST, "scope must be all, expired or expiring")),
     }
+
+    let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM licenses l{where_sql}"))
+        .fetch_one(pool)
+        .await?;
+
+    let mut sql = String::from(LICENSE_SELECT);
+    sql.push_str(&where_sql);
     sql.push_str(" ORDER BY l.expiry_date ASC NULLS LAST, l.name");
+    let (limit, offset) = crate::pagination::page_params(q.limit, q.offset);
+    let limit = limit.unwrap_or(100);
     sql.push_str(&format!(" LIMIT {limit} OFFSET {offset}"));
 
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
@@ -82,7 +90,7 @@ async fn list_licenses(
         .iter()
         .map(|r| sqlx::FromRow::from_row(r).unwrap())
         .collect::<Vec<License>>();
-    Ok(Json(licenses))
+    Ok((crate::pagination::total_header(total), Json(licenses)))
 }
 
 #[derive(Deserialize)]

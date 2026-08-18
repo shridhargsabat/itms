@@ -63,14 +63,37 @@ const EVENT_SELECT: &str = "SELECT id, event_type, person_name, person_email, st
 async fn list_events(
     State(state): State<AppState>,
     Query(q): Query<EventQuery>,
-) -> Result<Json<Vec<OnboardingEvent>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let pool = &state.pool;
-    let limit = q.limit.unwrap_or(100).clamp(1, 500);
-    let offset = q.offset.unwrap_or(0).max(0);
 
     // Interpolated values are whitelist-validated strings, numbers, or an
     // escaped ILIKE pattern — no raw user text reaches SQL text (P0-4 lesson:
     // Box<dyn Encode> fails sqlx bind; push_bind inlines dangerously).
+    let mut where_sql = String::from(" WHERE 1 = 1");
+    if let Some(ty) = q.event_type.as_deref() {
+        if !matches!(ty, "ONBOARDING" | "OFFBOARDING") {
+            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "event_type must be ONBOARDING or OFFBOARDING"));
+        }
+        where_sql.push_str(&format!(" AND e.event_type = '{ty}'"));
+    }
+    if let Some(st) = q.status.as_deref() {
+        if !matches!(st, "OPEN" | "CLOSED") {
+            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "status must be OPEN or CLOSED"));
+        }
+        where_sql.push_str(&format!(" AND e.status = '{st}'"));
+    }
+    if let Some(s) = q.search.as_deref() {
+        let pat = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        where_sql.push_str(&format!(
+            " AND (e.person_name ILIKE '%{pat}%' ESCAPE '\\' OR e.person_email ILIKE '%{pat}%' ESCAPE '\\')"
+        ));
+    }
+
+    // Count query shares the WHERE (no join needed for the event rows).
+    let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM onboarding_events e{where_sql}"))
+        .fetch_one(pool)
+        .await?;
+
     let mut sql = String::from(
         "SELECT e.id, e.event_type, e.person_name, e.person_email, e.start_date, e.notes, \
                 e.status, e.created_by, e.created_at, e.updated_at, \
@@ -79,28 +102,12 @@ async fn list_events(
                 COUNT(t.id) FILTER (WHERE t.status = 'PENDING' AND t.due_date IS NOT NULL \
                     AND t.due_date < CURRENT_DATE)::bigint AS overdue_tasks \
          FROM onboarding_events e \
-         LEFT JOIN onboarding_tasks t ON t.event_id = e.id \
-         WHERE 1 = 1",
+         LEFT JOIN onboarding_tasks t ON t.event_id = e.id",
     );
-    if let Some(ty) = q.event_type.as_deref() {
-        if !matches!(ty, "ONBOARDING" | "OFFBOARDING") {
-            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "event_type must be ONBOARDING or OFFBOARDING"));
-        }
-        sql.push_str(&format!(" AND e.event_type = '{ty}'"));
-    }
-    if let Some(st) = q.status.as_deref() {
-        if !matches!(st, "OPEN" | "CLOSED") {
-            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "status must be OPEN or CLOSED"));
-        }
-        sql.push_str(&format!(" AND e.status = '{st}'"));
-    }
-    if let Some(s) = q.search.as_deref() {
-        let pat = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
-        sql.push_str(&format!(
-            " AND (e.person_name ILIKE '%{pat}%' ESCAPE '\\' OR e.person_email ILIKE '%{pat}%' ESCAPE '\\')"
-        ));
-    }
+    sql.push_str(&where_sql);
     sql.push_str(" GROUP BY e.id ORDER BY e.created_at DESC");
+    let (limit, offset) = crate::pagination::page_params(q.limit, q.offset);
+    let limit = limit.unwrap_or(100);
     sql.push_str(&format!(" LIMIT {limit} OFFSET {offset}"));
 
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
@@ -114,7 +121,7 @@ async fn list_events(
             e
         })
         .collect::<Vec<_>>();
-    Ok(Json(events))
+    Ok((crate::pagination::total_header(total), Json(events)))
 }
 
 async fn get_event(

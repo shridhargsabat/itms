@@ -183,10 +183,8 @@ async fn list_requests(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
     Query(q): Query<RequestQuery>,
-) -> Result<Json<Vec<ServiceRequest>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let pool = &state.pool;
-    let limit = q.limit.unwrap_or(100).clamp(1, 500);
-    let offset = q.offset.unwrap_or(0).max(0);
     let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
         .bind(actor_id)
         .fetch_one(pool)
@@ -194,45 +192,60 @@ async fn list_requests(
 
     // Non-agents see only their own requests unless they explicitly ask for
     // pending approvals (approvers = ADMIN/AGENT can see the queue).
-    let mut sql = String::from(REQUEST_SELECT);
-    sql.push_str(" WHERE 1 = 1");
+    let mut where_sql = String::from(" WHERE 1 = 1");
     let is_agent = role == "ADMIN" || role == "AGENT";
     let show_all = is_agent && q.mine != Some(true) && q.pending != Some(true);
     if !show_all && q.pending != Some(true) {
-        sql.push_str(&format!(" AND r.requester_id = '{actor_id}'"));
+        where_sql.push_str(&format!(" AND r.requester_id = '{actor_id}'"));
     }
     if q.mine == Some(true) {
-        sql.push_str(&format!(" AND r.requester_id = '{actor_id}'"));
+        where_sql.push_str(&format!(" AND r.requester_id = '{actor_id}'"));
     }
     if let Some(st) = q.status.as_deref() {
         if !matches!(st, "SUBMITTED" | "APPROVED" | "REJECTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED") {
             return Err(AppError::new(StatusCode::BAD_REQUEST, "invalid status"));
         }
-        sql.push_str(&format!(" AND r.status = '{st}'"));
+        where_sql.push_str(&format!(" AND r.status = '{st}'"));
     }
     if q.pending == Some(true) {
         // approval queue is agent-facing; non-agents get an empty list
         if !is_agent {
-            return Ok(Json(vec![]));
+            return Ok((crate::pagination::total_header(0), Json(vec![])));
         }
         // SUBMITTED on approval-required catalog items
-        sql.push_str(" AND r.status = 'SUBMITTED' AND c.approval_required = TRUE");
+        where_sql.push_str(" AND r.status = 'SUBMITTED' AND c.approval_required = TRUE");
     }
     if let Some(a) = q.assignee.as_deref() {
         match a {
-            "me" => sql.push_str(&format!(" AND r.assignee_id = '{actor_id}'")),
-            "unassigned" => sql.push_str(" AND r.assignee_id IS NULL"),
-            _ => sql.push_str(&format!(" AND r.assignee_id = '{a}'")),
+            "me" => where_sql.push_str(&format!(" AND r.assignee_id = '{actor_id}'")),
+            "unassigned" => where_sql.push_str(" AND r.assignee_id IS NULL"),
+            _ => where_sql.push_str(&format!(" AND r.assignee_id = '{a}'")),
         }
     }
     if let Some(s) = q.search.as_deref() {
         let pat = s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
-        sql.push_str(&format!(
+        where_sql.push_str(&format!(
             " AND (r.request_number ILIKE '%{pat}%' ESCAPE '\\' OR r.subject ILIKE '%{pat}%' ESCAPE '\\' \
                  OR u.name ILIKE '%{pat}%' ESCAPE '\\' OR c.name ILIKE '%{pat}%' ESCAPE '\\')"
         ));
     }
+
+    // Count query mirrors the data query's joins + WHERE (u/a/c are 1:1 so
+    // COUNT(*) is exact).
+    let total: i64 = sqlx::query_scalar(&format!(
+        "SELECT COUNT(*) FROM service_requests r \
+         JOIN users u ON u.id = r.requester_id \
+         LEFT JOIN users a ON a.id = r.assignee_id \
+         JOIN request_catalog_items c ON c.id = r.catalog_item_id{where_sql}"
+    ))
+    .fetch_one(pool)
+    .await?;
+
+    let mut sql = String::from(REQUEST_SELECT);
+    sql.push_str(&where_sql);
     sql.push_str(" ORDER BY r.created_at DESC");
+    let (limit, offset) = crate::pagination::page_params(q.limit, q.offset);
+    let limit = limit.unwrap_or(100);
     sql.push_str(&format!(" LIMIT {limit} OFFSET {offset}"));
 
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
@@ -240,7 +253,7 @@ async fn list_requests(
         .iter()
         .map(|r| sqlx::FromRow::from_row(r).unwrap())
         .collect::<Vec<ServiceRequest>>();
-    Ok(Json(requests))
+    Ok((crate::pagination::total_header(total), Json(requests)))
 }
 
 async fn get_request(

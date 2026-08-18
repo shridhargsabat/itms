@@ -101,6 +101,9 @@ export default function CMDB() {
             </div>
           )}
           <div className="max-h-[70vh] overflow-y-auto p-1">
+            {/* CMDB carve-out: the CI table lives in a narrow 300px sidebar and
+                slices the in-memory topology graph (unpaginated by design —
+                the graph is loaded whole). */}
             <DataTable<TopologyNode>
               columns={ciColumns}
               rows={allNodes.slice((ciPage - 1) * ciPageSize, ciPage * ciPageSize)}

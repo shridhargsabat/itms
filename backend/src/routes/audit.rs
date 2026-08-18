@@ -40,8 +40,9 @@ async fn audit_log(
     State(state): State<AppState>,
     Query(params): Query<AuditLogParams>,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
-    let limit = params.limit.unwrap_or(20).clamp(1, 200);
-    let offset = params.offset.unwrap_or(0).max(0);
+    // Always paginated (default 20) — audit logs grow without bound.
+    let (limit, offset) = crate::pagination::page_params(params.limit, params.offset);
+    let limit = limit.unwrap_or(20);
 
     // No filter branches, so a plain COUNT mirrors the data query exactly.
     let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_logs")
@@ -71,5 +72,5 @@ async fn audit_log(
         .fetch_all(&state.pool)
         .await?;
 
-    Ok(([("x-total-count", total.to_string())], Json(entries)))
+    Ok((crate::pagination::total_header(total), Json(entries)))
 }

@@ -33,7 +33,7 @@ export default function NotificationsBell({ className }: { className?: string })
   });
   const items = useQuery({
     queryKey: ['notifications'],
-    queryFn: () => getNotifications(15),
+    queryFn: () => getNotifications({ limit: 15 }),
     enabled: open,
   });
 
@@ -165,10 +165,10 @@ export default function NotificationsBell({ className }: { className?: string })
               </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
-              {items.data?.length === 0 && (
+              {items.data?.items.length === 0 && (
                 <p className="px-4 py-8 text-center text-xs text-muted">No notifications yet.</p>
               )}
-              {(items.data ?? []).map((n) => (
+              {(items.data?.items ?? []).map((n) => (
                 <button
                   key={n.id}
                   type="button"

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { BellRing, CheckCheck } from 'lucide-react';
-import { getNotifications, markAllNotificationsRead, markNotificationRead } from '@/api/client';
+import { getNotifications, getUnreadCount, markAllNotificationsRead, markNotificationRead } from '@/api/client';
 import { cn, formatDate } from '@/lib/utils';
+import { useServerPagination } from '@/lib/usePagination';
+import PaginationFooter from '@/components/PaginationFooter';
 
 const KIND_ICON: Record<string, string> = {
   TICKET_ASSIGNED: '🎫',
@@ -16,10 +18,14 @@ const KIND_ICON: Record<string, string> = {
 export default function Notifications() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { page, pageSize, setPage, setPageSize, offset } = useServerPagination(20);
   const { data, isLoading } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: () => getNotifications(100),
+    queryKey: ['notifications', page, pageSize],
+    queryFn: () => getNotifications({ limit: pageSize, offset }),
   });
+  // Unread badge must not depend on the current page.
+  const unread = useQuery({ queryKey: ['unread-count'], queryFn: getUnreadCount });
+  const items = data?.items ?? [];
   const markAll = useMutation({
     mutationFn: markAllNotificationsRead,
     onSuccess: () => {
@@ -45,10 +51,10 @@ export default function Notifications() {
         <div>
           <h1 className="text-xl font-bold text-primary">Notifications</h1>
           <p className="text-xs text-muted">
-            {(data ?? []).filter((n) => !n.read_at).length} unread · in-app + email mirror
+            {unread.data?.unread ?? 0} unread · in-app + email mirror
           </p>
         </div>
-        {(data ?? []).some((n) => !n.read_at) && (
+        {!!unread.data?.unread && (
           <button
             type="button"
             onClick={() => markAll.mutate()}
@@ -61,7 +67,7 @@ export default function Notifications() {
       </div>
 
       {isLoading && <p className="py-10 text-center text-sm text-muted">Loading…</p>}
-      {!isLoading && (data ?? []).length === 0 && (
+      {!isLoading && items.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-14 text-muted">
           <BellRing className="h-8 w-8" />
           <p className="text-sm">No notifications yet.</p>
@@ -70,7 +76,7 @@ export default function Notifications() {
       )}
 
       <div className="flex flex-col gap-2">
-        {(data ?? []).map((n) => (
+        {items.map((n) => (
           <button
             key={n.id}
             type="button"
@@ -92,6 +98,15 @@ export default function Notifications() {
           </button>
         ))}
       </div>
+
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        total={data?.total}
+        rowsLength={items.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }
