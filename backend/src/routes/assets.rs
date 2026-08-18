@@ -573,14 +573,14 @@ async fn warranty_alerts(
     Query(params): Query<AlertParams>,
 ) -> Result<impl axum::response::IntoResponse, AppError> {
     let scope = params.scope.as_deref().unwrap_or("all");
-    let mut where_q = String::from(
-        " FROM assets \
-         WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL \
+    // WHERE fragment (no FROM) — reused by the count and the data query.
+    let mut where_sql = String::from(
+        "WHERE status <> 'RETIRED' AND warranty_expiry IS NOT NULL \
            AND warranty_expiry <= CURRENT_DATE + 90",
     );
     match scope {
-        "expired" => where_q.push_str(" AND warranty_expiry < CURRENT_DATE"),
-        "expiring" => where_q.push_str(" AND warranty_expiry >= CURRENT_DATE"),
+        "expired" => where_sql.push_str(" AND warranty_expiry < CURRENT_DATE"),
+        "expiring" => where_sql.push_str(" AND warranty_expiry >= CURRENT_DATE"),
         "all" => {}
         _ => {
             return Err(AppError::new(
@@ -590,16 +590,16 @@ async fn warranty_alerts(
         }
     }
 
-    let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*){where_q}"))
+    let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM assets {where_sql}"))
         .fetch_one(&state.pool)
         .await?;
 
     let mut q = String::from(
         "SELECT id, asset_tag, name, status, warranty_expiry, \
                 (warranty_expiry - CURRENT_DATE)::bigint AS days_left \
-                FROM assets",
+         FROM assets",
     );
-    q.push_str(&where_q);
+    q.push_str(&format!(" {where_sql}"));
     q.push_str(" ORDER BY warranty_expiry ASC");
     let (limit, offset) = crate::pagination::page_params(params.limit, params.offset);
     let limit = limit.unwrap_or(20);
