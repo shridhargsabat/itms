@@ -8,6 +8,7 @@ import type { Asset } from '@/api/types';
 import { payloadFor } from '@/lib/qr';
 import Select from '@/components/Select';
 import Modal from '@/components/Modal';
+import DataTable, { type Column } from '@/components/DataTable';
 import { LabelPrinter, type LabelPrinterStage } from '@/components/LabelPrinter';
 
 /**
@@ -65,16 +66,50 @@ export default function Labels() {
 
   const rows: Asset[] = assets.data?.items ?? [];
   const selectedRows = rows.filter((a) => selected.has(a.id));
-  const nonRetired = rows.filter((a) => a.status !== 'RETIRED');
 
-  const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const columns: Column<Asset>[] = [
+    {
+      key: 'asset_tag',
+      header: 'Tag',
+      render: (a) => <span className="font-mono text-xs">{a.asset_tag}</span>,
+    },
+    { key: 'name', header: 'Name' },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (a) => <span className="text-xs text-secondary">{a.category}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (a) => <span className="text-xs text-secondary">{a.status}</span>,
+    },
+    {
+      key: 'serial_number',
+      header: 'Serial',
+      className: 'text-right',
+      render: (a) => <span className="font-mono text-[11px] text-muted">{a.serial_number ?? '—'}</span>,
+    },
+    {
+      key: 'print',
+      header: 'Print',
+      className: 'text-right',
+      render: (a) => (
+        <button
+          type="button"
+          onClick={() => {
+            setPrintAsset(a);
+            setPrintRun((n) => n + 1);
+          }}
+          aria-label={`Print label for ${a.asset_tag}`}
+          title="Animated single-label print"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:bg-elevated hover:text-primary"
+        >
+          <Printer className="h-3.5 w-3.5" />
+        </button>
+      ),
+    },
+  ];
 
   /* Single-label print: processing → printing (feed animation ~1.75s) →
      complete → auto window.print(). Only the .print-area renders on paper.
@@ -153,65 +188,15 @@ export default function Labels() {
         <Select value={status} onChange={setStatus} options={STATUS_OPTIONS.map((s) => ({ value: s, label: s === 'ALL' ? 'All statuses' : s }))} />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-edge">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-surface/80 text-[11px] uppercase tracking-wide text-muted">
-            <tr>
-              <th className="w-10 px-3 py-2">
-                <input
-                  type="checkbox"
-                  className="accent-indigo-500"
-                  checked={nonRetired.length > 0 && selected.size === nonRetired.length}
-                  onChange={(e) => setSelected(e.target.checked ? new Set(nonRetired.map((a) => a.id)) : new Set())}
-                />
-              </th>
-              <th className="px-3 py-2">Tag</th>
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Category</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2 text-right">Serial</th>
-              <th className="w-8 px-2 py-2">
-                <span className="sr-only">Print</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-edge/60">
-            {rows.map((a) => (
-              <tr key={a.id} className={selected.has(a.id) ? 'bg-accent/5' : undefined}>
-                <td className="px-3 py-2">
-                  <input type="checkbox" className="accent-indigo-500" checked={selected.has(a.id)} onChange={() => toggle(a.id)} />
-                </td>
-                <td className="px-3 py-2 font-mono text-xs">{a.asset_tag}</td>
-                <td className="px-3 py-2">{a.name}</td>
-                <td className="px-3 py-2 text-xs text-secondary">{a.category}</td>
-                <td className="px-3 py-2 text-xs text-secondary">{a.status}</td>
-                <td className="px-3 py-2 text-right font-mono text-[11px] text-muted">{a.serial_number ?? '—'}</td>
-                <td className="px-2 py-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPrintAsset(a);
-                      setPrintRun((n) => n + 1);
-                    }}
-                    aria-label={`Print label for ${a.asset_tag}`}
-                    title="Animated single-label print"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:bg-elevated hover:text-primary"
-                  >
-                    <Printer className="h-3.5 w-3.5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!assets.isLoading && rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-xs text-muted">
-                  No assets match — widen the filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        isRowSelectable={(a) => a.status !== 'RETIRED'}
+        loading={assets.isLoading}
+        emptyMessage="No assets match — widen the filters."
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <button

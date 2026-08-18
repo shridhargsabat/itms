@@ -6,6 +6,11 @@ import type { TopologyNode } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 
+// CMDB carve-out: the CI table is embedded in a narrow 300px sidebar column —
+// geometry/typography still uses the shared spec (TableView covers it), only
+// the scroll threshold is narrower. All other tables use the DataTable default.
+const CI_TABLE_MIN_WIDTH = 'min-w-[380px]' as const;
+
 export default function CMDB() {
   const topology = useQuery({ queryKey: ['topology'], queryFn: getTopology });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -114,7 +119,7 @@ export default function CMDB() {
               }}
               loading={topology.isLoading}
               emptyMessage="No configuration items found."
-              minWidth="min-w-[380px]"
+              minWidth={CI_TABLE_MIN_WIDTH}
               onRowClick={(n) => setSelectedId(n.id)}
             />
           </div>

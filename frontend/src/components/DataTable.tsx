@@ -5,6 +5,23 @@ import { cn } from '@/lib/utils';
 import Select from '@/components/Select';
 import ScrollX from '@/components/ScrollX';
 
+/** Canonical table geometry — the ONE spec every ITMS table renders with.
+ *  Header text-xs uppercase on bg-surface, cells py-3/px-4 text-sm, shell
+ *  rounded-xl border, min-w-[640px] + ScrollX for consistent mobile behavior. */
+export const TABLE_SPEC = {
+  shell: 'rounded-xl border border-edge',
+  emptyShell: 'rounded-xl border border-dashed border-edge p-10 text-center text-sm text-muted',
+  head: 'bg-surface text-xs uppercase tracking-wide text-secondary',
+  th: 'px-4 py-3 font-medium',
+  td: 'px-4 py-3',
+  table: 'w-full text-left text-sm',
+  tbody: 'divide-y divide-edge bg-base',
+  checkboxCell: 'px-3 py-3',
+  footer:
+    'sticky bottom-[3.5rem] z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-edge bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur lg:bottom-0',
+  minWidth: 'min-w-[640px]',
+} as const;
+
 export interface Column<T> {
   key: string;
   header: string;
@@ -43,6 +60,8 @@ interface DataTableProps<T> {
   /** Row multi-select (bulk actions). Selection is controlled by the parent. */
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
+  /** Rows whose checkbox must be disabled (excluded from select-all). */
+  isRowSelectable?: (row: T) => boolean;
 }
 
 export default function DataTable<T extends { id: string }>({
@@ -51,7 +70,7 @@ export default function DataTable<T extends { id: string }>({
   loading = false,
   emptyMessage = 'No records found.',
   onRowClick,
-  minWidth = 'min-w-[640px]',
+  minWidth = TABLE_SPEC.minWidth,
   page = 1,
   pageSize = 20,
   total,
@@ -62,12 +81,15 @@ export default function DataTable<T extends { id: string }>({
   renderExpanded,
   selectedIds,
   onSelectionChange,
+  isRowSelectable,
 }: DataTableProps<T>) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const selectable = selectedIds !== undefined && onSelectionChange !== undefined;
   const headCheckboxRef = useRef<HTMLInputElement>(null);
-  const allPageSelected = selectable && rows.length > 0 && rows.every((r) => selectedIds!.has(r.id));
-  const somePageSelected = selectable && rows.some((r) => selectedIds!.has(r.id));
+  const rowSelectable = (r: T) => (isRowSelectable ? isRowSelectable(r) : true);
+  const selectableRows = rows.filter(rowSelectable);
+  const allPageSelected = selectable && selectableRows.length > 0 && selectableRows.every((r) => selectedIds!.has(r.id));
+  const somePageSelected = selectable && selectableRows.some((r) => selectedIds!.has(r.id));
   const cycleSort = (c: Column<T>) => {
     if (!onSortChange) return;
     const key = c.sortKey ?? c.key;
@@ -82,24 +104,26 @@ export default function DataTable<T extends { id: string }>({
     if (!selectable) return;
     const next = new Set(selectedIds!);
     if (allPageSelected) {
-      rows.forEach((r) => next.delete(r.id));
+      selectableRows.forEach((r) => next.delete(r.id));
     } else {
-      rows.forEach((r) => next.add(r.id));
+      selectableRows.forEach((r) => next.add(r.id));
     }
     onSelectionChange!(next);
   };
   const toggleRow = (id: string) => {
     if (!selectable) return;
+    const row = rows.find((r) => r.id === id);
+    if (row && !rowSelectable(row)) return;
     const next = new Set(selectedIds!);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     onSelectionChange!(next);
   };
   const head = (
-    <thead className="bg-surface text-xs uppercase tracking-wide text-secondary">
+    <thead className={TABLE_SPEC.head}>
       <tr>
         {selectable && (
-          <th className="w-10 px-3 py-3">
+          <th className={cn('w-10', TABLE_SPEC.checkboxCell)}>
             <input
               type="checkbox"
               aria-label="Select all on page"
@@ -114,7 +138,7 @@ export default function DataTable<T extends { id: string }>({
           </th>
         )}
         {columns.map((c) => (
-          <th key={c.key} className={cn('px-4 py-3 font-medium', c.className)}>
+          <th key={c.key} className={cn(TABLE_SPEC.th, c.className)}>
             {c.sortable ? (
               <button
                 type="button"
@@ -146,10 +170,10 @@ export default function DataTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <ScrollX className="rounded-xl border border-edge">
-        <table className={cn('w-full text-left text-sm', minWidth)}>
+      <ScrollX className={TABLE_SPEC.shell}>
+        <table className={cn(TABLE_SPEC.table, minWidth)}>
           {head}
-          <tbody className="divide-y divide-edge bg-base">
+          <tbody className={TABLE_SPEC.tbody}>
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i}>
                 {columns.map((c) => (
@@ -175,7 +199,7 @@ export default function DataTable<T extends { id: string }>({
     'flex h-8 w-8 items-center justify-center rounded-lg border border-edge2 text-secondary transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   const footer = paginated && (
-    <div className="sticky bottom-[3.5rem] z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-edge bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur lg:bottom-0">
+    <div className={TABLE_SPEC.footer}>
       <span>
         {total !== undefined && total > 0 && rows.length > 0
           ? `Showing ${from}–${to} of ${total}`
@@ -184,6 +208,7 @@ export default function DataTable<T extends { id: string }>({
       <div className="flex items-center gap-2">
         <Select
           className="w-auto"
+          triggerClassName="h-8 px-2.5 py-0 text-xs"
           value={String(pageSize)}
           onChange={(v) => onPageSizeChange?.(Number(v))}
           options={[
@@ -219,17 +244,13 @@ export default function DataTable<T extends { id: string }>({
 
   if (rows.length === 0) {
     if (!paginated) {
-      return (
-        <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-muted">
-          {emptyMessage}
-        </div>
-      );
+      return <div className={TABLE_SPEC.emptyShell}>{emptyMessage}</div>;
     }
     // Paginated empty state: keep the footer so total=0 shows "0 rows" with
     // both nav buttons disabled, and a stale page (rows gone, total > 0)
     // still offers Prev to navigate back.
     return (
-      <div className="rounded-xl border border-edge">
+      <div className={TABLE_SPEC.shell}>
         <div className="p-10 text-center text-sm text-muted">{emptyMessage}</div>
         {footer}
       </div>
@@ -237,11 +258,11 @@ export default function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className="rounded-xl border border-edge">
+    <div className={TABLE_SPEC.shell}>
       <ScrollX>
-        <table className={cn('w-full text-left text-sm', minWidth)}>
+        <table className={cn(TABLE_SPEC.table, minWidth)}>
           {head}
-          <tbody className="divide-y divide-edge bg-base">
+          <tbody className={TABLE_SPEC.tbody}>
             {rows.map((row, i) => {
               const expanded = expandedId === row.id;
               const clickable = onRowClick !== undefined || renderExpanded !== undefined;
@@ -263,24 +284,22 @@ export default function DataTable<T extends { id: string }>({
                     style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                   >
                     {selectable && (
-                      <td
-                        className="px-3 py-3"
-                        onClick={(e) => {
-                          // checkbox click must not open the row detail
-                          e.stopPropagation();
-                        }}
-                      >
+                      <td className={TABLE_SPEC.checkboxCell} onClick={(e) => {
+                        // checkbox click must not open the row detail
+                        e.stopPropagation();
+                      }}>
                         <input
                           type="checkbox"
                           aria-label={`Select ${String((row as Record<string, unknown>).asset_tag ?? row.id)}`}
                           checked={selectedIds!.has(row.id)}
                           onChange={() => toggleRow(row.id)}
-                          className="h-4 w-4 cursor-pointer rounded border-edge2 accent-accent"
+                          disabled={!rowSelectable(row)}
+                          className="h-4 w-4 cursor-pointer rounded border-edge2 accent-accent disabled:cursor-not-allowed disabled:opacity-40"
                         />
                       </td>
                     )}
                     {columns.map((c) => (
-                      <td key={c.key} className={cn('px-4 py-3', c.className)}>
+                      <td key={c.key} className={cn(TABLE_SPEC.td, c.className)}>
                         {c.render
                           ? c.render(row, { expanded })
                           : String((row as Record<string, unknown>)[c.key] ?? '')}
