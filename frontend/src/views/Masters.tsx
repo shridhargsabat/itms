@@ -574,6 +574,7 @@ function TemplatesTab() {
   const [prio, setPrio] = useState('MEDIUM');
   const [desc, setDesc] = useState('');
   const [editing, setEditing] = useState<TicketTemplate | null>(null);
+  // Small master data — intentionally unpaginated (backend stays array-bodied).
   const templates = useQuery({ queryKey: ['templates'], queryFn: () => listTemplates() });
 
   const create = useMutation({
@@ -692,6 +693,7 @@ function VendorsTab() {
   const qc = useQueryClient();
   const me = getCachedUser();
   const isAdmin = me?.role === 'ADMIN';
+  // Small master data — intentionally unpaginated (backend stays array-bodied).
   const vendors = useQuery({ queryKey: ['vendors'], queryFn: () => listVendors() });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
@@ -815,6 +817,7 @@ function VendorsTab() {
 
 function VendorClaims({ vendorId }: { vendorId: string }) {
   const qc = useQueryClient();
+  // Per-vendor claims — bounded small list, intentionally unpaginated.
   const claims = useQuery({ queryKey: ['claims', vendorId], queryFn: () => listClaims({ vendor_id: vendorId }) });
   const [adding, setAdding] = useState(false);
   const [issue, setIssue] = useState('');

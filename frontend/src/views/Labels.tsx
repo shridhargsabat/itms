@@ -9,6 +9,7 @@ import { payloadFor } from '@/lib/qr';
 import Select from '@/components/Select';
 import Modal from '@/components/Modal';
 import DataTable, { type Column } from '@/components/DataTable';
+import { useClientPagination } from '@/lib/usePagination';
 import { LabelPrinter, type LabelPrinterStage } from '@/components/LabelPrinter';
 
 /**
@@ -64,8 +65,15 @@ export default function Labels() {
       }),
   });
 
-  const rows: Asset[] = assets.data?.items ?? [];
-  const selectedRows = rows.filter((a) => selected.has(a.id));
+  const allRows: Asset[] = assets.data?.items ?? [];
+  // Client-side pagination of the fetched list (batch-selection page — the
+  // full list is kept for the selection count below).
+  const { page, pageSize, setPage, setPageSize, pageRows } = useClientPagination(allRows, 50);
+  const rows = pageRows;
+  // Selection must span ALL fetched rows, not just the current page, or the
+  // "Print labels (N)" / "Start audit run" counts silently drop off-page
+  // selections (the Set persists across page changes).
+  const selectedRows = assets.data?.items.filter((a) => selected.has(a.id)) ?? [];
 
   const columns: Column<Asset>[] = [
     {
@@ -152,7 +160,8 @@ export default function Labels() {
   };
 
   const startRun = () => {
-    const targets = rows
+    // Scan targets span all selected rows across pages, not just the page.
+    const targets = (assets.data?.items ?? [])
       .filter((a) => selected.has(a.id) && a.status !== 'RETIRED')
       .map((a) => ({ id: a.id, tag: a.asset_tag, name: a.name }));
     try {
@@ -196,6 +205,11 @@ export default function Labels() {
         isRowSelectable={(a) => a.status !== 'RETIRED'}
         loading={assets.isLoading}
         emptyMessage="No assets match — widen the filters."
+        page={page}
+        pageSize={pageSize}
+        total={allRows.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
 
       <div className="flex flex-wrap items-center gap-3">
