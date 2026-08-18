@@ -107,7 +107,7 @@ export default function DataTable<T extends { id: string }>({
     <thead className={TABLE_SPEC.head}>
       <tr>
         {selectable && (
-          <th className={cn('w-10', TABLE_SPEC.checkboxCell)}>
+          <th className={cn('w-10 sticky top-0 z-10 bg-surface', TABLE_SPEC.checkboxCell)}>
             <input
               type="checkbox"
               aria-label="Select all on page"
