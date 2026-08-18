@@ -69,6 +69,26 @@
   --t-accent-strong: #3cc9b3;
 }
 
+/* Theme-manager preview reset: force the LIGHT palette inside a wrapper even
+   while the app itself is in a dark theme. Element-level vars beat inherited
+   .dark/.ledgerly-dark tokens, so "Light"/"System" preview cards always show
+   light colors. */
+.theme-light {
+  color-scheme: light;
+  --t-base: #ffffff;
+  --t-surface: #f8fafc;
+  --t-elevated: #e2e8f0;
+  --t-elevated2: #cbd5e1;
+  --t-input: #ffffff;
+  --t-edge: #cbd5e1;
+  --t-edge2: #94a3b8;
+  --t-primary: #0f172a;
+  --t-secondary: #334155;
+  --t-muted: #64748b;
+  --t-accent: #4f46e5;
+  --t-accent-strong: #4338ca;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
