@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { forgotPassword, resetPassword } from '@/api/client';
 import { inputCls, labelCls } from '@/lib/utils';
+import { Button } from '@/components/Button';
 
 // P1-6: two public pages in one component.
 //  - /forgot-password: request a reset link (always "check your inbox")
@@ -65,9 +66,7 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
               autoFocus
             />
           </label>
-          <button type="submit" disabled={mutation.isPending} className={'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}>
-            {mutation.isPending ? 'Sending…' : 'Send reset link'}
-          </button>
+          <Button type="submit" loading={mutation.isPending} variant="primary" size="lg" fullWidth>Send reset link</Button>
           {mutation.isError && (
             <p className="text-sm text-red-500">Something went wrong — please try again.</p>
           )}
@@ -134,9 +133,7 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
               onChange={(e) => setPw2(e.target.value)} />
           </label>
           {err && <p className="text-sm text-red-500">{err}</p>}
-          <button type="submit" disabled={mutation.isPending} className={'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}>
-            {mutation.isPending ? 'Saving…' : 'Update password'}
-          </button>
+          <Button type="submit" loading={mutation.isPending} variant="primary" size="lg" fullWidth>Update password</Button>
         </form>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Clock, PackageX } from 'lucide-react';
 import { getWarrantyAlerts } from '@/api/client';
 import type { WarrantyAlert } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
+import { Button } from '@/components/Button';
 import { formatDateOnly } from '@/lib/utils';
 import { useClientPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
@@ -127,13 +128,16 @@ export default function WarrantyView() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => nav('/assets')}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-edge px-3 text-sm text-secondary transition-colors hover:bg-elevated"
+            variant="secondary"
+            size="sm"
+            className="border-edge px-3 text-sm"
+            leftIcon={<CheckCircle2 className="h-4 w-4" />}
           >
-            <CheckCircle2 className="h-4 w-4" /> Open Assets
-          </button>
+            Open Assets
+          </Button>
         </div>
       </div>
 

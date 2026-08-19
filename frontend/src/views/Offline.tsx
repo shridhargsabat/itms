@@ -1,4 +1,5 @@
 import { WifiOff } from 'lucide-react';
+import { Button } from '@/components/Button';
 
 export default function Offline() {
   return (
@@ -11,12 +12,13 @@ export default function Offline() {
         The app shell is cached and works without a connection, but live data needs the network.
         Reconnect and try again.
       </p>
-      <button
+      <Button
         onClick={() => window.location.reload()}
-        className="mt-2 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400"
+        variant="primary"
+        className="mt-2"
       >
         Try again
-      </button>
+      </Button>
     </div>
   );
 }

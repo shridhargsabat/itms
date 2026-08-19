@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, LoaderCircle, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getOAuthAdmin, updateOAuthAdmin } from '@/api/client';
 import type { OAuthConfig } from '@/api/types';
 import ThemeManager, { THEMES } from '@/components/ThemeManager';
+import { Button } from '@/components/Button';
 import { getThemeMode, onThemeChanged, type ThemeMode } from '@/lib/theme';
 
 /** Icon component that never renders stale after server hydration. */
@@ -67,13 +68,15 @@ export default function Settings() {
       <div className="rounded-xl border border-edge bg-surface p-5">
         <div className="flex items-center justify-between gap-3">
           <CurrentThemeSummary />
-          <button
+          <Button
             type="button"
             onClick={() => setThemeOpen(true)}
-            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-white hover:bg-accent/90"
+            variant="primary"
+            size="lg"
+            className="shrink-0"
           >
             Change theme
-          </button>
+          </Button>
         </div>
         <p className="mt-3 rounded-lg border border-edge bg-base p-2 text-xs text-muted">
           Your theme follows your account — change it on any device and it syncs everywhere.
@@ -166,7 +169,7 @@ export default function Settings() {
           )}
 
           <div className="flex justify-end">
-            <button
+            <Button
               onClick={() =>
                 save.mutate({
                   enabled: enabled ?? cfg.enabled,
@@ -176,10 +179,12 @@ export default function Settings() {
                 })
               }
               disabled={save.isPending}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-5 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+              loading={save.isPending}
+              variant="primary"
+              size="lg"
             >
-              {save.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : 'Save configuration'}
-            </button>
+              Save configuration
+            </Button>
           </div>
         </div>
       </div>
