@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BellRing, CheckCheck } from 'lucide-react';
 import { getNotifications, getUnreadCount, markAllNotificationsRead, markNotificationRead } from '@/api/client';
 import { cn, formatDate } from '@/lib/utils';
+import { Button } from '@/components/Button';
 import { useServerPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
 
@@ -55,14 +56,18 @@ export default function Notifications() {
           </p>
         </div>
         {!!unread.data?.unread && (
-          <button
+          <Button
             type="button"
             onClick={() => markAll.mutate()}
             disabled={markAll.isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-edge px-3 py-1.5 text-xs text-accent hover:bg-elevated disabled:opacity-50"
+            loading={markAll.isPending}
+            variant="secondary"
+            size="sm"
+            className="border-edge px-3 py-1.5 text-xs text-accent"
+            leftIcon={!markAll.isPending ? <CheckCheck className="h-3.5 w-3.5" /> : undefined}
           >
-            <CheckCheck className="h-3.5 w-3.5" /> Mark all read
-          </button>
+            Mark all read
+          </Button>
         )}
       </div>
 

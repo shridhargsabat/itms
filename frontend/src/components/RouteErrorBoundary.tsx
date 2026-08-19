@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { RefreshCcw, TriangleAlert } from 'lucide-react';
+import { Button } from '@/components/Button';
 
 interface Props {
   children: ReactNode;
@@ -51,20 +52,21 @@ export default class RouteErrorBoundary extends Component<Props, State> {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => window.location.reload()}
-            className="rounded-lg border border-edge2 px-4 py-2 text-sm text-secondary transition-colors hover:bg-elevated"
+            variant="secondary"
           >
             Reload
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={this.retry}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+            variant="primary"
+            leftIcon={<RefreshCcw className="h-3.5 w-3.5" />}
           >
-            <RefreshCcw className="h-3.5 w-3.5" /> Retry
-          </button>
+            Retry
+          </Button>
         </div>
       </div>
     );

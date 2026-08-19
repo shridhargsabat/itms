@@ -28,6 +28,7 @@ import {
 } from '@/api/client';
 import { useServerPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
+import { Button } from '@/components/Button';
 import type { License, LicenseType } from '@/api/types';
 
 const TYPE_STYLE: Record<LicenseType, string> = {
@@ -120,12 +121,13 @@ export default function Licenses() {
           <p className="text-xs text-secondary">Seat register — track what you pay for vs what you use.</p>
         </div>
         {isAdmin && (
-          <button
+          <Button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            variant="primary"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> Register License
-          </button>
+            Register License
+          </Button>
         )}
       </div>
 
@@ -276,18 +278,18 @@ function LicenseCard({
           )}
           {isAdmin && (
             <>
-              <button onClick={() => onEdit(l)} className="rounded-lg border border-edge p-1.5 text-secondary hover:bg-elevated" title="Edit">
+              <Button onClick={() => onEdit(l)} variant="ghost" size="icon" className="border border-edge p-1.5" title="Edit">
                 <Pencil className="h-3.5 w-3.5" />
-              </button>
+              </Button>
               {confirmDel ? (
                 <>
                   <button onClick={onDelete} className="rounded-lg bg-red-500 px-2 py-1.5 text-[11px] font-semibold text-white">Confirm</button>
                   <button onClick={() => setConfirmDel(false)} className="rounded-lg border border-edge px-2 py-1.5 text-[11px] text-secondary">No</button>
                 </>
               ) : (
-                <button onClick={() => setConfirmDel(true)} className="rounded-lg border border-edge p-1.5 text-red-400 hover:bg-red-500/10" title="Delete">
+                <Button onClick={() => setConfirmDel(true)} variant="ghost" size="icon" className="border border-edge p-1.5 text-red-400 hover:bg-red-500/10" title="Delete">
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               )}
             </>
           )}
@@ -413,12 +415,15 @@ function LicenseDetailModal({
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Assigned seats</p>
             {isAdmin && available && (
-              <button
+              <Button
                 onClick={() => setAssigning((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-medium text-white"
+                variant="primary"
+                size="sm"
+                className="px-2.5 py-1.5 text-[11px]"
+                leftIcon={<UserPlus className="h-3.5 w-3.5" />}
               >
-                <UserPlus className="h-3.5 w-3.5" /> Assign seat
-              </button>
+                Assign seat
+              </Button>
             )}
           </div>
           {assigning && (
@@ -429,13 +434,16 @@ function LicenseDetailModal({
                 options={assignableUsers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))}
                 placeholder="Choose a user…"
               />
-              <button
+              <Button
                 onClick={() => pickUser && assign.mutate(pickUser)}
                 disabled={!pickUser || assign.isPending}
-                className="shrink-0 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                loading={assign.isPending}
+                variant="primary"
+                size="sm"
+                className="shrink-0"
               >
-                {assign.isPending ? 'Assigning…' : 'Assign'}
-              </button>
+                Assign
+              </Button>
             </div>
           )}
           <div className="flex flex-col gap-1.5">
@@ -567,14 +575,15 @@ function LicenseFormModal({ license, onClose, onSaved }: { license: License | nu
         </label>
         {err && <p className="text-xs text-red-400">{err}</p>}
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-elevated">Cancel</button>
-          <button
+          <Button onClick={onClose} variant="secondary">Cancel</Button>
+          <Button
             onClick={() => save.mutate()}
             disabled={!name.trim() || !seats || save.isPending}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            loading={save.isPending}
+            variant="primary"
           >
-            {save.isPending ? 'Saving…' : license ? 'Save changes' : 'Register'}
-          </button>
+            {license ? 'Save changes' : 'Register'}
+          </Button>
         </div>
       </div>
     </Modal>

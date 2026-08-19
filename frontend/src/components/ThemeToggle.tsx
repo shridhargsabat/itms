@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { applyTheme, getThemeMode, onThemeChanged, watchSystemTheme, type ThemeMode } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import ThemeManager, { THEMES } from '@/components/ThemeManager';
+import { Button } from '@/components/Button';
 
 /**
  * Header theme control. Clicking opens the theme manager (live previews,
@@ -25,18 +26,17 @@ export default function ThemeToggle({ className }: { className?: string }) {
 
   return (
     <>
-      <button
+      <Button
         type="button"
         aria-label="Theme manager"
         title={`Theme: ${meta.label} (open manager)`}
         onClick={() => setManagerOpen(true)}
-        className={cn(
-          'flex h-9 w-9 items-center justify-center rounded-lg border border-edge bg-elevated/60 text-secondary transition-colors hover:text-primary',
-          className,
-        )}
+        variant="secondary"
+        size="icon"
+        className={cn('border-edge bg-elevated/60', className)}
       >
         <Icon className="h-4 w-4" />
-      </button>
+      </Button>
       <ThemeManager open={managerOpen} onClose={() => setManagerOpen(false)} />
     </>
   );

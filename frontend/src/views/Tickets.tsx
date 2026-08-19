@@ -7,7 +7,6 @@ import {
   Columns3,
   Download,
   Link2,
-  LoaderCircle,
   MessageSquare,
   Paperclip,
   Plus,
@@ -42,6 +41,7 @@ import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
 import SlaChip, { SlaBar } from '@/components/SlaChip';
+import { Button } from '@/components/Button';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 
@@ -154,21 +154,21 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         </p>
       )}
       <div className="flex justify-end gap-2 pt-1">
-        <button
+        <Button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-edge2 px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated"
+          variant="secondary"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+          loading={mutation.isPending}
+          variant="primary"
         >
-          {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Create Ticket
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -304,7 +304,7 @@ export default function Tickets() {
         </div>
         <div className="w-full min-w-0 sm:w-auto">
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-            <button
+            <Button
               type="button"
               onClick={() =>
                 exportTicketsCsv({
@@ -315,10 +315,13 @@ export default function Tickets() {
                   order: order ?? undefined,
                 })
               }
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary sm:flex-none"
+              variant="secondary"
+              size="lg"
+              className="sm:flex-none"
+              leftIcon={<Download className="h-4 w-4" />}
             >
-              <Download className="h-4 w-4" /> Export
-            </button>
+              Export
+            </Button>
             <div className="col-span-2 flex overflow-hidden rounded-lg border border-edge2 sm:col-auto">
               <button
                 type="button"
@@ -365,13 +368,15 @@ export default function Tickets() {
               ...TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') })),
             ]}
           />
-          <button
+          <Button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-500 sm:col-auto sm:inline-flex"
+            variant="primary"
+            className="col-span-2 sm:col-auto"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> New Ticket
-          </button>
+            New Ticket
+          </Button>
           </div>
         </div>
       </div>
@@ -534,16 +539,17 @@ export default function Tickets() {
 
             <div className="mt-5 border-t border-edge pt-4">
               {next ? (
-                <button
+                <Button
                   type="button"
                   onClick={() => advance.mutate({ id: selected.id, st: next })}
                   disabled={advance.isPending}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+                  loading={advance.isPending}
+                  fullWidth
+                  variant="primary"
+                  rightIcon={!advance.isPending ? <ArrowRight className="h-4 w-4" /> : undefined}
                 >
-                  {advance.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
                   Advance to {next.replace('_', ' ')}
-                  {!advance.isPending && <ArrowRight className="h-4 w-4" />}
-                </button>
+                </Button>
               ) : (
                 <p className="text-center text-xs text-muted">
                   No further status transition.
@@ -656,7 +662,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           {attachments.map((a) => (
             <div key={a.id} className="flex items-center gap-2 rounded-lg border border-edge bg-elevated/30 px-2.5 py-1.5">
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-accent" />
-              <button
+              <Button
                 type="button"
                 onClick={() => downloadTicketAttachment(a.id).then((blob) => {
                   const url = URL.createObjectURL(blob);
@@ -666,11 +672,12 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
                   el.click();
                   URL.revokeObjectURL(url);
                 })}
-                className="min-w-0 flex-1 truncate text-left text-xs text-accent hover:underline"
+                variant="text"
+                className="min-w-0 flex-1 truncate text-left text-xs"
                 title={`Download ${a.file_name}`}
               >
                 {a.file_name}
-              </button>
+              </Button>
               <span className="text-[10px] text-muted">{fmtBytes(a.size_bytes)}</span>
               {(isAdmin || me?.id === a.uploader_id) &&
                 (confirmAttDel === a.id ? (
@@ -742,15 +749,18 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
         />
         {uploadErr && <p className="text-[10px] text-red-400">{uploadErr}</p>}
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={upload.isPending}
-            className="inline-flex items-center gap-1 rounded-lg border border-edge px-2.5 py-1.5 text-[11px] text-secondary hover:bg-elevated disabled:opacity-50"
+            variant="secondary"
+            size="sm"
+            className="border-edge px-2.5 py-1.5 text-[11px]"
             title="Attach file (max 10 MB)"
+            leftIcon={<Paperclip className="h-3.5 w-3.5" />}
           >
-            <Paperclip className="h-3.5 w-3.5" /> {upload.isPending ? 'Uploading…' : 'Attach'}
-          </button>
+            {upload.isPending ? 'Uploading…' : 'Attach'}
+          </Button>
           <input
             ref={fileRef}
             type="file"
@@ -761,15 +771,17 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
               e.target.value = '';
             }}
           />
-          <button
+          <Button
             type="button"
             onClick={() => draft.trim() && post.mutate(draft)}
             disabled={!draft.trim() || post.isPending}
-            className="ml-auto inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[11px] font-medium text-white disabled:opacity-50"
+            loading={post.isPending}
+            variant="primary"
+            size="sm"
+            className="ml-auto px-3 py-1.5 text-[11px]"
           >
-            {post.isPending && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
             Post comment
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -830,16 +842,18 @@ function ConvertButton({ ticket }: { ticket: Ticket }) {
   if (user?.role === 'EMPLOYEE') return null;
   if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') return null;
   return (
-    <button
+    <Button
       type="button"
       disabled={convert.isPending}
+      loading={convert.isPending}
+      fullWidth
+      variant="secondary"
       onClick={() => convert.mutate()}
-      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-indigo-500/20 disabled:opacity-60"
+      leftIcon={!convert.isPending ? <BookOpen className="h-4 w-4" /> : undefined}
       title="Capture this resolution as a knowledge-base article"
     >
-      {convert.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
       Convert to KB article
-    </button>
+    </Button>
   );
 }
 
@@ -851,13 +865,16 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
   if (!canned.data?.length) return null;
   return (
     <div className="relative">
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-lg border border-edge px-2 py-1 text-[11px] text-accent hover:bg-elevated"
+        variant="secondary"
+        size="sm"
+        className="border-edge px-2 py-1 text-[11px] text-accent"
+        leftIcon={<Zap className="h-3 w-3" />}
       >
-        <Zap className="h-3 w-3" /> Canned response
-      </button>
+        Canned response
+      </Button>
       {open && (
         <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-80 overflow-y-auto rounded-xl border border-edge bg-surface p-1 shadow-xl">
           {canned.data.map((c) => (
