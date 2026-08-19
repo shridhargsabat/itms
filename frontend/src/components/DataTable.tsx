@@ -1,5 +1,5 @@
-import { Fragment, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PaginationFooter from '@/components/PaginationFooter';
@@ -71,6 +71,55 @@ export default function DataTable<T extends { id: string }>({
   const selectable = selectedIds !== undefined && onSelectionChange !== undefined;
   const headCheckboxRef = useRef<HTMLInputElement>(null);
   const rowSelectable = (r: T) => (isRowSelectable ? isRowSelectable(r) : true);
+
+  // Auto-fill: on desktop (lg+) the table body grows to fill the viewport bottom
+  // instead of leaving empty space, scrolling internally when rows are longer
+  // than the available height. Measured live so it tracks header/filter/footer
+  // height changes and window resizes (Shridhar: tables should use the bottom space).
+  const shellRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const bodyMaxH = useRef<number | undefined>(undefined);
+  const [, setFillTick] = useState(0);
+  useEffect(() => {
+    const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+    const compute = () => {
+      if (!isDesktop() || !shellRef.current) {
+        if (bodyMaxH.current !== undefined) {
+          bodyMaxH.current = undefined;
+          setFillTick((t) => t + 1);
+        }
+        return;
+      }
+      const shellTop = shellRef.current.getBoundingClientRect().top;
+      const footerH = footerRef.current?.offsetHeight ?? 0;
+      // available = viewport bottom - where the shell starts - footer - borders/breathing (24)
+      const avail = window.innerHeight - shellTop - footerH - 24;
+      const next = Math.max(avail, 260);
+      // only re-render when the measured height actually moved (avoid churn on scroll/resize)
+      if (bodyMaxH.current === undefined || Math.abs(bodyMaxH.current - next) > 2) {
+        bodyMaxH.current = next;
+        setFillTick((t) => t + 1);
+      }
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    if (shellRef.current) ro.observe(shellRef.current);
+    window.addEventListener('resize', compute);
+    // the page scrolls under a sticky header on some screens — re-measure on scroll too
+    window.addEventListener('scroll', compute, { passive: true, capture: true });
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, { capture: true } as EventListenerOptions);
+    };
+  }, []);
+
+  // Applied only when the measured fill height is active (desktop); the CSS
+  // max-h-[55vh]/[62vh] classes still provide the mobile fallback.
+  const fillStyle: CSSProperties | undefined =
+    bodyMaxH.current !== undefined
+      ? { maxHeight: `${bodyMaxH.current}px` }
+      : undefined;
   const selectableRows = rows.filter(rowSelectable);
   const allPageSelected = selectable && selectableRows.length > 0 && selectableRows.every((r) => selectedIds!.has(r.id));
   const somePageSelected = selectable && selectableRows.some((r) => selectedIds!.has(r.id));
@@ -154,7 +203,7 @@ export default function DataTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <ScrollX className={TABLE_SPEC.shell} innerClassName={TABLE_SPEC.tableScroll}>
+      <ScrollX className={TABLE_SPEC.shell} innerClassName={TABLE_SPEC.tableScroll} style={fillStyle}>
         <table className={cn(TABLE_SPEC.table, minWidth)}>
           {head}
           <tbody className={TABLE_SPEC.tbody}>
@@ -175,14 +224,16 @@ export default function DataTable<T extends { id: string }>({
 
   const paginated = onPageChange !== undefined;
   const footer = paginated && (
-    <PaginationFooter
-      page={page}
-      pageSize={pageSize}
-      total={total}
-      rowsLength={rows.length}
-      onPageChange={onPageChange}
-      onPageSizeChange={onPageSizeChange}
-    />
+    <div ref={footerRef}>
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        rowsLength={rows.length}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
+    </div>
   );
 
   if (rows.length === 0) {
@@ -193,7 +244,7 @@ export default function DataTable<T extends { id: string }>({
     // both nav buttons disabled, and a stale page (rows gone, total > 0)
     // still offers Prev to navigate back.
     return (
-      <div className={TABLE_SPEC.shell}>
+      <div ref={shellRef} className={TABLE_SPEC.shell}>
         <div className="p-10 text-center text-sm text-muted">{emptyMessage}</div>
         {footer}
       </div>
@@ -201,8 +252,8 @@ export default function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className={TABLE_SPEC.shell}>
-      <ScrollX innerClassName={TABLE_SPEC.tableScroll}>
+    <div ref={shellRef} className={TABLE_SPEC.shell}>
+      <ScrollX innerClassName={TABLE_SPEC.tableScroll} style={fillStyle}>
         <table className={cn(TABLE_SPEC.table, minWidth)}>
           {head}
           <tbody className={TABLE_SPEC.tbody}>
