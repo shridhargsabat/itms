@@ -11,6 +11,7 @@ import Modal from '@/components/Modal';
 import DataTable, { type Column } from '@/components/DataTable';
 import { useClientPagination } from '@/lib/usePagination';
 import { LabelPrinter, type LabelPrinterStage } from '@/components/LabelPrinter';
+import { Button } from '@/components/Button';
 
 /**
  * Phase 2 (#65): printable QR label sheets + audit-run target picker.
@@ -104,7 +105,7 @@ export default function Labels() {
       header: 'Print',
       className: 'text-right',
       render: (a) => (
-        <button
+        <Button
           type="button"
           onClick={() => {
             setPrintAsset(a);
@@ -112,10 +113,12 @@ export default function Labels() {
           }}
           aria-label={`Print label for ${a.asset_tag}`}
           title="Animated single-label print"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:bg-elevated hover:text-primary"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-md"
         >
           <Printer className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       ),
     },
   ];
@@ -214,23 +217,27 @@ export default function Labels() {
       />
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
+        <Button
           onClick={() => {
             setPrintBatch(selectedRows);
             setBatchRun((n) => n + 1);
           }}
           disabled={selectedRows.length === 0}
-          className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+          variant="primary"
+          size="sm"
+          leftIcon={<Printer className="h-4 w-4" />}
         >
-          <Printer className="h-4 w-4" /> Print labels ({selectedRows.length})
-        </button>
-        <button
+          Print labels ({selectedRows.length})
+        </Button>
+        <Button
           onClick={startRun}
           disabled={selectedRows.length === 0}
-          className="flex h-9 items-center gap-1.5 rounded-lg border border-edge2 px-4 text-xs font-medium text-secondary hover:bg-elevated disabled:opacity-50"
+          variant="secondary"
+          size="sm"
+          leftIcon={<CheckCircle2 className="h-4 w-4" />}
         >
-          <CheckCircle2 className="h-4 w-4" /> Start audit run → Scan
-        </button>
+          Start audit run → Scan
+        </Button>
         <p className="text-[11px] text-muted">Labels: 38×21 mm (A4 3×8 grid) · audit guidance: 5% monthly, 100% annual, &lt;3% ghost target</p>
       </div>
 
@@ -269,12 +276,14 @@ export default function Labels() {
             </LabelPrinter.Root>
 
             {printStage === 'complete' && (
-              <button
+              <Button
                 onClick={() => window.print()}
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90"
+                variant="primary"
+                size="sm"
+                leftIcon={<Printer className="h-4 w-4" />}
               >
-                <Printer className="h-4 w-4" /> Print again
-              </button>
+                Print again
+              </Button>
             )}
           </div>
         </Modal>
@@ -325,12 +334,14 @@ export default function Labels() {
             </LabelPrinter.Root>
 
             {batchStage === 'complete' && (
-              <button
+              <Button
                 onClick={() => window.print()}
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90"
+                variant="primary"
+                size="sm"
+                leftIcon={<Printer className="h-4 w-4" />}
               >
-                <Printer className="h-4 w-4" /> Print again
-              </button>
+                Print again
+              </Button>
             )}
           </div>
         </Modal>
