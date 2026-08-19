@@ -1,0 +1,110 @@
+name: CI/CD
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
+      - '.env.example'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
+      - '.env.example'
+  workflow_dispatch:
+
+jobs:
+  # ── Frontend: install + typecheck + production build ──────────────────
+  frontend-check:
+    runs-on: ubuntu-latest   # node:20-bullseye job container
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Frontend - Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Frontend - Typecheck + build
+        run: |
+          cd frontend
+          npm run build
+
+  # ── Backend: Rust compile check ───────────────────────────────────────
+  # Runs on the default node:20-bullseye container (which has node, required
+  # by actions/checkout — an overridden rust-only image breaks checkout with
+  # "exec: node not found"). We install the Rust toolchain inside the step.
+  backend-check:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_HOME: /root/.cargo
+      RUSTUP_HOME: /root/.rustup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Backend - Install Rust toolchain + build deps
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            curl build-essential gcc libc6-dev pkg-config 2>&1 | tail -2
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            -o /tmp/rustup-init.sh
+          sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain stable
+          export PATH="$CARGO_HOME/bin:$PATH"
+          rustc --version && cargo --version
+
+      - name: Backend - cargo check (release profile)
+        run: |
+          export PATH="$CARGO_HOME/bin:$PATH"
+          cd backend
+          cargo check --release
+
+  # ── Deploy: build+push registry images, compose up, smoke ─────────────
+  # Runs on the VPS runner (docker socket + filesystem access). Only fires on
+  # a real push to main (PRs only run the two check jobs above, not deploy).
+  deploy:
+    runs-on: vps-deploy
+    needs: [frontend-check, backend-check]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Deploy to live via Host Docker
+        run: |
+          echo "🚀 Deploying ITMS — build+push both images, compose up --pull always..."
+
+          # Install Docker CLI (runner container is node:20-bullseye)
+          apt-get update -qq && apt-get install -y -qq docker.io 2>&1 | tail -3
+
+          # Helper container with host Docker + filesystem access + the
+          # itms-deploy-bot registry token. Mount /root/itms as the deploy
+          # checkout; the script resets it to origin/main and deploys.
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /root/itms:/code \
+            -v /root/.hermes/itms-deploy-bot-token.txt:/run/secrets/registry-token:ro \
+            -w /code \
+            docker:28-cli \
+            sh -c '
+              apk add --no-cache git openssh-client 2>/dev/null
+              # Bootstrap: sync the host checkout BEFORE running the script —
+              # the script itself re-syncs and self-heals, but must EXIST first.
+              git -C /code fetch origin main 2>/dev/null
+              git -C /code checkout -f main 2>/dev/null || git -C /code checkout -f FETCH_HEAD
+              git -C /code reset --hard origin/main
+              sh /code/scripts/build-deploy.sh
+            ' 2>&1
+
+          echo "✅ ITMS deploy complete!"
+
+      - name: Backend freshness probe (non-blocking)
+        # The deploy script already warns if the backend is stale; this is a
+        # belt-and-braces re-check that surfaces the running image tag.
+        run: |
+          docker inspect itms-backend --format 'backend running image: {{.Config.Image}}' 2>/dev/null || echo "itms-backend not found"
+          docker inspect itms-frontend --format 'frontend running image: {{.Config.Image}}' 2>/dev/null || echo "itms-frontend not found"
