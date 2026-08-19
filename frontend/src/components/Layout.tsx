@@ -276,12 +276,17 @@ export default function Layout() {
 
       <main
         className={cn(
-          'relative z-[1] min-h-screen transition-all duration-300',
+          'relative z-[1] transition-all duration-300',
           'ml-0 pb-24 lg:pb-8', // pb clears the mobile bottom nav (56px + safe area)
+          // Desktop: lock the app to the viewport so the page itself never
+          // scrolls — only the DataTable's inner overflow-y-auto (and this
+          // wrapper, for any non-table overflow) scrolls. Removes the
+          // redundant outer page scrollbar seen next to the window controls.
+          'lg:flex lg:h-screen lg:flex-col lg:overflow-hidden',
           collapsed ? 'lg:ml-16' : 'lg:ml-60',
         )}
       >
-        <div className="mx-auto max-w-7xl p-6 lg:p-8">
+        <div className="mx-auto w-full max-w-7xl flex-1 p-6 lg:min-h-0 lg:overflow-y-auto lg:p-8">
           {/* keyed by pathname: fresh entrance per route change.
               NOTE: opacity-only — a transform here would make every
               position:fixed descendant (sheets, drawers, dropdowns)
