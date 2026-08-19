@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { changePassword } from '@/api/client';
 import { inputCls, labelCls } from '@/lib/utils';
+import { Button } from '@/components/Button';
 
 // P1-6: self-service change-own-password page.
 export default function Account() {
@@ -54,9 +55,15 @@ export default function Account() {
         </label>
         {err && <p className="text-sm text-red-500">{err}</p>}
         {ok && <p className="text-sm text-emerald-500">Password updated.</p>}
-        <button type="submit" disabled={mutation.isPending} className={'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}>
-          {mutation.isPending ? 'Saving…' : 'Change password'}
-        </button>
+        <Button
+          type="submit"
+          loading={mutation.isPending}
+          variant="primary"
+          size="lg"
+          fullWidth
+        >
+          Change password
+        </Button>
       </form>
     </div>
   );
