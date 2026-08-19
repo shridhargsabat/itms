@@ -92,11 +92,17 @@ jobs:
             docker:28-cli \
             sh -c '
               apk add --no-cache git openssh-client 2>/dev/null
-              # Bootstrap: sync the host checkout BEFORE running the script —
-              # the script itself re-syncs and self-heals, but must EXIST first.
-              git -C /code fetch origin main 2>/dev/null
-              git -C /code checkout -f main 2>/dev/null || git -C /code checkout -f FETCH_HEAD
-              git -C /code reset --hard origin/main
+              # Bootstrap: force-fetch the TRUE main tip into the checkout and
+              # detach HEAD onto it. Do NOT trust the local branch refs — the
+              # deploy checkout (/root/itms) can be stale or on another branch
+              # (linked worktree), and a plain checkout -f main then resolves
+              # against stale refs → wraps up on an old commit with no scripts/
+              # and fails. Using --force on the refspec guarantees origin/main
+              # is the live remote tip, then --detach avoids any "already
+              # checked out in another worktree" failure.
+              git -C /code fetch --force origin main:refs/remotes/origin/main 2>&1 | tail -2
+              git -C /code checkout -f --detach refs/remotes/origin/main
+              git -C /code reset --hard refs/remotes/origin/main
               sh /code/scripts/build-deploy.sh
             ' 2>&1
 
