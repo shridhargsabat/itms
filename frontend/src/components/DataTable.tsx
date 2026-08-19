@@ -91,8 +91,35 @@ export default function DataTable<T extends { id: string }>({
         }
         return;
       }
-      // available = viewport bottom - where the shell starts - bottom breathing (24)
-      const next = Math.max(window.innerHeight - shell.getBoundingClientRect().top - 24, 280);
+      // available = scroll-container bottom - where the shell starts - breathing (24).
+      // On desktop the app is locked to the viewport (Layout's <main> is a flex
+      // column) so the nearest vertical scroll ancestor is the content wrapper,
+      // NOT the window — measuring against window.innerHeight there made the shell
+      // overshoot the wrapper by its padding, leaving a second (wrapper) scrollbar
+      // next to the table's own. Walk up to the real scroll container so the shell
+      // caps exactly to its bottom; fall back to the window when no bounded scroll
+      // ancestor exists (mobile / unlocked flow).
+      const scrollParent = (() => {
+        let el: HTMLElement | null = shell;
+        while (el && el !== document.documentElement && el !== document.body) {
+          const ov = getComputedStyle(el).overflowY;
+          if (/auto|scroll/.test(ov)) return el;
+          el = el.parentElement;
+        }
+        return null;
+      })();
+      // Target the scroll container's CONTENT-BOX bottom (drop its bottom
+      // padding) so the capped shell never spills past the wrapper's content —
+      // otherwise the wrapper still scrolls a few px and gives a second bar.
+      let targetBottom: number;
+      if (scrollParent) {
+        const r = scrollParent.getBoundingClientRect();
+        const padBottom = parseFloat(getComputedStyle(scrollParent).paddingBottom) || 0;
+        targetBottom = r.bottom - padBottom;
+      } else {
+        targetBottom = window.innerHeight;
+      }
+      const next = Math.max(targetBottom - shell.getBoundingClientRect().top - 24, 280);
       // only re-render when the measured height actually moved (avoid churn on scroll/resize)
       if (shellMaxH.current === undefined || Math.abs(shellMaxH.current - next) > 2) {
         shellMaxH.current = next;
