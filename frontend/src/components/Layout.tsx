@@ -21,13 +21,31 @@ import { clearSession, getCachedUser, logout } from '@/api/client';
 import { usePwaInstallable } from '@/lib/pwa';
 
 export default function Layout() {
-  const [collapsed, setCollapsed] = useState(false);
+  // User's persistent rail choice (collapsed / expanded), remembered across reloads.
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('itms_sidebar_collapsed') === '1',
+  );
+  // Transient hover expand: when the collapsed rail is hovered it peeks open (overlay).
+  const [hovering, setHovering] = useState(false);
   const [showIosTip, setShowIosTip] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const user = getCachedUser();
   const { installable, promptInstall } = usePwaInstallable();
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  // Effective sidebar width: hover temporarily overrides a user-collapsed rail so it
+  // peeks open, then snaps back when the pointer leaves.
+  const wide = !collapsed || hovering;
+
+  const toggleSidebar = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      // Keep the user's persistent choice across reloads (matches itms_theme pattern).
+      localStorage.setItem('itms_sidebar_collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
 
   const signOut = async () => {
     await logout().catch(() => {});
@@ -120,26 +138,30 @@ export default function Layout() {
         </button>
       </header>
       <aside
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
         className={cn(
-          'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-edge bg-surface/80 backdrop-blur transition-all duration-300 lg:flex',
-          collapsed ? 'w-16' : 'w-60',
+          'fixed inset-y-0 left-0 hidden flex-col border-r border-edge bg-surface/80 backdrop-blur transition-all duration-300 lg:flex',
+          wide ? 'w-60' : 'w-16',
+          // Transient hover peek overlays the page (higher z + shadow, content not pushed).
+          hovering && collapsed && 'z-[60] shadow-2xl',
         )}
       >
         <div
           className={cn(
             'flex h-16 items-center border-b border-edge px-4',
-            collapsed ? 'justify-center px-0' : 'gap-3',
+            wide ? 'justify-start gap-3' : 'justify-center px-0',
           )}
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
             <Network className="h-4 w-4" />
           </span>
-          {!collapsed && (
+          {wide && (
             <span className="truncate text-sm font-semibold tracking-wide text-primary">
               ITMS
             </span>
           )}
-          {!collapsed && (
+          {wide && (
             <NotificationsBell className="ml-auto" />
           )}
         </div>
@@ -150,11 +172,11 @@ export default function Layout() {
               key={to}
               to={to}
               end={end}
-              title={collapsed ? label : undefined}
+              title={collapsed && !hovering ? label : undefined}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  collapsed && 'justify-center px-0',
+                  wide ? '' : 'justify-center px-0',
                   isActive
                     ? 'bg-elevated text-primary'
                     : 'text-secondary hover:bg-elevated/60 hover:text-primary',
@@ -162,12 +184,12 @@ export default function Layout() {
               }
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
+              {wide && <span className="truncate">{label}</span>}
             </NavLink>
           ))}
         </nav>
 
-        {!collapsed && user && (
+        {wide && user && (
           <div className="flex items-center gap-3 border-t border-edge px-4 py-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
               {(user.name ?? user.email ?? '?').slice(0, 2).toUpperCase()}
@@ -184,10 +206,10 @@ export default function Layout() {
         <div className="p-2">
           <button
             type="button"
-            onClick={() => setCollapsed((c) => !c)}
+            onClick={toggleSidebar}
             className={cn(
               'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated/60 hover:text-primary',
-              collapsed && 'justify-center px-0',
+              wide ? '' : 'justify-center px-0',
             )}
           >
             {collapsed ? (
@@ -204,23 +226,23 @@ export default function Layout() {
             onClick={signOut}
             className={cn(
               'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-red-500/10 hover:text-red-400',
-              collapsed && 'justify-center px-0',
+              wide ? '' : 'justify-center px-0',
             )}
             title="Sign out"
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>Sign out</span>}
+            {wide && <span>Sign out</span>}
           </button>
           <Link
             to="/account"
             className={cn(
               'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-accent/10 hover:text-accent',
-              collapsed && 'justify-center px-0',
+              wide ? '' : 'justify-center px-0',
             )}
             title="Change password"
           >
             <KeyRound className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>Change password</span>}
+            {wide && <span>Change password</span>}
           </Link>
           {installable && (
             <button
@@ -228,18 +250,18 @@ export default function Layout() {
               onClick={promptInstall}
               className={cn(
                 'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-elevated/60 hover:text-accent',
-                collapsed && 'justify-center px-0',
+                wide ? '' : 'justify-center px-0',
               )}
               title="Install app"
             >
               <Download className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>Install app</span>}
+              {wide && <span>Install app</span>}
             </button>
           )}
-          <div className={cn('mt-1', !collapsed && 'px-2')}>
-            <ThemeToggle className={cn('w-full', collapsed ? 'h-9 w-9' : 'h-9')} />
+          <div className={cn('mt-1', wide && 'px-2')}>
+            <ThemeToggle className={cn('w-full', wide ? 'h-9' : 'h-9 w-9')} />
           </div>
-          {!collapsed && (
+          {wide && (
             <p className="mt-2 px-2 text-center text-[10px] text-muted">build {__BUILD_SHA__}</p>
           )}
         </div>
