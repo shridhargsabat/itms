@@ -5,12 +5,12 @@ import type { LucideIcon } from 'lucide-react';
 import { PriorityBadge } from '@/components/TicketBadge';
 import SlaChip from '@/components/SlaChip';
 import BentoCard, { BucketBar } from '@/components/BentoCard';
+import { Button } from '@/components/Button';
 import {
   Timer,
   Activity,
   Boxes,
   ChevronRight,
-  LoaderCircle,
   Play,
   Plus,
   BadgeCheck,
@@ -213,14 +213,14 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         >
           Cancel
         </button>
-        <button
+        <Button
           type="submit"
           disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+          loading={mutation.isPending}
+          variant="primary"
         >
-          {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Create Ticket
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -397,14 +397,14 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
         >
           Cancel
         </button>
-        <button
+        <Button
           type="submit"
           disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+          loading={mutation.isPending}
+          variant="primary"
         >
-          {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Add Asset
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -443,13 +443,15 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-all duration-150 hover:bg-blue-500 active:scale-[0.97]"
+            variant="primary"
+            size="lg"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> New Ticket
-          </button>
+            New Ticket
+          </Button>
           {isAdmin && (
             <button
               type="button"

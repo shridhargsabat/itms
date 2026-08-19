@@ -5,6 +5,7 @@ import { assignAsset, createClaim, getAssetLifecycle, getCachedUser, listAssetMo
 import type { Asset, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import Select from '@/components/Select';
+import { Button } from '@/components/Button';
 import { formatDateOnly, inputCls, labelCls, pretty } from '@/lib/utils';
 
 interface AssetSpecModalProps {
@@ -473,23 +474,26 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
               />
-              <button
+              <Button
                 type="submit"
                 disabled={assign.isPending}
-                className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+                loading={assign.isPending}
+                variant="primary"
+                className="shrink-0"
               >
-                {assign.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : asset.assigned_to_user_id ? 'Reassign' : 'Assign'}
-              </button>
+                {asset.assigned_to_user_id ? 'Reassign' : 'Assign'}
+              </Button>
             </form>
             {asset.assigned_to_user_id && (
-              <button
+              <Button
                 type="button"
                 onClick={() => assign.mutate({ id: asset.id, uid: null })}
                 disabled={assign.isPending}
-                className="mt-2 text-xs text-muted underline-offset-2 hover:text-red-400 hover:underline"
+                variant="text"
+                className="mt-2 text-xs text-muted hover:text-red-400"
               >
                 Unassign current user
-              </button>
+              </Button>
             )}
             {assign.isError && (
               <p className="mt-2 text-xs text-red-400">

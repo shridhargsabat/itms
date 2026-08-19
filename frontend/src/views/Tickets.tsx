@@ -41,6 +41,7 @@ import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
 import SlaChip, { SlaBar } from '@/components/SlaChip';
+import { Button } from '@/components/Button';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 
@@ -160,14 +161,14 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         >
           Cancel
         </button>
-        <button
+        <Button
           type="submit"
           disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+          loading={mutation.isPending}
+          variant="primary"
         >
-          {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Create Ticket
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -364,13 +365,15 @@ export default function Tickets() {
               ...TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') })),
             ]}
           />
-          <button
+          <Button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-500 sm:col-auto sm:inline-flex"
+            variant="primary"
+            className="col-span-2 sm:col-auto"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> New Ticket
-          </button>
+            New Ticket
+          </Button>
           </div>
         </div>
       </div>
@@ -517,16 +520,17 @@ export default function Tickets() {
 
             <div className="mt-5 border-t border-edge pt-4">
               {next ? (
-                <button
+                <Button
                   type="button"
                   onClick={() => advance.mutate({ id: selected.id, st: next })}
                   disabled={advance.isPending}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+                  loading={advance.isPending}
+                  fullWidth
+                  variant="primary"
+                  rightIcon={!advance.isPending ? <ArrowRight className="h-4 w-4" /> : undefined}
                 >
-                  {advance.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
                   Advance to {next.replace('_', ' ')}
-                  {!advance.isPending && <ArrowRight className="h-4 w-4" />}
-                </button>
+                </Button>
               ) : (
                 <p className="text-center text-xs text-muted">
                   No further status transition.
@@ -812,16 +816,18 @@ function ConvertButton({ ticket }: { ticket: Ticket }) {
   if (user?.role === 'EMPLOYEE') return null;
   if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') return null;
   return (
-    <button
+    <Button
       type="button"
       disabled={convert.isPending}
+      loading={convert.isPending}
+      fullWidth
+      variant="secondary"
       onClick={() => convert.mutate()}
-      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-indigo-500/20 disabled:opacity-60"
+      leftIcon={!convert.isPending ? <BookOpen className="h-4 w-4" /> : undefined}
       title="Capture this resolution as a knowledge-base article"
     >
-      {convert.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
       Convert to KB article
-    </button>
+    </Button>
   );
 }
 

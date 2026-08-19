@@ -6,6 +6,7 @@ import { cn, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
 import ScrollX from '@/components/ScrollX';
+import { Button } from '@/components/Button';
 import Select from '@/components/Select';
 import DataTable, { type Column } from '@/components/DataTable';
 import { getCachedUser } from '@/api/client';
@@ -282,13 +283,15 @@ function UsersTab() {
             ...departments.filter((d) => d.active).map((d) => ({ value: d.code, label: d.label })),
           ]}
         />
-        <button
+        <Button
           type="button"
           onClick={openCreate}
-          className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+          className="ml-auto"
+          variant="primary"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" /> New User
-        </button>
+          New User
+        </Button>
       </div>
 
       {users.isLoading ? (
@@ -382,14 +385,14 @@ function UsersTab() {
               <button type="button" onClick={() => setFormOpen(false)} className="h-10 rounded-lg border border-edge2 px-4 text-sm text-secondary hover:bg-elevated">
                 Cancel
               </button>
-              <button
+              <Button
                 type="submit"
                 disabled={mutation.isPending}
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-60"
+                loading={mutation.isPending}
+                variant="primary"
               >
-                {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 {editing ? 'Save changes' : 'Create user'}
-              </button>
+              </Button>
             </div>
           </form>
         </Modal>
@@ -551,15 +554,16 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
           <label className={labelCls}>Order</label>
           <input className={cn(inputCls, 'w-16')} type="number" value={newRow.sort_order} onChange={(e) => setNewRow({ ...newRow, sort_order: Number(e.target.value) })} />
         </div>
-        <button
+        <Button
           type="button"
           disabled={!newRow.label.trim() || !newRow.code.trim() || createMut.isPending}
+          loading={createMut.isPending}
           onClick={() => createMut.mutate()}
-          className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
+          variant="primary"
+          leftIcon={!createMut.isPending ? <Plus className="h-4 w-4" /> : undefined}
         >
-          {createMut.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           Add option
-        </button>
+        </Button>
         {createMut.isError && <p className="w-full text-xs text-red-400">{(createMut.error as Error).message}</p>}
       </div>
     </div>
