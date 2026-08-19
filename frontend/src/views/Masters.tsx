@@ -228,29 +228,31 @@ function UsersTab() {
         className: 'sticky right-0 w-28 border-l border-edge bg-inherit',
         render: (u) => (
           <div className="flex items-center gap-1">
-            <button
+            <Button
               type="button"
               onClick={() => openEdit(u)}
               aria-label={`Edit ${u.name}`}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated hover:text-accent"
+              variant="ghost"
+              size="icon"
             >
               <Pencil className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => toggleActive(u)}
               disabled={u.email === 'admin@itms.local'}
               title={u.email === 'admin@itms.local' ? 'Seed admin cannot be disabled' : u.active ? 'Disable' : 'Enable'}
+              variant="ghost"
+              size="icon"
               className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
                 u.active
-                  ? 'text-secondary hover:bg-red-500/10 hover:text-red-400'
+                  ? 'hover:bg-red-500/10 hover:text-red-400'
                   : 'text-muted hover:bg-emerald-500/10 hover:text-emerald-400',
                 u.email === 'admin@itms.local' && 'cursor-not-allowed opacity-30',
               )}
             >
               {u.active ? <Trash2 className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
         ),
       },
@@ -382,9 +384,9 @@ function UsersTab() {
             </div>
             {formError && <p className="text-xs text-red-400">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={() => setFormOpen(false)} className="h-10 rounded-lg border border-edge2 px-4 text-sm text-secondary hover:bg-elevated">
+              <Button type="button" onClick={() => setFormOpen(false)} variant="secondary" size="lg">
                 Cancel
-              </button>
+              </Button>
               <Button
                 type="submit"
                 disabled={mutation.isPending}
@@ -493,37 +495,42 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => saveMut.mutate({ id: o.id, body: d })}
                         disabled={!dirty || saveMut.isPending}
-                        className="inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-30"
+                        variant="ghost"
+                        className="gap-1 px-2.5 text-xs font-medium text-accent hover:bg-accent/10"
+                        leftIcon={<Save className="h-3.5 w-3.5" />}
                       >
-                        <Save className="h-3.5 w-3.5" /> Save
-                      </button>
+                        Save
+                      </Button>
                       {confirmDelete === o.id ? (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => {
                             delMut.mutate(o.id);
                             setConfirmDelete(null);
                           }}
-                          className="inline-flex h-9 items-center rounded-lg bg-red-500/15 px-2.5 text-xs font-medium text-red-400 hover:bg-red-500/25"
+                          variant="ghost"
+                          className="gap-1 bg-red-500/15 px-2.5 text-xs font-medium text-red-400 hover:bg-red-500/25"
                         >
                           Sure?
-                        </button>
+                        </Button>
                       ) : (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => {
                             setConfirmDelete(o.id);
                             window.setTimeout(() => setConfirmDelete((c) => (c === o.id ? null : c)), 3000);
                           }}
                           aria-label={`Delete ${o.label}`}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted hover:bg-red-500/10 hover:text-red-400"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
@@ -627,17 +634,20 @@ function TemplatesTab() {
             placeholder="Steps/details the requester should provide…" />
         </div>
         <div className="mt-3 flex gap-2">
-          <button
+          <Button
             type="button"
             disabled={!name.trim() || create.isPending || save.isPending}
+            loading={create.isPending || save.isPending}
             onClick={() => (editing ? save.mutate() : create.mutate())}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+            variant="primary"
+            size="sm"
+            leftIcon={!(create.isPending || save.isPending) ? <Save className="h-3.5 w-3.5" /> : undefined}
           >
-            <Save className="h-3.5 w-3.5" /> {editing ? 'Save changes' : 'Create template'}
-          </button>
+            {editing ? 'Save changes' : 'Create template'}
+          </Button>
           {editing && (
-            <button type="button" onClick={() => { setEditing(null); setName(''); setDesc(''); }}
-              className="rounded-lg border border-edge px-3 py-2 text-xs text-muted hover:bg-elevated">Cancel</button>
+            <Button type="button" onClick={() => { setEditing(null); setName(''); setDesc(''); }}
+              variant="secondary" size="sm" className="border-edge text-muted">Cancel</Button>
           )}
         </div>
       </div>
@@ -652,18 +662,18 @@ function TemplatesTab() {
               <span className="rounded-full bg-elevated px-2 py-0.5 text-[10px] text-muted">{t.priority}</span>
               {!t.active && <span className="text-[10px] text-muted">inactive</span>}
               <div className="ml-auto flex items-center gap-1.5">
-                <button type="button" onClick={() => toggle.mutate(t)}
-                  className="rounded-lg border border-edge px-2 py-1 text-[11px] text-secondary hover:bg-elevated">
+                <Button type="button" onClick={() => toggle.mutate(t)}
+                  variant="secondary" size="sm" className="border-edge px-2 py-1 text-[11px]">
                   {t.active ? 'Deactivate' : 'Activate'}
-                </button>
-                <button type="button" onClick={() => startEdit(t)}
-                  className="rounded-lg border border-edge px-2 py-1 text-[11px] text-accent hover:bg-elevated">
+                </Button>
+                <Button type="button" onClick={() => startEdit(t)}
+                  variant="ghost" size="sm" className="border border-edge px-2 py-1 text-accent">
                   <Pencil className="h-3 w-3" />
-                </button>
-                <button type="button" onClick={() => del.mutate(t.id)}
-                  className="rounded-lg border border-edge px-2 py-1 text-[11px] text-red-400 hover:bg-red-500/10">
+                </Button>
+                <Button type="button" onClick={() => del.mutate(t.id)}
+                  variant="ghost" size="sm" className="border border-edge px-2 py-1 text-red-400 hover:bg-red-500/10">
                   <Trash2 className="h-3 w-3" />
-                </button>
+                </Button>
               </div>
             </div>
             {t.description && <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-xs text-muted">{t.description}</p>}
@@ -742,10 +752,10 @@ function VendorsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted">Vendor records + AMC dates — asset detail shows the vendor and its claim/repair log</p>
-        <button onClick={() => { setEditing(null); setForm({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' }); setError(''); setOpen(true); }}
-          className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent/90">
-          <Plus className="h-4 w-4" /> Add vendor
-        </button>
+        <Button onClick={() => { setEditing(null); setForm({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' }); setError(''); setOpen(true); }}
+          variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />}>
+          Add vendor
+        </Button>
       </div>
 
       <div className="space-y-2">
@@ -762,9 +772,9 @@ function VendorsTab() {
                 </div>
               </button>
               <div className="flex shrink-0 items-center gap-1">
-                <button onClick={() => startEdit(v)} className="rounded-lg p-2 text-muted hover:bg-elevated hover:text-accent" title="Edit"><Pencil className="h-4 w-4" /></button>
+                <Button onClick={() => startEdit(v)} variant="ghost" size="icon" className="p-2 text-muted hover:text-accent" title="Edit"><Pencil className="h-4 w-4" /></Button>
                 {isAdmin && (
-                  <button onClick={() => { if (confirm(`Delete vendor ${v.name}?`)) remove.mutate(v.id); }} className="rounded-lg p-2 text-muted hover:bg-red-500/10 hover:text-red-400" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                  <Button onClick={() => { if (confirm(`Delete vendor ${v.name}?`)) remove.mutate(v.id); }} variant="ghost" size="icon" className="p-2 text-muted hover:bg-red-500/10 hover:text-red-400" title="Delete"><Trash2 className="h-4 w-4" /></Button>
                 )}
               </div>
             </div>
@@ -807,10 +817,10 @@ function VendorsTab() {
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={() => setOpen(false)} className="h-9 rounded-lg border border-edge2 px-4 text-xs text-secondary hover:bg-elevated">Cancel</button>
-              <button type="submit" disabled={save.isPending} className="h-9 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60">
-                {save.isPending ? 'Saving…' : 'Save'}
-              </button>
+              <Button type="button" onClick={() => setOpen(false)} variant="secondary" size="sm">Cancel</Button>
+              <Button type="submit" loading={save.isPending} variant="primary" size="sm">
+                Save
+              </Button>
             </div>
           </form>
         </Modal>
@@ -845,7 +855,7 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
     <div className="border-t border-edge px-4 py-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[11px] font-medium text-secondary">Claim / repair log</span>
-        <button onClick={() => setAdding(!adding)} className="text-[11px] text-accent hover:underline">{adding ? 'Cancel' : '+ Add claim'}</button>
+        <Button onClick={() => setAdding(!adding)} variant="text" className="text-[11px]">{adding ? 'Cancel' : '+ Add claim'}</Button>
       </div>
       {adding && (
         <form className="mb-3 space-y-2 rounded-lg border border-edge2 bg-base p-3" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
@@ -854,7 +864,7 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
           <label className="flex items-center gap-2 text-xs text-secondary">
             <input type="checkbox" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} className="accent-indigo-500" /> Replacement unit provided
           </label>
-          <button type="submit" disabled={add.isPending} className="h-8 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60">{add.isPending ? 'Saving…' : 'Log claim'}</button>
+          <Button type="submit" loading={add.isPending} variant="primary" size="sm">{add.isPending ? 'Saving…' : 'Log claim'}</Button>
         </form>
       )}
       <div className="space-y-1.5">
@@ -867,7 +877,7 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
                 {c.replacement && ' · replacement'}
               </div>
             </div>
-            <button onClick={() => remove.mutate(c.id)} className="shrink-0 rounded p-1 text-muted hover:text-red-400" title="Delete claim"><Trash2 className="h-3.5 w-3.5" /></button>
+            <Button onClick={() => remove.mutate(c.id)} variant="ghost" size="icon" className="shrink-0 p-1 text-muted hover:text-red-400" title="Delete claim"><Trash2 className="h-3.5 w-3.5" /></Button>
           </div>
         ))}
         {(claims.data?.length ?? 0) === 0 && <p className="text-[11px] text-muted">No claims logged yet.</p>}
@@ -882,14 +892,14 @@ function DeleteButton({ onConfirm, label }: { onConfirm: () => void; label: stri
   const [confirming, setConfirming] = useState(false);
   if (!confirming) {
     return (
-      <button onClick={() => setConfirming(true)} className="ml-3 text-xs text-rose-400 hover:underline">Delete</button>
+      <Button onClick={() => setConfirming(true)} variant="text" className="ml-3 text-xs text-rose-400">Delete</Button>
     );
   }
   return (
     <span className="ml-3 inline-flex items-center gap-1.5 text-[11px]">
       <span className="text-muted">Delete “{label}”?</span>
-      <button onClick={() => { setConfirming(false); onConfirm(); }} className="font-semibold text-rose-400 hover:underline">Yes</button>
-      <button onClick={() => setConfirming(false)} className="text-secondary hover:underline">No</button>
+      <Button onClick={() => { setConfirming(false); onConfirm(); }} variant="text" className="font-semibold text-rose-400">Yes</Button>
+      <Button onClick={() => setConfirming(false)} variant="text">No</Button>
     </span>
   );
 }
@@ -956,12 +966,14 @@ function LocationsTab() {
           placeholder="Search site / building / floor / room…"
           className="h-9 min-w-0 flex-1 rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent"
         />
-        <button
+        <Button
           onClick={() => { setEditing(null); setForm(EMPTY_LOCATION); setError(''); setOpen(true); }}
-          className="h-9 shrink-0 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90"
+          variant="primary"
+          size="sm"
+          className="shrink-0"
         >
           + Add location
-        </button>
+        </Button>
       </div>
 
       {error && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">{error}</p>}
@@ -985,12 +997,13 @@ function LocationsTab() {
                 </td>
                 <td className="px-3 py-2 text-right text-xs text-secondary">{l.asset_count}</td>
                 <td className="px-3 py-2 text-right">
-                  <button
+                  <Button
                     onClick={() => { setEditing(l); setForm({ site: l.site, building: l.building, floor: l.floor, room: l.room }); setError(''); setOpen(true); }}
-                    className="text-xs text-accent hover:underline"
+                    variant="text"
+                    className="text-xs"
                   >
                     Edit
-                  </button>
+                  </Button>
                   <DeleteButton onConfirm={() => remove.mutate(l.id)} label={fmtLocation(l)} />
                 </td>
               </tr>
@@ -1018,14 +1031,16 @@ function LocationsTab() {
               </label>
             ))}
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setOpen(false)} className="h-9 rounded-lg border border-edge2 px-4 text-xs text-secondary hover:bg-elevated">Cancel</button>
-              <button
+              <Button onClick={() => setOpen(false)} variant="secondary" size="sm">Cancel</Button>
+              <Button
                 onClick={() => save.mutate(editing ? { id: editing.id, input: form } : { input: form })}
                 disabled={save.isPending || !form.site && !form.building && !form.floor && !form.room}
-                className="h-9 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+                loading={save.isPending}
+                variant="primary"
+                size="sm"
               >
                 {editing ? 'Save' : 'Create'}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>
