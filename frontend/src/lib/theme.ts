@@ -14,12 +14,12 @@
  */
 import { setThemePref } from '@/api/client';
 
-export type ThemeMode = 'light' | 'dark' | 'ledgerly' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'ledgerly' | 'ledgerly-light' | 'system';
 
 const KEY = 'itms_theme';
 const mq = () => window.matchMedia('(prefers-color-scheme: dark)');
 
-const THEMES: ThemeMode[] = ['light', 'dark', 'ledgerly', 'system'];
+const THEMES: ThemeMode[] = ['light', 'dark', 'ledgerly-light', 'ledgerly', 'system'];
 
 export function isThemeMode(v: unknown): v is ThemeMode {
   return typeof v === 'string' && (THEMES as string[]).includes(v);
@@ -30,25 +30,36 @@ export function getThemeMode(): ThemeMode {
   return isThemeMode(v) ? v : 'system';
 }
 
-export function getResolvedTheme(): 'light' | 'dark' | 'ledgerly' {
+export function getResolvedTheme(): 'light' | 'dark' | 'ledgerly' | 'ledgerly-light' {
   const mode = getThemeMode();
-  if (mode === 'ledgerly') return 'ledgerly';
+  if (mode === 'ledgerly' || mode === 'ledgerly-light') return mode;
   return mode === 'system' ? (mq().matches ? 'dark' : 'light') : mode;
 }
 
 export function applyTheme(mode?: ThemeMode) {
   const resolved = getResolvedTheme();
   const root = document.documentElement;
-  // `.dark` keeps the @custom-variant dark: utilities live; `.ledgerly-dark`
-  // (later in index.css) overrides every --t-* token with the Ledgerly palette.
-  root.classList.toggle('dark', resolved !== 'light');
+  // `.dark` drives the @custom-variant dark: utilities — it must be present
+  // ONLY for the dark-family themes (dark, ledgerly). The light themes
+  // (light, ledgerly-light) never carry it, so dark: variants stay inert.
+  root.classList.toggle('dark', resolved === 'dark' || resolved === 'ledgerly');
+  // `.ledgerly-dark` / `.ledgerly-light` (later in index.css) override every
+  // --t-* token with the Ledgerly palette.
   root.classList.toggle('ledgerly-dark', resolved === 'ledgerly');
+  root.classList.toggle('ledgerly-light', resolved === 'ledgerly-light');
   // meta theme-color follows the resolved theme (PWA chrome)
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
+    // ledgerly-light → warm paper #f6f5f1 · light → #ffffff · ledgerly(dark) → #141311 · slate dark → #020617
     meta.setAttribute(
       'content',
-      resolved === 'light' ? '#ffffff' : resolved === 'ledgerly' ? '#141311' : '#020617',
+      resolved === 'ledgerly-light'
+        ? '#f6f5f1'
+        : resolved === 'ledgerly'
+          ? '#141311'
+          : resolved === 'light'
+            ? '#ffffff'
+            : '#020617',
     );
   }
   void mode;

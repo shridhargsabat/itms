@@ -127,7 +127,7 @@ pub struct ThemeRequest {
     pub theme: String,
 }
 
-const VALID_THEMES: [&str; 4] = ["light", "dark", "ledgerly", "system"];
+const VALID_THEMES: [&str; 5] = ["light", "dark", "ledgerly", "ledgerly-light", "system"];
 
 pub async fn set_theme(
     State(state): State<AppState>,
@@ -138,7 +138,7 @@ pub async fn set_theme(
     if !VALID_THEMES.contains(&theme.as_str()) {
         return Err(AppError::new(
             StatusCode::UNPROCESSABLE_ENTITY,
-            "theme must be one of: light, dark, ledgerly, system",
+            "theme must be one of: light, dark, ledgerly, ledgerly-light, system",
         ));
     }
     sqlx::query("UPDATE users SET theme = $1 WHERE id = $2")

@@ -69,6 +69,28 @@
   --t-accent-strong: #3cc9b3;
 }
 
+/* Ledgerly light ("warm paper") — derived from Ledgerly's :root light palette
+   (/root/money-management/frontend/src/styles.css:8-39). Muted text lifted to
+   #6f6a61 (vs Ledgerly #8a857d, which is only 3.36:1) so muted/tertiary text
+   clears WCAG AA (4.9:1). Deliberately carries NO `.dark` class: this is a
+   light theme, so `dark:` utilities correctly stay inert and color-scheme:light
+   governs native controls. */
+.ledgerly-light {
+  color-scheme: light;
+  --t-base: #f6f5f1;
+  --t-surface: #ffffff;
+  --t-elevated: #efede7;
+  --t-elevated2: #f3f1eb;
+  --t-input: #ffffff;
+  --t-edge: #e7e4dc;
+  --t-edge2: #d8d4c9;
+  --t-primary: #1b1917;
+  --t-secondary: #57534e;
+  --t-muted: #6f6a61;
+  --t-accent: #0e7c6b;
+  --t-accent-strong: #0b5d51;
+}
+
 /* Theme-manager preview reset: force the LIGHT palette inside a wrapper even
    while the app itself is in a dark theme. Element-level vars beat inherited
    .dark/.ledgerly-dark tokens, so "Light"/"System" preview cards always show
