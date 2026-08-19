@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Download, FileUp, LoaderCircle, Search, Tags, Trash2, TriangleAlert, UserCog, X } from 'lucide-react';
+import { CheckCircle2, Download, FileUp, Search, Tags, Trash2, TriangleAlert, UserCog, X } from 'lucide-react';
 import {
   bulkAssignAssets,
   bulkDeleteAssets,
@@ -20,6 +20,7 @@ import AssetSpecModal from '@/components/AssetSpecModal';
 import DataTable, { type Column } from '@/components/DataTable';
 import Modal from '@/components/Modal';
 import Select from '@/components/Select';
+import { Button } from '@/components/Button';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import { inputCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
@@ -238,25 +239,29 @@ export default function Assets() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setImportOpen(true);
                 setFile(null);
                 setImportResult(null);
               }}
-              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              variant="secondary"
+              size="lg"
+              leftIcon={<FileUp className="h-4 w-4" />}
             >
-              <FileUp className="h-4 w-4" /> Import
-            </button>
+              Import
+            </Button>
           )}
-          <button
+          <Button
             type="button"
             onClick={onExport}
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            variant="secondary"
+            size="lg"
+            leftIcon={<Download className="h-4 w-4" />}
           >
-            <Download className="h-4 w-4" /> Export
-          </button>
+            Export
+          </Button>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
@@ -305,48 +310,58 @@ export default function Assets() {
             {selectedIds.size} selected
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setBulkStatus('IN_STOCK');
                 setBulkAction('status');
               }}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-2.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              variant="secondary"
+              size="sm"
+              leftIcon={<Tags className="h-3.5 w-3.5" />}
             >
-              <Tags className="h-3.5 w-3.5" /> Status…
-            </button>
-            <button
+              Status…
+            </Button>
+            <Button
               type="button"
               onClick={() => {
                 setBulkUserId('');
                 setBulkAction('assign');
               }}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-2.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              variant="secondary"
+              size="sm"
+              leftIcon={<UserCog className="h-3.5 w-3.5" />}
             >
-              <UserCog className="h-3.5 w-3.5" /> Assign…
-            </button>
-            <button
+              Assign…
+            </Button>
+            <Button
               type="button"
               onClick={() => setBulkAction('delete')}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"
+              variant="secondary"
+              size="sm"
+              className="border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+              leftIcon={<Trash2 className="h-3.5 w-3.5" />}
             >
-              <Trash2 className="h-3.5 w-3.5" /> Delete…
-            </button>
-            <button
+              Delete…
+            </Button>
+            <Button
               type="button"
               onClick={() => exportAssetsCsv({ ids: [...selectedIds] })}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-edge2 bg-surface px-2.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              variant="secondary"
+              size="sm"
+              leftIcon={<Download className="h-3.5 w-3.5" />}
             >
-              <Download className="h-3.5 w-3.5" /> Export CSV
-            </button>
-            <button
+              Export CSV
+            </Button>
+            <Button
               type="button"
               onClick={() => setSelectedIds(new Set())}
               aria-label="Clear selection"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              variant="ghost"
+              className="h-8 w-8"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -384,13 +399,14 @@ export default function Assets() {
               </code>
               . Valid rows are imported; invalid rows are reported per line.
             </p>
-            <button
+            <Button
               type="button"
               onClick={onDownloadTemplate}
-              className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+              variant="text"
+              leftIcon={<Download className="h-4 w-4" />}
             >
-              <Download className="h-4 w-4" /> Download template CSV
-            </button>
+              Download template CSV
+            </Button>
             <input
               ref={fileRef}
               type="file"
@@ -407,22 +423,18 @@ export default function Assets() {
                 {(file.size / 1024).toFixed(1)} KB)
               </p>
             )}
-            <button
+            <Button
               type="button"
               onClick={onImport}
-              disabled={!file || importMutation.isPending}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+              disabled={!file}
+              loading={importMutation.isPending}
+              fullWidth
+              variant="primary"
+              size="lg"
+              leftIcon={!importMutation.isPending ? <FileUp className="h-4 w-4" /> : undefined}
             >
-              {importMutation.isPending ? (
-                <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" /> Importing…
-                </>
-              ) : (
-                <>
-                  <FileUp className="h-4 w-4" /> Import {file ? file.name : 'CSV'}
-                </>
-              )}
-            </button>
+              Import {file ? file.name : 'CSV'}
+            </Button>
             {importMutation.isError && (
               <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
                 {(importMutation.error as Error).message}
@@ -477,18 +489,17 @@ export default function Assets() {
               onChange={setBulkStatus}
               options={ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))}
             />
-            <button
+            <Button
               type="button"
               onClick={() => bulkStatusMutation.mutate({ ids: [...selectedIds], status: bulkStatus })}
               disabled={bulkStatusMutation.isPending}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+              loading={bulkStatusMutation.isPending}
+              fullWidth
+              variant="primary"
+              size="lg"
             >
-              {bulkStatusMutation.isPending ? (
-                <><LoaderCircle className="h-4 w-4 animate-spin" /> Updating…</>
-              ) : (
-                <>Update status</>
-              )}
-            </button>
+              Update status
+            </Button>
             {bulkStatusMutation.isError && (
               <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
                 {(bulkStatusMutation.error as Error).message}
@@ -509,27 +520,28 @@ export default function Assets() {
                 placeholder="Select user…"
                 options={(usersData?.items ?? []).map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))}
               />
-              <button
+              <Button
                 type="button"
                 onClick={() => bulkAssignMutation.mutate({ ids: [...selectedIds], userId: null })}
                 disabled={bulkAssignMutation.isPending}
-                className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-edge2 bg-surface px-3 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+                variant="secondary"
+                size="lg"
+                className="shrink-0"
               >
                 Unassign
-              </button>
+              </Button>
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => bulkAssignMutation.mutate({ ids: [...selectedIds], userId: bulkUserId || null })}
-              disabled={bulkAssignMutation.isPending || !bulkUserId}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+              disabled={!bulkUserId}
+              loading={bulkAssignMutation.isPending}
+              fullWidth
+              variant="primary"
+              size="lg"
             >
-              {bulkAssignMutation.isPending ? (
-                <><LoaderCircle className="h-4 w-4 animate-spin" /> Assigning…</>
-              ) : (
-                <>Assign to user</>
-              )}
-            </button>
+              Assign to user
+            </Button>
             {bulkAssignMutation.isError && (
               <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
                 {(bulkAssignMutation.error as Error).message}
@@ -546,25 +558,27 @@ export default function Assets() {
               This permanently removes {selectedIds.size} asset{selectedIds.size === 1 ? '' : 's'} from the registry. Tickets keep their history (asset link cleared); CMDB relationships are removed. This cannot be undone.
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => setBulkAction(null)}
-                className="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-edge2 bg-surface px-4 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+                variant="secondary"
+                size="lg"
+                className="flex-1"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => bulkDeleteMutation.mutate([...selectedIds])}
                 disabled={bulkDeleteMutation.isPending}
-                className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+                loading={bulkDeleteMutation.isPending}
+                variant="danger"
+                size="lg"
+                className="flex-1"
+                leftIcon={!bulkDeleteMutation.isPending ? <Trash2 className="h-4 w-4" /> : undefined}
               >
-                {bulkDeleteMutation.isPending ? (
-                  <><LoaderCircle className="h-4 w-4 animate-spin" /> Deleting…</>
-                ) : (
-                  <><Trash2 className="h-4 w-4" /> Delete</>
-                )}
-              </button>
+                Delete
+              </Button>
             </div>
             {bulkDeleteMutation.isError && (
               <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">

@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Select from '@/components/Select';
 import { TABLE_SPEC } from '@/components/tableSpec';
+import { Button, BUTTON } from '@/components/Button';
 
 /**
  * Shared pagination footer — the SAME UI every ITMS list renders:
@@ -31,7 +32,8 @@ export default function PaginationFooter({
   const from = total !== undefined && total > 0 ? Math.min((page - 1) * pageSize + 1, total) : 0;
   const to = total !== undefined ? Math.min(page * pageSize, total) : rowsLength;
   const navBtn =
-    'flex h-8 w-8 items-center justify-center rounded-lg border border-edge2 text-secondary transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
+    BUTTON.ghost +
+    ' h-8 w-8 rounded-lg border border-edge2 text-secondary hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   return (
     <div className={TABLE_SPEC.footer}>
@@ -52,7 +54,7 @@ export default function PaginationFooter({
             { value: '50', label: '50 / page' },
           ]}
         />
-        <button
+        <Button
           type="button"
           aria-label="Previous page"
           className={navBtn}
@@ -60,11 +62,11 @@ export default function PaginationFooter({
           onClick={() => onPageChange?.(page - 1)}
         >
           <ChevronLeft className="h-4 w-4" />
-        </button>
+        </Button>
         <span className="min-w-[76px] text-center tabular-nums">
           {pages > 0 ? `Page ${page} of ${pages}` : ''}
         </span>
-        <button
+        <Button
           type="button"
           aria-label="Next page"
           className={navBtn}
@@ -72,7 +74,7 @@ export default function PaginationFooter({
           onClick={() => onPageChange?.(page + 1)}
         >
           <ChevronRight className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
     </div>
   );

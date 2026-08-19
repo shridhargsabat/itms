@@ -16,6 +16,7 @@ import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
 import PaginationFooter from '@/components/PaginationFooter';
 import Select from '@/components/Select';
+import { Button } from '@/components/Button';
 import { getCachedUser } from '@/api/client';
 import {
   approveRequest,
@@ -118,12 +119,13 @@ export default function Requests() {
             Raise a structured IT request instead of a corridor / WhatsApp ask.
           </p>
         </div>
-        <button
+        <Button
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          variant="primary"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" /> New Request
-        </button>
+          New Request
+        </Button>
       </div>
 
       {/* tabs */}
@@ -443,17 +445,15 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
 
         {create.isError && <p className="text-xs text-red-400">Failed to submit. Please try again.</p>}
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-elevated">
-            Cancel
-          </button>
-          <button
+          <Button onClick={onClose} variant="secondary">Cancel</Button>
+          <Button
             onClick={() => create.mutate()}
-            disabled={!catalogId || !subject.trim() || missingRequired || create.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+            disabled={!catalogId || !subject.trim() || missingRequired}
+            loading={create.isPending}
+            variant="primary"
           >
-            {create.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
             Submit Request
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>
