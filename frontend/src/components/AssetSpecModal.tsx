@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CalendarDays, History, IndianRupee, LoaderCircle, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
+import { ArrowRight, CalendarDays, History, IndianRupee, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
 import { assignAsset, createClaim, getAssetLifecycle, getCachedUser, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
 import type { Asset, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
@@ -129,21 +129,24 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
           </div>
           <div className="flex items-center gap-1">
             {!editing && isAdmin && (
-              <button
+              <Button
                 type="button"
                 onClick={openEdit}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-elevated"
+                variant="ghost"
+                className="gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent"
               >
                 <Pencil className="h-3.5 w-3.5" /> Edit
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1 text-secondary transition-colors hover:bg-elevated hover:text-primary"
+              variant="ghost"
+              className="rounded-md p-1"
+              aria-label="Close"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -264,23 +267,27 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                 </p>
               )}
               <div className="flex gap-2">
-                <button
+                <Button
                   type="submit"
-                  disabled={save.isPending}
-                  className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+                  loading={save.isPending}
+                  variant="primary"
+                  size="lg"
+                  className="flex-1"
                 >
-                  {save.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : 'Save changes'}
-                </button>
-                <button
+                  Save changes
+                </Button>
+                <Button
                   type="button"
                   onClick={() => {
                     setEditing(false);
                     setForm({});
                   }}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-edge px-4 text-sm text-secondary transition-colors hover:bg-elevated"
+                  variant="secondary"
+                  size="lg"
+                  className="border-edge"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </form>
           ) : (
@@ -402,13 +409,15 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                       onChange={(e) => setClaimIssue(e.target.value)}
                       className="h-9 min-w-0 flex-1 rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent"
                     />
-                    <button
+                    <Button
                       onClick={() => claimVendor && claimIssue.trim() && addClaim.mutate({ vendor_id: claimVendor, issue: claimIssue.trim() })}
                       disabled={addClaim.isPending || !claimVendor || !claimIssue.trim()}
-                      className="h-9 shrink-0 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+                      variant="primary"
+                      size="sm"
+                      className="shrink-0"
                     >
                       Log
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {(claims.data?.length ?? 0) === 0 ? (

@@ -96,7 +96,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ) : (
         leftIcon
       )}
-      {children != null && <span>{children}</span>}
+      {children}
       {!loading && rightIcon}
     </button>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import ThemeToggle from '@/components/ThemeToggle';
+import { Button } from '@/components/Button';
 import { applyTheme, watchSystemTheme } from '@/lib/theme';
 import {
   Download,
@@ -118,24 +119,26 @@ export default function Layout() {
           <span className="block text-[9px] text-muted">build {__BUILD_SHA__}</span>
         </div>
         <NotificationsBell />
-        <button
+        <Button
           type="button"
           onClick={handleInstall}
           aria-label="Install app"
           title={isIOS ? 'Install via Share → Add to Home Screen' : 'Install app'}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated/60 hover:text-accent"
+          variant="ghost"
+          className="h-11 w-11 shrink-0 hover:text-accent"
         >
           <Download className="h-5 w-5" />
-        </button>
+        </Button>
         <ThemeToggle className="h-11 w-11 rounded-lg text-secondary hover:text-accent" />
-        <button
+        <Button
           type="button"
           onClick={signOut}
           aria-label="Sign out"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated/60 hover:text-red-400"
+          variant="ghost"
+          className="h-11 w-11 shrink-0 hover:text-red-400"
         >
           <LogOut className="h-5 w-5" />
-        </button>
+        </Button>
       </header>
       <aside
         onMouseEnter={() => setHovering(true)}
@@ -204,11 +207,12 @@ export default function Layout() {
         )}
 
         <div className="p-2">
-          <button
+          <Button
             type="button"
             onClick={toggleSidebar}
+            variant="ghost"
             className={cn(
-              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated/60 hover:text-primary',
+              'w-full justify-start gap-3 px-3 py-2 text-sm',
               wide ? '' : 'justify-center px-0',
             )}
           >
@@ -220,19 +224,20 @@ export default function Layout() {
                 <span>Collapse</span>
               </>
             )}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={signOut}
+            variant="ghost"
             className={cn(
-              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-red-500/10 hover:text-red-400',
+              'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm text-muted hover:bg-red-500/10 hover:text-red-400',
               wide ? '' : 'justify-center px-0',
             )}
             title="Sign out"
           >
             <LogOut className="h-5 w-5 shrink-0" />
             {wide && <span>Sign out</span>}
-          </button>
+          </Button>
           <Link
             to="/account"
             className={cn(
@@ -245,18 +250,19 @@ export default function Layout() {
             {wide && <span>Change password</span>}
           </Link>
           {installable && (
-            <button
+            <Button
               type="button"
               onClick={promptInstall}
+              variant="ghost"
               className={cn(
-                'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-elevated/60 hover:text-accent',
+                'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm text-muted hover:text-accent',
                 wide ? '' : 'justify-center px-0',
               )}
               title="Install app"
             >
               <Download className="h-4 w-4 shrink-0" />
               {wide && <span>Install app</span>}
-            </button>
+            </Button>
           )}
           <div className={cn('mt-1', wide && 'px-2')}>
             <ThemeToggle className={cn('w-full', wide ? 'h-9' : 'h-9 w-9')} />

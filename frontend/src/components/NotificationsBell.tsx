@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, BellOff } from 'lucide-react';
 import { getNotifications, getUnreadCount, markAllNotificationsRead, markNotificationRead } from '@/api/client';
 import { cn, formatDate } from '@/lib/utils';
+import { Button } from '@/components/Button';
 
 const KIND_ICON: Record<string, string> = {
   TICKET_ASSIGNED: '🎫',
@@ -117,11 +118,12 @@ export default function NotificationsBell({ className }: { className?: string })
 
   return (
     <div ref={boxRef} className={cn('relative', className)}>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label="Notifications"
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-elevated/60 hover:text-accent"
+        variant="ghost"
+        className="relative h-11 w-11 shrink-0 hover:text-accent"
       >
         <Bell className="h-5 w-5" />
         {count > 0 && (
@@ -129,7 +131,7 @@ export default function NotificationsBell({ className }: { className?: string })
             {count > 99 ? '99+' : count}
           </span>
         )}
-      </button>
+      </Button>
 
       {open &&
         createPortal(
@@ -141,27 +143,29 @@ export default function NotificationsBell({ className }: { className?: string })
             <div className="flex items-center justify-between border-b border-edge px-3 py-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">Notifications</p>
               <div className="flex items-center gap-1">
-                <button
+                <Button
                   type="button"
                   onClick={() => markAllNotificationsRead().then(() => {
                     qc.invalidateQueries({ queryKey: ['unread-count'] });
                     qc.invalidateQueries({ queryKey: ['notifications'] });
                   })}
-                  className="rounded px-2 py-0.5 text-[10px] text-accent hover:bg-elevated"
+                  variant="ghost"
+                  className="px-2 py-0.5 text-[10px] text-accent"
                 >
                   Mark all read
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => {
                     setVisible((v) => !v);
                     if (!visible) qc.invalidateQueries({ queryKey: ['unread-count'] });
                   }}
                   aria-label="Toggle badge"
-                  className="rounded px-1.5 py-0.5 text-muted hover:bg-elevated"
+                  variant="ghost"
+                  className="px-1.5 py-0.5 text-muted"
                 >
                   <BellOff className="h-3 w-3" />
-                </button>
+                </Button>
               </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
@@ -190,13 +194,14 @@ export default function NotificationsBell({ className }: { className?: string })
                 </button>
               ))}
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => { setOpen(false); navigate('/notifications'); }}
-              className="block w-full border-t border-edge px-3 py-2 text-center text-[11px] text-accent hover:bg-elevated/40"
+              variant="ghost"
+              className="w-full border-t border-edge px-3 py-2 text-[11px] text-accent"
             >
               View all notifications
-            </button>
+            </Button>
           </div>,
           document.body,
         )}
