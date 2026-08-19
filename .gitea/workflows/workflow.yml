@@ -37,23 +37,32 @@ jobs:
           npm run build
 
   # ── Backend: Rust compile check ───────────────────────────────────────
-  # node:20-bullseye has no Rust toolchain, so override the job container
-  # with the Rust builder image (same base as the backend Dockerfile).
+  # Runs on the default node:20-bullseye container (which has node, required
+  # by actions/checkout — an overridden rust-only image breaks checkout with
+  # "exec: node not found"). We install the Rust toolchain inside the step.
   backend-check:
     runs-on: ubuntu-latest
-    container:
-      image: rust:1.97-slim
+    env:
+      CARGO_HOME: /root/.cargo
+      RUSTUP_HOME: /root/.rustup
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Backend - Install build deps
+      - name: Backend - Install Rust toolchain + build deps
         run: |
-          apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-            gcc libc6-dev pkg-config 2>&1 | tail -2
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            curl build-essential gcc libc6-dev pkg-config 2>&1 | tail -2
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            -o /tmp/rustup-init.sh
+          sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain stable
+          export PATH="$CARGO_HOME/bin:$PATH"
+          rustc --version && cargo --version
 
       - name: Backend - cargo check (release profile)
         run: |
+          export PATH="$CARGO_HOME/bin:$PATH"
           cd backend
           cargo check --release
 
