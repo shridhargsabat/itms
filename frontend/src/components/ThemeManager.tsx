@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Monitor, Moon, Palette, Sun } from 'lucide-react';
 import Modal from '@/components/Modal';
+import { Button } from '@/components/Button';
 import { cn } from '@/lib/utils';
 import { getThemeMode, onThemeChanged, setThemeMode, type ThemeMode } from '@/lib/theme';
 
@@ -147,20 +148,20 @@ export default function ThemeManager({
       </div>
 
       <div className="mt-5 flex items-center justify-end gap-2">
-        <button
+        <Button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-edge2 px-4 py-2 text-sm font-medium text-secondary hover:bg-elevated hover:text-primary"
+          variant="secondary"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={apply}
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90"
+          variant="primary"
         >
           Apply theme
-        </button>
+        </Button>
       </div>
     </Modal>
   );

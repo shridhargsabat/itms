@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { visibleNav } from '@/lib/nav';
 import { getCachedUser } from '@/api/client';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/Button';
 
 /**
  * Mobile-only bottom navigation — SAPL-style: 4 primary tabs + a "More" sheet
@@ -103,11 +104,12 @@ export default function BottomNav() {
             </NavLink>
           ))}
           {rest.length > 0 && (
-            <button
+            <Button
               type="button"
               onClick={() => setMore((v) => !v)}
               aria-label="More sections"
               aria-expanded={more}
+              variant="nav"
               className={cn(cell(more), 'text-[10.5px] leading-none')}
             >
               <svg
@@ -122,7 +124,7 @@ export default function BottomNav() {
                 <circle cx="14" cy="9" r="1.35" fill="currentColor" />
               </svg>
               <span className="text-[10.5px] leading-none font-medium">More</span>
-            </button>
+            </Button>
           )}
         </div>
       </nav>

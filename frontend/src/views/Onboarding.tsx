@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn, formatDateOnly, inputCls, labelCls } from '@/lib/utils';
+import { Button } from '@/components/Button';
 import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
 import PaginationFooter from '@/components/PaginationFooter';
@@ -171,12 +172,13 @@ export default function Onboarding() {
           </p>
         </div>
         {isAdmin && (
-          <button
+          <Button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            variant="primary"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> New {tab === 'ONBOARDING' ? 'Joiner' : 'Leaver'} Event
-          </button>
+            New {tab === 'ONBOARDING' ? 'Joiner' : 'Leaver'} Event
+          </Button>
         )}
       </div>
 
@@ -366,13 +368,15 @@ function CreateEventModal({
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className={labelCls}>Checklist</span>
-            <button
+            <Button
               type="button"
               onClick={() => setTasks((ts) => [...ts, { title: '', category: 'OTHER' }])}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent/10"
+              variant="ghost"
+              className="gap-1 rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent/10"
+              leftIcon={<Plus className="h-3 w-3" />}
             >
-              <Plus className="h-3 w-3" /> Add row
-            </button>
+              Add row
+            </Button>
           </div>
           <ScrollX>
             <div className="flex min-w-[560px] flex-col gap-2">
@@ -390,13 +394,15 @@ function CreateEventModal({
                     options={CATS.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
                     className="w-36"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setTasks((ts) => ts.filter((_, idx) => idx !== i))}
-                    className="rounded-md p-1.5 text-muted hover:bg-elevated hover:text-red-400"
+                    variant="ghost"
+                    size="icon"
+                    className="p-1.5 text-muted hover:text-red-400"
                   >
                     <Trash2 className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -407,17 +413,15 @@ function CreateEventModal({
           <p className="text-xs text-red-400">Failed to create event. Please try again.</p>
         )}
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-elevated">
-            Cancel
-          </button>
-          <button
+          <Button onClick={onClose} variant="secondary">Cancel</Button>
+          <Button
             onClick={() => create.mutate()}
-            disabled={!name.trim() || !email.trim() || create.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+            disabled={!name.trim() || !email.trim()}
+            loading={create.isPending}
+            variant="primary"
           >
-            {create.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
             Create Event
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>
@@ -521,13 +525,15 @@ function EventDetailModal({
                       {t.note && <span>{t.note}</span>}
                     </div>
                   </div>
-                  <button
+                  <Button
                     onClick={() => onDeleteTask(t.id)}
-                    className="rounded-md p-1 text-muted hover:bg-elevated hover:text-red-400"
+                    variant="ghost"
+                    size="icon"
+                    className="p-1 text-muted hover:text-red-400"
                     title="Delete task"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
@@ -549,50 +555,52 @@ function EventDetailModal({
             options={CATS.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
             className="w-32"
           />
-          <button
+          <Button
             onClick={() => newTitle.trim() && addTask.mutate()}
-            disabled={!newTitle.trim() || addTask.isPending}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            disabled={!newTitle.trim()}
+            loading={addTask.isPending}
+            variant="primary"
+            size="sm"
           >
             Add
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-edge pt-3">
           {isAdmin && (
             <>
-              <button onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-lg border border-edge px-3 py-2 text-xs font-medium text-secondary hover:bg-elevated">
-                <Pencil className="h-3.5 w-3.5" /> Edit
-              </button>
-              <button onClick={() => onToggleEvent(ev)} className="inline-flex items-center gap-1.5 rounded-lg border border-edge px-3 py-2 text-xs font-medium text-secondary hover:bg-elevated">
+              <Button onClick={onEdit} variant="secondary" size="sm" className="border-edge" leftIcon={<Pencil className="h-3.5 w-3.5" />}>
+                Edit
+              </Button>
+              <Button onClick={() => onToggleEvent(ev)} variant="secondary" size="sm" className="border-edge">
                 {ev.status === 'OPEN' ? 'Close event' : 'Reopen event'}
-              </button>
+              </Button>
               {deleting ? (
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] text-secondary">Delete {ev.person_name.split(' ')[0]}'s event + all tasks?</span>
-                  <button
+                  <Button
                     onClick={() => {
                       onDeleteEvent();
                       setDeleting(false);
                     }}
-                    className="rounded-lg bg-red-500 px-2.5 py-1.5 text-[11px] font-semibold text-white"
+                    variant="danger"
+                    size="sm"
+                    className="px-2.5 py-1.5 text-[11px]"
                   >
                     Yes, delete
-                  </button>
-                  <button onClick={() => setDeleting(false)} className="rounded-lg border border-edge px-2.5 py-1.5 text-[11px] text-secondary hover:bg-elevated">
+                  </Button>
+                  <Button onClick={() => setDeleting(false)} variant="secondary" size="sm" className="border-edge px-2.5 py-1.5 text-[11px]">
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <button onClick={() => setDeleting(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10">
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
-                </button>
+                <Button onClick={() => setDeleting(true)} variant="secondary" size="sm" className="border-red-500/30 text-red-400 hover:bg-red-500/10" leftIcon={<Trash2 className="h-3.5 w-3.5" />}>
+                  Delete
+                </Button>
               )}
             </>
           )}
-          <button onClick={onClose} className="rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white">
-            Done
-          </button>
+          <Button onClick={onClose} variant="primary" size="sm">Done</Button>
         </div>
       </div>
     </Modal>
@@ -640,16 +648,14 @@ function EditEventModal({
           <input type="date" className={inputCls} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </label>
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-secondary hover:bg-elevated">
-            Cancel
-          </button>
-          <button
+          <Button onClick={onClose} variant="secondary">Cancel</Button>
+          <Button
             onClick={() => save.mutate()}
-            disabled={save.isPending}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            loading={save.isPending}
+            variant="primary"
           >
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

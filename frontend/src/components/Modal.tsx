@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { Button } from '@/components/Button';
 
 interface ModalProps {
   title: string;
@@ -29,14 +30,15 @@ export default function Modal({ title, onClose, children }: ModalProps) {
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-elevated2 sm:hidden" />
         <div className="flex items-center justify-between border-b border-edge px-5 py-4">
           <h2 className="text-sm font-semibold text-primary">{title}</h2>
-          <button
+          <Button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-md p-2 text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            variant="ghost"
+            size="icon"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         <div className="overflow-y-auto px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] [overscroll-behavior:contain]">
           {children}

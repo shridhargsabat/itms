@@ -5,6 +5,7 @@ import { CheckCircle2, CircleAlert, Flag, ScanLine, XCircle } from 'lucide-react
 import { listAssets, scanAudit } from '@/api/client';
 import type { Asset, QrScanResult } from '@/api/types';
 import { parsePayload } from '@/lib/qr';
+import { Button } from '@/components/Button';
 
 /**
  * Phase 2 (#65): mobile QR scan audit mode.
@@ -165,7 +166,7 @@ export default function Scan() {
               placeholder="e.g. AST-0012 or serial"
               className="h-9 min-w-0 flex-1 rounded-lg border border-edge2 bg-base px-3 font-mono text-sm outline-none focus:border-accent"
             />
-            <button type="submit" className="h-9 shrink-0 rounded-lg bg-accent px-4 text-xs font-semibold text-white hover:bg-accent/90">Enter</button>
+            <Button type="submit" variant="primary" size="sm" className="shrink-0">Enter</Button>
           </div>
         </form>
       )}
@@ -175,12 +176,13 @@ export default function Scan() {
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-secondary"><Flag className="h-3.5 w-3.5" /> Audit run</h2>
           {run && expected > 0 && !ended && (
-            <button
+            <Button
               onClick={() => setEnded(true)}
-              className="rounded-lg border border-edge2 px-3 py-1.5 text-[11px] font-medium text-secondary hover:bg-elevated"
+              variant="secondary"
+              size="sm"
             >
               End run & see result
-            </button>
+            </Button>
           )}
         </div>
 

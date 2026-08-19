@@ -5,12 +5,12 @@ import type { LucideIcon } from 'lucide-react';
 import { PriorityBadge } from '@/components/TicketBadge';
 import SlaChip from '@/components/SlaChip';
 import BentoCard, { BucketBar } from '@/components/BentoCard';
+import { Button } from '@/components/Button';
 import {
   Timer,
   Activity,
   Boxes,
   ChevronRight,
-  LoaderCircle,
   Play,
   Plus,
   BadgeCheck,
@@ -74,13 +74,14 @@ function OverdueTickets() {
     <section className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-primary">SLA Overdue</h2>
-        <button
+        <Button
           type="button"
           onClick={() => navigate('/tickets?overdue=true')}
-          className="text-xs text-accent hover:underline"
+          variant="text"
+          className="text-xs"
         >
           View all →
-        </button>
+        </Button>
       </div>
       <div className="flex flex-col gap-2">
         {rows.map((t) => (
@@ -206,21 +207,21 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
         </p>
       )}
       <div className="flex justify-end gap-2 pt-1">
-        <button
+        <Button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-edge2 px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated"
+          variant="secondary"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+          loading={mutation.isPending}
+          variant="primary"
         >
-          {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Create Ticket
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -365,23 +366,27 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
                   setSpecRows((rows) => rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))
                 }
               />
-              <button
+              <Button
                 type="button"
                 aria-label={`Remove spec ${k || i + 1}`}
                 onClick={() => setSpecRows((rows) => rows.filter((_, j) => j !== i))}
-                className="shrink-0 rounded-lg border border-edge p-2 text-secondary transition-colors hover:bg-elevated hover:text-red-400"
+                variant="ghost"
+                className="shrink-0 border border-edge p-2 hover:text-red-400"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           ))}
-          <button
+          <Button
             type="button"
             onClick={() => setSpecRows((rows) => [...rows, ['', '']])}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-edge2 px-3 py-1.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-primary"
+            variant="secondary"
+            size="sm"
+            className="border-dashed"
+            leftIcon={<Plus className="h-3.5 w-3.5" />}
           >
-            <Plus className="h-3.5 w-3.5" /> Add specification
-          </button>
+            Add specification
+          </Button>
         </div>
       </div>
       {mutation.isError && (
@@ -390,21 +395,21 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
         </p>
       )}
       <div className="flex justify-end gap-2 pt-1">
-        <button
+        <Button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-edge2 px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated"
+          variant="secondary"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+          loading={mutation.isPending}
+          variant="primary"
         >
-          {mutation.isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Add Asset
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -443,21 +448,26 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-all duration-150 hover:bg-blue-500 active:scale-[0.97]"
+            variant="primary"
+            size="lg"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> New Ticket
-          </button>
+            New Ticket
+          </Button>
           {isAdmin && (
-            <button
+            <Button
               type="button"
               onClick={() => setAssetOpen(true)}
-              className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-edge2 px-4 text-sm font-medium text-primary transition-all duration-150 hover:bg-elevated active:scale-[0.97]"
+              variant="secondary"
+              size="lg"
+              className="text-primary"
+              leftIcon={<Plus className="h-4 w-4" />}
             >
-              <Plus className="h-4 w-4" /> Add Asset
-            </button>
+              Add Asset
+            </Button>
           )}
         </div>
       </div>
@@ -590,11 +600,12 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 border-b border-edge px-5 py-4">
             <Activity className="h-4 w-4 text-secondary" />
             <h2 className="text-sm font-semibold text-primary">Recent Activity</h2>
-            <button
+            <Button
               type="button"
               onClick={() => setPaused((p) => !p)}
               title={paused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-edge px-2 py-0.5 text-xs text-muted transition-colors hover:border-edge2 hover:text-primary"
+              variant="ghost"
+              className="ml-auto rounded-full border border-edge px-2 py-0.5 text-xs text-muted hover:border-edge2 hover:text-primary"
             >
               {paused ? (
                 <Play className="h-3 w-3" />
@@ -605,7 +616,7 @@ export default function Dashboard() {
                 </>
               )}
               {paused && <span className="text-amber-400">paused</span>}
-            </button>
+            </Button>
           </div>
           <div className="divide-y divide-edge/60">
             {audit.isLoading &&
