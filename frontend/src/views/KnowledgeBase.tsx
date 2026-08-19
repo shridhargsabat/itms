@@ -11,6 +11,7 @@ import { getCachedUser } from '@/api/client';
 import { cn, formatDate, inputCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
+import { Button } from '@/components/Button';
 import type { KbArticle } from '@/api/types';
 
 // P1-7 (issue #48): lite knowledge base — articles by ticket type + canned
@@ -64,13 +65,15 @@ export default function KnowledgeBase() {
           <p className="text-xs text-muted">Solutions by ticket type · canned responses for agents</p>
         </div>
         {isStaff && (
-          <button
+          <Button
             type="button"
             onClick={() => setCreating(true)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-500/25"
+            className="ml-auto"
+            variant="primary"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> New article
-          </button>
+            New article
+          </Button>
         )}
       </div>
 
@@ -103,17 +106,20 @@ export default function KnowledgeBase() {
 
       {tab === 'canned' && (
         <div className="mt-3 flex items-center gap-2">
-          <button type="button" onClick={() => setTab('articles')} className="text-xs text-accent hover:underline">
+          <Button type="button" onClick={() => setTab('articles')} variant="text" className="text-xs">
             ← Articles
-          </button>
+          </Button>
           {isStaff && (
-            <button
+            <Button
               type="button"
               onClick={() => setShowCannedForm((v) => !v)}
-              className="ml-auto inline-flex items-center gap-1 rounded-lg border border-edge px-2.5 py-1 text-xs text-accent hover:bg-elevated"
+              className="ml-auto border-edge px-2.5 py-1 text-xs text-accent"
+              variant="secondary"
+              size="sm"
+              leftIcon={<Zap className="h-3.5 w-3.5" />}
             >
-              <Zap className="h-3.5 w-3.5" /> {showCannedForm ? 'Close' : 'New canned response'}
-            </button>
+              {showCannedForm ? 'Close' : 'New canned response'}
+            </Button>
           )}
         </div>
       )}
@@ -158,16 +164,16 @@ export default function KnowledgeBase() {
                     </p>
                   </div>
                   {isStaff && (
-                    <button type="button" onClick={() => setEditing(a)}
-                      className="rounded-lg border border-edge px-2 py-1 text-[11px] text-accent hover:bg-elevated">
+                    <Button type="button" onClick={() => setEditing(a)}
+                      variant="secondary" size="sm" className="border-edge px-2 py-1 text-[11px] text-accent">
                       Edit
-                    </button>
+                    </Button>
                   )}
                   {isAdmin && (
-                    <button type="button" onClick={() => delArticle.mutate(a.id)}
-                      className="rounded-lg border border-edge px-2 py-1 text-[11px] text-red-400 hover:bg-red-500/10">
+                    <Button type="button" onClick={() => delArticle.mutate(a.id)}
+                      variant="ghost" size="sm" className="border border-edge px-2 py-1 text-red-400 hover:bg-red-500/10">
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -192,10 +198,10 @@ export default function KnowledgeBase() {
                     <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-xs text-muted">{c.body}</p>
                   </div>
                   {isAdmin && (
-                    <button type="button" onClick={() => delCanned.mutate(c.id)}
-                      className="rounded-lg border border-edge px-2 py-1 text-[11px] text-red-400 hover:bg-red-500/10">
+                    <Button type="button" onClick={() => delCanned.mutate(c.id)}
+                      variant="ghost" size="sm" className="border border-edge px-2 py-1 text-red-400 hover:bg-red-500/10">
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -210,13 +216,15 @@ export default function KnowledgeBase() {
       </div>
 
       {tab === 'articles' && isStaff && (
-        <button
+        <Button
           type="button"
           onClick={() => setTab('canned')}
-          className="mt-6 inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
+          variant="text"
+          className="mt-6 text-xs"
+          leftIcon={<Zap className="h-3.5 w-3.5" />}
         >
-          <Zap className="h-3.5 w-3.5" /> Canned responses for agents →
-        </button>
+          Canned responses for agents →
+        </Button>
       )}
     </div>
   );
@@ -253,17 +261,19 @@ function ArticleForm({ article, onClose }: { article: KbArticle | null; onClose:
           onChange={(e) => setBody(e.target.value)}
         />
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
             disabled={!title.trim() || !body.trim() || mutation.isPending}
+            loading={mutation.isPending}
             onClick={() => mutation.mutate()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+            variant="primary"
+            size="sm"
           >
             {article ? 'Save changes' : 'Create article'}
-          </button>
-          <button type="button" onClick={onClose} className="rounded-lg border border-edge px-3 py-2 text-xs text-muted hover:bg-elevated">
+          </Button>
+          <Button type="button" onClick={onClose} variant="secondary" size="sm" className="border-edge text-muted">
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -290,14 +300,16 @@ function CannedForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setTitle(e.target.value)} />
         <textarea className={cn(inputCls, 'min-h-24 resize-y')} placeholder="Template body…" value={body}
           onChange={(e) => setBody(e.target.value)} />
-        <button
+        <Button
           type="button"
           disabled={!title.trim() || !body.trim() || mutation.isPending}
+          loading={mutation.isPending}
           onClick={() => mutation.mutate()}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          variant="primary"
+          size="sm"
         >
           Save
-        </button>
+        </Button>
       </div>
     </div>
   );
