@@ -8,9 +8,13 @@ export const TABLE_SPEC = {
      be on the single scrolling element — if the vertical scroll sat on an outer shell
      while an inner overflow-x div sat between it and thead, that inner div becomes the
      nearest scroll container and captures (breaks) the sticky pinning (react-spa-ui-pitfalls §1).
+     On desktop the shell is a bounded flex column and this box becomes `flex-1 min-h-0`
+     (DataTable classes) so the body auto-fills the viewport bottom, scrolling internally;
+     `lg:max-h-none` removes the old 62vh ceiling (the fill max-height now comes from the
+     shell's measured inline max-height). Mobile keeps the capped fallback.
      NOTE: do NOT add transform/filter/will-change here — they create a containing block
      that breaks position:sticky on th. */
-  tableScroll: 'max-h-[55vh] overflow-y-auto lg:max-h-[62vh]',
+  tableScroll: 'max-h-[55vh] overflow-y-auto lg:max-h-none',
   emptyShell: 'rounded-xl border border-dashed border-edge p-10 text-center text-sm text-muted',
   head: 'bg-surface text-xs uppercase tracking-wide text-secondary',
   /* sticky top-0 pins the header inside the shell's vertical scroll box; opaque bg so

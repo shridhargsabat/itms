@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ScrollXProps {
@@ -6,6 +6,8 @@ interface ScrollXProps {
   className?: string;
   /** Class for the scrolling element itself. */
   innerClassName?: string;
+  /** Inline styles forwarded to the scrolling element (e.g. a fill-height max-height). */
+  style?: CSSProperties;
 }
 
 /**
@@ -13,7 +15,7 @@ interface ScrollXProps {
  * The fade appears only when content actually overflows (ResizeObserver),
  * so wide tables/boards signal "swipe for more" without permanent decoration.
  */
-export default function ScrollX({ children, className, innerClassName }: ScrollXProps) {
+export default function ScrollX({ children, className, innerClassName, style }: ScrollXProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [canScroll, setCanScroll] = useState(false);
 
@@ -29,7 +31,7 @@ export default function ScrollX({ children, className, innerClassName }: ScrollX
 
   return (
     <div className={cn('relative', className)}>
-      <div ref={ref} className={cn('overflow-x-auto', innerClassName)}>
+      <div ref={ref} style={style} className={cn('overflow-x-auto', innerClassName)}>
         {children}
       </div>
       <div

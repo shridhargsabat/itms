@@ -1,5 +1,5 @@
-import { Fragment, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PaginationFooter from '@/components/PaginationFooter';
@@ -71,6 +71,53 @@ export default function DataTable<T extends { id: string }>({
   const selectable = selectedIds !== undefined && onSelectionChange !== undefined;
   const headCheckboxRef = useRef<HTMLInputElement>(null);
   const rowSelectable = (r: T) => (isRowSelectable ? isRowSelectable(r) : true);
+
+  // Auto-fill: on desktop (lg+) the table body grows to fill the viewport bottom
+  // instead of leaving empty space, scrolling internally when rows are longer
+  // than the available height. The SHELL is a flex column: the scroll area takes
+  // the flexible middle (flex-1 min-h-0) and the pagination footer sits naturally
+  // at the shell bottom, so only the shell's top needs measuring (no footer math).
+  const shellRef = useRef<HTMLDivElement>(null);
+  const shellMaxH = useRef<number | undefined>(undefined);
+  const [, setFillTick] = useState(0);
+  useEffect(() => {
+    const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+    const compute = () => {
+      const shell = shellRef.current;
+      if (!isDesktop() || !shell) {
+        if (shellMaxH.current !== undefined) {
+          shellMaxH.current = undefined;
+          setFillTick((t) => t + 1);
+        }
+        return;
+      }
+      // available = viewport bottom - where the shell starts - bottom breathing (24)
+      const next = Math.max(window.innerHeight - shell.getBoundingClientRect().top - 24, 280);
+      // only re-render when the measured height actually moved (avoid churn on scroll/resize)
+      if (shellMaxH.current === undefined || Math.abs(shellMaxH.current - next) > 2) {
+        shellMaxH.current = next;
+        setFillTick((t) => t + 1);
+      }
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    if (shellRef.current) ro.observe(shellRef.current);
+    window.addEventListener('resize', compute);
+    // the page scrolls under a sticky header on some screens — re-measure on scroll too
+    window.addEventListener('scroll', compute, { passive: true, capture: true });
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, { capture: true } as EventListenerOptions);
+    };
+  }, []);
+
+  // Applied to the SHELL only when the measured fill height is active (desktop);
+  // the CSS max-h-[55vh]/[62vh] classes still provide the mobile fallback.
+  const fillStyle: CSSProperties | undefined =
+    shellMaxH.current !== undefined
+      ? { maxHeight: `${shellMaxH.current}px` }
+      : undefined;
   const selectableRows = rows.filter(rowSelectable);
   const allPageSelected = selectable && selectableRows.length > 0 && selectableRows.every((r) => selectedIds!.has(r.id));
   const somePageSelected = selectable && selectableRows.some((r) => selectedIds!.has(r.id));
@@ -154,22 +201,27 @@ export default function DataTable<T extends { id: string }>({
 
   if (loading) {
     return (
-      <ScrollX className={TABLE_SPEC.shell} innerClassName={TABLE_SPEC.tableScroll}>
-        <table className={cn(TABLE_SPEC.table, minWidth)}>
-          {head}
-          <tbody className={TABLE_SPEC.tbody}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i}>
-                {columns.map((c) => (
-                  <td key={c.key} className="px-4 py-3">
-                    <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-elevated" />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </ScrollX>
+      <div ref={shellRef} style={fillStyle} className={cn(TABLE_SPEC.shell, 'flex flex-col')}>
+        <ScrollX
+          className="min-h-0 flex-1 flex flex-col"
+          innerClassName={cn(TABLE_SPEC.tableScroll, 'flex-1 min-h-0')}
+        >
+          <table className={cn(TABLE_SPEC.table, minWidth)}>
+            {head}
+            <tbody className={TABLE_SPEC.tbody}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  {columns.map((c) => (
+                    <td key={c.key} className="px-4 py-3">
+                      <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-elevated" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollX>
+      </div>
     );
   }
 
@@ -193,7 +245,7 @@ export default function DataTable<T extends { id: string }>({
     // both nav buttons disabled, and a stale page (rows gone, total > 0)
     // still offers Prev to navigate back.
     return (
-      <div className={TABLE_SPEC.shell}>
+      <div ref={shellRef} style={fillStyle} className={cn(TABLE_SPEC.shell, 'flex flex-col')}>
         <div className="p-10 text-center text-sm text-muted">{emptyMessage}</div>
         {footer}
       </div>
@@ -201,8 +253,15 @@ export default function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className={TABLE_SPEC.shell}>
-      <ScrollX innerClassName={TABLE_SPEC.tableScroll}>
+    <div
+      ref={shellRef}
+      style={fillStyle}
+      className={cn(TABLE_SPEC.shell, 'flex flex-col')}
+    >
+      <ScrollX
+        className="min-h-0 flex-1 flex flex-col"
+        innerClassName={cn(TABLE_SPEC.tableScroll, 'flex-1 min-h-0')}
+      >
         <table className={cn(TABLE_SPEC.table, minWidth)}>
           {head}
           <tbody className={TABLE_SPEC.tbody}>
