@@ -36,9 +36,9 @@ IMAGE_PREFIX="${IMAGE_PREFIX:-itms}"
 cd /code
 
 # ── 1. Reset checkout to the branch tip ─────────────────────────────────
-git fetch origin "$BRANCH" 2>/dev/null
-git checkout -f "$BRANCH" 2>/dev/null || git checkout -f FETCH_HEAD
-git reset --hard "origin/$BRANCH"
+git fetch --force origin "$BRANCH:refs/remotes/origin/$BRANCH" 2>/dev/null
+git checkout -f --detach "refs/remotes/origin/$BRANCH" 2>/dev/null
+git reset --hard "refs/remotes/origin/$BRANCH"
 SHA="$(git rev-parse --short=8 HEAD)"
 TAG="itms-${SHA}"
 BACKEND_IMG="${REGISTRY}/${PUSH_USER}/${IMAGE_PREFIX}-backend"
