@@ -14,6 +14,7 @@ import {
   Table,
   Trash2,
   User,
+  X,
   Zap,
 } from 'lucide-react';
 import {
@@ -375,8 +376,7 @@ export default function Tickets() {
         </div>
       </div>
 
-      <div className={cn('grid gap-4', selected && 'lg:grid-cols-[1fr_360px]')}>
-        <div className="min-w-0">
+      <div className="min-w-0">
           {view === 'table' ? (
             <DataTable
               columns={columns}
@@ -446,22 +446,39 @@ export default function Tickets() {
         </div>
 
         {selected && (
-          <aside className="h-fit min-w-0 rounded-xl border border-edge bg-surface/60 p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-accent">{selected.ticket_number}</span>
-              <PriorityBadge priority={selected.priority} />
-              <StatusBadge status={selected.status} />
-            </div>
-            <h2 className="mt-2 text-lg font-semibold text-primary">{selected.title}</h2>
-            <p className="mt-1 text-xs uppercase tracking-wide text-muted">
-              {selected.ticket_type.replace('_', ' ')}
-              {selected.source === 'EMAIL' && (
-                <span className="ml-2 rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-400">
-                  via Email
-                </span>
-              )}
-            </p>
-
+          <div className="fixed inset-0 z-[60]">
+            <div
+              className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setSelectedId(null)}
+            />
+            <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-edge bg-surface shadow-2xl">
+              <div className="flex items-start justify-between border-b border-edge px-5 py-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs text-accent">{selected.ticket_number}</span>
+                    <PriorityBadge priority={selected.priority} />
+                    <StatusBadge status={selected.status} />
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold text-primary">{selected.title}</h2>
+                  <p className="mt-0.5 text-xs uppercase tracking-wide text-muted">
+                    {selected.ticket_type.replace('_', ' ')}
+                    {selected.source === 'EMAIL' && (
+                      <span className="ml-1 rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-400">
+                        via Email
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  aria-label="Close"
+                  className="rounded-md p-1 text-secondary transition-colors hover:bg-elevated hover:text-primary"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 space-y-4 overflow-y-auto p-5">
             <div className="mt-3 rounded-lg border border-edge bg-surface/60 p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
@@ -542,9 +559,10 @@ export default function Tickets() {
             <div className="mt-3">
               <ConvertButton ticket={selected} />
             </div>
-          </aside>
+              </div>
+            </div>
+          </div>
         )}
-      </div>
 
       {newOpen && (
         <Modal title="New Ticket" onClose={() => setNewOpen(false)}>
