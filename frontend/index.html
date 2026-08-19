@@ -10,6 +10,8 @@
           var d = document.documentElement;
           if (m === 'ledgerly') {
             d.classList.add('dark', 'ledgerly-dark');
+          } else if (m === 'ledgerly-light') {
+            d.classList.add('ledgerly-light'); // light only — never .dark
           } else {
             var dark =
               m === 'dark' ||

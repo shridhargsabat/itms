@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Monitor, Moon, Palette, Sun } from 'lucide-react';
+import { Check, Monitor, Moon, Palette, Sparkles, Sun } from 'lucide-react';
 import Modal from '@/components/Modal';
 import { cn } from '@/lib/utils';
 import { getThemeMode, onThemeChanged, setThemeMode, type ThemeMode } from '@/lib/theme';
@@ -20,6 +20,13 @@ export const THEMES: ThemeMeta[] = [
     description: 'Bright white surfaces, slate text, indigo accent.',
     icon: Sun,
     wrapperClass: 'theme-light',
+  },
+  {
+    value: 'ledgerly-light',
+    label: 'Ledgerly Light',
+    description: 'Warm-paper light, deep-teal accent — the elegant Ledgerly look in daylight.',
+    icon: Sparkles,
+    wrapperClass: 'ledgerly-light',
   },
   {
     value: 'dark',
