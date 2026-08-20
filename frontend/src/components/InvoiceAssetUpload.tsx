@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
@@ -74,6 +74,19 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
   const parseMutation = useMutation({
     mutationFn: (file: File) => parseInvoicePdf(file),
   });
+
+  // ONE hidden file input drives all three picker triggers ("Choose PDF",
+  // "Try another file", "Replace PDF"). Programmatic .click() via this ref is
+  // required: wrapping a <Button> (a real <button>) inside a <label> does NOT
+  // forward the click to the input in browsers, so label-wrapped buttons were
+  // dead (bug fixed 2026-08-20).
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pickFile = () => fileInputRef.current?.click();
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFile(e.target.files?.[0]);
+    // Reset the input value so picking the SAME file again re-fires onChange.
+    e.target.value = '';
+  };
 
   // Creation state, keyed per-draft so each 'Add this asset' is independent.
   const [drafts, setDrafts] = useState<DraftForm[]>([]);
@@ -173,21 +186,14 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
           and add the assets by hand.
         </p>
         <div className="flex gap-2">
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0])}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              leftIcon={<FileUp className="h-4 w-4" />}
-            >
-              Try another file
-            </Button>
-          </label>
+          <Button
+            type="button"
+            variant="secondary"
+            leftIcon={<FileUp className="h-4 w-4" />}
+            onClick={pickFile}
+          >
+            Try another file
+          </Button>
           <Button type="button" variant="primary" onClick={onSwitchManual}>
             Fill manually
           </Button>
@@ -205,17 +211,9 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
           Line items are extracted into editable drafts. Each draft becomes its own
           asset with the invoice attached.
         </p>
-        <label className="cursor-pointer">
-          <input
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-          />
-          <Button type="button" leftIcon={<FileUp className="h-4 w-4" />}>
-            Choose PDF
-          </Button>
-        </label>
+        <Button type="button" leftIcon={<FileUp className="h-4 w-4" />} onClick={pickFile}>
+          Choose PDF
+        </Button>
       </div>
     );
   } else {
@@ -229,15 +227,15 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
             <span className="rounded-full border border-edge bg-elevated px-2 py-0.5">
               {source === 'digital' ? 'PDF text' : 'OCR'}
             </span>
-            <label className="ml-auto cursor-pointer text-accent hover:underline">
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={(e) => handleFile(e.target.files?.[0])}
-              />
+            <Button
+              type="button"
+              variant="text"
+              size="sm"
+              className="ml-auto px-0"
+              onClick={pickFile}
+            >
               Replace PDF
-            </label>
+            </Button>
           </div>
         )}
 
@@ -404,5 +402,16 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
     );
   }
 
-  return <div className="space-y-4">{body}</div>;
+  return (
+    <div className="space-y-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={handleInputChange}
+      />
+      {body}
+    </div>
+  );
 }
