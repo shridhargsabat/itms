@@ -33,6 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = db::AppState {
         pool,
         login_attempts: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+        opencode_api_key: std::env::var("OPENCODE_GO_API_KEY").ok(),
     };
 
     let cors = CorsLayer::new()

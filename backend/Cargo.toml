@@ -30,6 +30,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 sha2 = "0.10"
 csv = "1.3"
 pdf-extract = "0.8"
+base64 = "0.22"
 
 [profile.release]
 # Single-binary backend: thinner + smaller artifact, marginally faster at

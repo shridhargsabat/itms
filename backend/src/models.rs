@@ -70,6 +70,22 @@ pub struct Asset {
     pub location_name: Option<String>,
 }
 
+/// One stored document (invoice PDF) attached to an asset. `asset_id` is NULL
+/// while the document is in staging (parsed but not yet linked to a created
+/// asset); it is set when the parsed asset is created (invoice-parse feature).
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetDocument {
+    pub id: Uuid,
+    pub asset_id: Option<Uuid>,
+    pub filename: String,
+    pub content_type: String,
+    pub size_bytes: i64,
+    pub storage_path: String,
+    pub uploaded_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Ticket {
     pub id: Uuid,
