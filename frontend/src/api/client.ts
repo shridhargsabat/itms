@@ -333,21 +333,40 @@ export const importAssetsCsv = (csvText: string) =>
   });
 
 // ---- invoice-parse asset creation ----
-// CRITICAL: the Content-Type must NOT be set — `apiFetch` forces
-// application/json when a body is present, which would break multipart. Setting
-// it to undefined lets the browser add `multipart/form-data; boundary=…`.
+// CRITICAL: must NOT go through `apiFetchRaw`. Two reasons:
+//   1. apiFetchRaw forces `application/json` on a body when no Content-Type is set.
+//   2. Even setting `Content-Type: undefined` is wrong — `new Headers({...})`
+//      coerces that to the STRING "undefined" and keeps the header, so the browser
+//      never auto-injects the multipart boundary → backend gets "Invalid boundary
+//      for multipart/form-data" (400). A pre-built Headers object suppresses the
+//      automatic `multipart/form-data; boundary=…`.
+// Fix (mirrors uploadTicketAttachment): bypass apiFetch for the multipart request
+// and send a raw fetch with a plain headers object and no Content-Type, letting the
+// browser set the boundary itself.
 
 /** POST an invoice PDF; backend OCR/parses it into editable drafts. */
-export const parseInvoicePdf = (file: File) =>
-  apiFetch<InvoiceParseResult>('/assets/parse-invoice', {
+export const parseInvoicePdf = async (file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getToken();
+  const res = await fetch('/api/v1/assets/parse-invoice', {
     method: 'POST',
-    headers: { 'Content-Type': undefined as unknown as string },
-    body: (() => {
-      const fd = new FormData();
-      fd.append('file', file);
-      return fd;
-    })(),
+    body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
+  if (res.status === 401) {
+    clearSession();
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
+    }
+    throw new ApiError(401, 'Session expired — please sign in again');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error || `parse failed: ${res.status}`);
+  }
+  return res.json() as Promise<InvoiceParseResult>;
+};
 
 /** Bind a staged (parsed) document to the just-created asset. */
 export const linkInvoiceDocument = (docId: string, assetId: string) =>
