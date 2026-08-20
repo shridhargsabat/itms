@@ -20,6 +20,7 @@ import {
   TriangleAlert,
   UserRoundCheck,
   X,
+  FileUp,
 } from 'lucide-react';
 import {
   Link } from 'react-router-dom';
@@ -30,6 +31,7 @@ import {
 import type { CreateAssetInput, CreateTicketInput, DashboardMetrics, MetricBucket } from '@/api/types';
 import Modal from '@/components/Modal';
 import Select from '@/components/Select';
+import InvoiceAssetUpload from '@/components/InvoiceAssetUpload';
 import {
   cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 
@@ -229,6 +231,9 @@ function NewTicketForm({ onDone }: { onDone: () => void }) {
 
 function AddAssetForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
+  // #Task8: 'manual' (default) keeps the original form byte-for-byte; 'invoice'
+  // swaps in the PDF line-item upload flow.
+  const [mode, setMode] = useState<'manual' | 'invoice'>('manual');
   const [form, setForm] = useState<CreateAssetInput>({
     name: '',
     asset_tag: '',
@@ -263,7 +268,41 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
     setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <form
+    <div className="space-y-4">
+      {/* #Task8: segmented mode toggle — the manual form below stays exactly
+          as it was whenever 'manual' mode is active. */}
+      <div className="grid grid-cols-2 gap-1 rounded-lg border border-edge bg-elevated p-1">
+        <button
+          type="button"
+          onClick={() => setMode('manual')}
+          className={cn(
+            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+            mode === 'manual'
+              ? 'bg-accent text-white'
+              : 'text-secondary hover:text-primary',
+          )}
+        >
+          Fill manually
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('invoice')}
+          className={cn(
+            'flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+            mode === 'invoice'
+              ? 'bg-accent text-white'
+              : 'text-secondary hover:text-primary',
+          )}
+        >
+          <FileUp className="h-3.5 w-3.5" />
+          Upload invoice
+        </button>
+      </div>
+
+      {mode === 'invoice' ? (
+        <InvoiceAssetUpload onDone={onDone} onSwitchManual={() => setMode('manual')} />
+      ) : (
+      <form
       className="space-y-4"
       onSubmit={(ev) => {
         ev.preventDefault();
@@ -412,6 +451,8 @@ function AddAssetForm({ onDone }: { onDone: () => void }) {
         </Button>
       </div>
     </form>
+      )}
+    </div>
   );
 }
 

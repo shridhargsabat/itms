@@ -17,4 +17,7 @@ pub struct AppState {
     pub pool: PgPool,
     /// Per-IP failed-login attempt window (login + forgot-password rate limit, #86)
     pub login_attempts: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, Vec<std::time::Instant>>>>,
+    /// OpenCode Go bearer token for invoice OCR/parsing (mimo-v2.5). Injected via
+    /// OPENCODE_GO_API_KEY; None when unset (invoice parse returns a clear error).
+    pub opencode_api_key: Option<String>,
 }

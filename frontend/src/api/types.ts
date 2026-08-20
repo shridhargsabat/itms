@@ -243,6 +243,38 @@ export interface CreateAssetInput {
   location_id?: string | null;
 }
 
+// ---- invoice-parse asset creation ----
+
+export interface InvoiceDraft {
+  name?: string | null;
+  serialNumber?: string | null;
+  category?: string | null;
+  unitCost?: number | null;
+  purchaseDate?: string | null;
+  warrantyExpiry?: string | null;
+  vendorGuess?: string | null;
+  confidence: Record<string, number>;
+}
+
+export interface InvoiceParseResult {
+  drafts: InvoiceDraft[];
+  source: 'digital' | 'ocr';
+  rawPreview: string;
+  documentId: string;
+  parseError?: string;
+}
+
+export interface AssetDocument {
+  id: string;
+  asset_id: string | null;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_path: string;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
 export interface CreateTicketInput {
   title: string;
   description?: string;
