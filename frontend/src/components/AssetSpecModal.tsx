@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CalendarDays, History, IndianRupee, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
-import { assignAsset, createClaim, getAssetLifecycle, getCachedUser, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
-import type { Asset, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
+import { ArrowRight, CalendarDays, FileText, History, IndianRupee, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
+import { assignAsset, assetDocumentUrl, createClaim, getAssetLifecycle, getCachedUser, listAssetDocuments, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
+import type { Asset, AssetDocument, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import Select from '@/components/Select';
 import { Button } from '@/components/Button';
@@ -78,6 +78,11 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
   const claims = useQuery({
     queryKey: ['claims', 'asset', asset?.id],
     queryFn: () => listClaims({ asset_id: asset!.id }),
+    enabled: !!asset,
+  });
+  const documents = useQuery({
+    queryKey: ['asset-documents', asset?.id],
+    queryFn: () => (asset ? listAssetDocuments(asset.id) : Promise.resolve([])),
     enabled: !!asset,
   });
   const [claimIssue, setClaimIssue] = useState('');
@@ -386,6 +391,37 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                       <div key={k} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
                         <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted">{k}</span>
                         <span className="break-all text-right text-primary">{pretty(v)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-secondary">
+                  <FileText className="h-3.5 w-3.5" /> Documents
+                </h3>
+                {documents.isLoading ? (
+                  <p className="animate-pulse rounded-lg border border-edge p-3 text-xs text-muted">Loading…</p>
+                ) : !documents.data || documents.data.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-edge p-4 text-center text-xs text-muted">
+                    No documents attached.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-edge/60 rounded-lg border border-edge bg-base">
+                    {documents.data.map((d: AssetDocument) => (
+                      <div key={d.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                        <span className="min-w-0 truncate text-primary">{d.filename}</span>
+                        <span className="shrink-0 text-[10px] text-muted">
+                          {formatDateOnly(d.created_at)}
+                        </span>
+                        <a
+                          href={assetDocumentUrl(asset.id, d.id)}
+                          download={d.filename}
+                          className="shrink-0 rounded-md border border-edge2 px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-surface"
+                        >
+                          Download
+                        </a>
                       </div>
                     ))}
                   </div>
