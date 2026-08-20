@@ -131,7 +131,11 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
       const createdAsset = await createAsset({
         name: draft.name,
         category: draft.category as AssetCategory,
-        serial_number: draft.serialNumber || undefined,
+        // Must send "" (empty string) — NOT undefined. The backend
+        // CreateAssetRequest declares serial_number as a REQUIRED String, so
+        // omitting it (undefined → field dropped in JSON) returns 422
+        // "missing field serial_number". The manual AddAssetForm sends ''.
+        serial_number: draft.serialNumber || '',
         purchase_date: draft.purchaseDate || undefined,
         warranty_expiry: draft.warrantyExpiry || undefined,
       });
