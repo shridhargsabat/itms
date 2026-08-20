@@ -292,17 +292,25 @@ export default function Layout() {
           collapsed ? 'lg:ml-16' : 'lg:ml-60',
         )}
       >
-        <div className="mx-auto w-full max-w-7xl flex-1 p-6 lg:min-h-0 lg:overflow-y-auto lg:p-8">
-          {/* keyed by pathname: fresh entrance per route change.
+        {/* Full-width scroll frame. Its scrollbar must sit at the window's
+            far-right edge, so the max-w-7xl centering below CANNOT live on this
+            frame — a centered 7xl box on a >1520px screen floats its scrollbar
+            mid-window (the "scrollbar in the middle" bug). Keep this frame
+            full-width; constrain + center content on an inner wrapper. */}
+        <div className="w-full flex-1 lg:min-h-0 lg:overflow-y-auto">
+          {/* Centered, width-capped content column (readability width).
+              keyed by pathname: fresh entrance per route change.
               NOTE: opacity-only — a transform here would make every
               position:fixed descendant (sheets, drawers, dropdowns)
               position against this element instead of the viewport. */}
-          {/* No animation class on the route wrapper: opacity-only entrance
-              animations froze at 0 on iOS when the app was backgrounded,
-              hiding the whole page (and a transform would break fixed
-              children). View Transitions provides the crossfade. */}
-          <div key={location.pathname}>
-            <Outlet />
+          <div className="mx-auto w-full max-w-7xl p-6 lg:p-8">
+            {/* No animation class on the route wrapper: opacity-only entrance
+                animations froze at 0 on iOS when the app was backgrounded,
+                hiding the whole page (and a transform would break fixed
+                children). View Transitions provides the crossfade. */}
+            <div key={location.pathname}>
+              <Outlet />
+            </div>
           </div>
         </div>
       </main>
