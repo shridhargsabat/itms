@@ -56,7 +56,10 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         // invoice-parse: POST /assets/parse-invoice (+ link) is an ADMIN mutation;
         // the docs list/download (any authenticated user) live flat below.
         .nest("/assets", invoice::mutations_router())
-        .nest("/", invoice::documents_router())
+        // invoice-parse documents: routes already start with /assets/{id}/documents,
+        // so MERGE (not nest at "/" which axum 0.8 panics on: "Nesting at the root
+        // is no longer supported"). Merging adds them at the current path level.
+        .merge(invoice::documents_router())
         .nest("/tickets", comments::router())
         .nest("/tickets", tickets::router())
         .route("/tickets/{id}/convert-to-article", post(kb::convert_to_article))
