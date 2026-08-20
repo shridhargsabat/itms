@@ -3,7 +3,13 @@
 # unprivileged user 10001 with a chown'd /app/uploads (volume-mounted).
 # invoice-parse feature: poppler-utils added for pdftoppm (scanned-PDF -> PNG
 # rasterization before mimo-v2.5 OCR).
-FROM rust:1.97-slim@sha256:8e8cf8f7fd54a2d23d5a743b3a03f56e26b6c774276c33fa0595111704ebb15c AS builder
+# CRITICAL (glibc match): the BUILDER must be a bookworm-based Rust image so the
+# compiled `server` binary links against glibc 2.36 — the runtime stage is
+# debian:bookworm-slim (glibc 2.36). A trixie-based builder (rust:1.97-slim
+# default) compiles against glibc 2.41 and the binary then dies on the runtime
+# with 'GLIBC_2.39 not found' (bit us 2026-08-20 when pdf-extract added a crate
+# requiring a newer symbol).
+FROM rust:1.97-slim-bookworm@sha256:39f68a3e8e3ff425f8945ffa91128e60ff930d53e17fbb5214e95824bdd46f1b AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
