@@ -296,14 +296,18 @@ export default function Layout() {
             far-right edge, so the max-w-7xl centering below CANNOT live on this
             frame — a centered 7xl box on a >1520px screen floats its scrollbar
             mid-window (the "scrollbar in the middle" bug). Keep this frame
-            full-width; constrain + center content on an inner wrapper. */}
-        <div className="w-full flex-1 lg:min-h-0 lg:overflow-y-auto">
+            full-width with the page PADDING OWNED BY THE FRAME: vertical padding
+            on an inner wrapper would count against the frame's scrollHeight and
+            make it overflow a few px, re-adding a second (page) scrollbar next
+            to a table's inner one. */}
+        <div className="w-full flex-1 p-6 lg:min-h-0 lg:overflow-y-auto lg:p-8">
           {/* Centered, width-capped content column (readability width).
+              No vertical padding here (see frame comment above).
               keyed by pathname: fresh entrance per route change.
               NOTE: opacity-only — a transform here would make every
               position:fixed descendant (sheets, drawers, dropdowns)
               position against this element instead of the viewport. */}
-          <div className="mx-auto w-full max-w-7xl p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-7xl">
             {/* No animation class on the route wrapper: opacity-only entrance
                 animations froze at 0 on iOS when the app was backgrounded,
                 hiding the whole page (and a transform would break fixed
