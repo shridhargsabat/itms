@@ -54,9 +54,10 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         .nest("/dashboard", dashboard::router())
         .nest("/assets", assets::router())
         // invoice-parse: POST /assets/parse-invoice (+ link) is an ADMIN mutation;
-        // the docs list/download (any authenticated user) live flat below.
+        // the docs list/download (any authenticated user) are merged at root
+        // (they define full /assets/{id}/documents paths — a nest("/") would panic).
         .nest("/assets", invoice::mutations_router())
-        .nest("/", invoice::documents_router())
+        .merge(invoice::documents_router())
         .nest("/tickets", comments::router())
         .nest("/tickets", tickets::router())
         .route("/tickets/{id}/convert-to-article", post(kb::convert_to_article))
