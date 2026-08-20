@@ -31,9 +31,13 @@ export default function PaginationFooter({
   // page past the last one) never renders a range like "Showing 81–45 of 45".
   const from = total !== undefined && total > 0 ? Math.min((page - 1) * pageSize + 1, total) : 0;
   const to = total !== undefined ? Math.min(page * pageSize, total) : rowsLength;
+  // Ghost (bordered, transparent) nav buttons with an EXPLICIT text label +
+  // chevron so they can never read as a blank icon-only square — the arrow is
+  // a hint, the word is the affordance. `BUTTON.ghost` + semantic tokens keep
+  // them theme-aware (no fixed accent fill, so no filled-empty-button glitch).
   const navBtn =
     BUTTON.ghost +
-    ' h-8 w-8 rounded-lg border border-edge2 text-secondary hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
+    ' h-8 rounded-lg border border-edge2 text-secondary hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   return (
     <div className={TABLE_SPEC.footer}>
@@ -57,11 +61,12 @@ export default function PaginationFooter({
         <Button
           type="button"
           aria-label="Previous page"
-          className={navBtn}
+          className={`${navBtn} px-2`}
           disabled={page <= 1}
           onClick={() => onPageChange?.(page - 1)}
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          <span>Prev</span>
         </Button>
         <span className="min-w-[76px] text-center tabular-nums">
           {pages > 0 ? `Page ${page} of ${pages}` : ''}
@@ -69,11 +74,12 @@ export default function PaginationFooter({
         <Button
           type="button"
           aria-label="Next page"
-          className={navBtn}
+          className={`${navBtn} px-2`}
           disabled={pages === 0 || page >= pages}
           onClick={() => onPageChange?.(page + 1)}
         >
-          <ChevronRight className="h-4 w-4" />
+          <span>Next</span>
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
     </div>
