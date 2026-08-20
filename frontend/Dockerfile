@@ -6,7 +6,19 @@ ARG BUILD_SHA=local
 ENV BUILD_SHA=$BUILD_SHA
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# Intermittent npm-registry ETIMEDOUT flakes have failed CI deploys (the single
+# `npm ci` step is a non-retried network op). Combine npm's built-in fetch
+# retries with a shell retry loop (3 tries, 10s backoff) so a transient registry
+# timeout can't fail the whole image build. `exit 0` on success short-circuits;
+# falling through 3 failed attempts exits 1 so the build fails loudly at npm ci
+# (never silently continues without node_modules).
+RUN for i in 1 2 3; do \
+      npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 \
+      && exit 0; \
+      echo "npm ci attempt $i failed (network flake?)"; \
+      [ "$i" -lt 3 ] && sleep 10; \
+    done; \
+    echo "npm ci failed after 3 attempts" >&2; exit 1
 COPY . .
 RUN npm run build
 
