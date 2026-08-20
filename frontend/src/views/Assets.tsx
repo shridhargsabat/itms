@@ -1,28 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Download, FileUp, Search, Tags, Trash2, TriangleAlert, UserCog, X } from 'lucide-react';
+import { CheckCircle2, Download, FileUp, Plus, Search, Tags, Trash2, TriangleAlert, UserCog, X } from 'lucide-react';
 import {
   bulkAssignAssets,
   bulkDeleteAssets,
   bulkUpdateAssetStatus,
+  createAsset,
   exportAssetsCsv,
   getCachedUser,
   importAssetsCsv,
   listAssets,
   listLocations,
   listUsers,
+  listVendors,
 } from '@/api/client';
 import type { ImportResult } from '@/api/client';
 import { ASSET_CATEGORIES, ASSET_STATUSES } from '@/api/types';
-import type { Asset } from '@/api/types';
+import type { Asset, CreateAssetInput } from '@/api/types';
 import AssetSpecModal from '@/components/AssetSpecModal';
 import DataTable, { type Column } from '@/components/DataTable';
 import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import { Button } from '@/components/Button';
 import { AssetStatusBadge } from '@/components/TicketBadge';
-import { inputCls } from '@/lib/utils';
+import { inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 
 type BulkAction = 'status' | 'assign' | 'delete' | null;
@@ -36,6 +38,13 @@ export default function Assets() {
   const [file, setFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // "Add Asset" dialog state + draft form (mirrors CreateAssetInput).
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateAssetInput>({
+    name: '',
+    category: 'LAPTOP',
+    status: 'IN_STOCK',
+  });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<BulkAction>(null);
   const [bulkStatus, setBulkStatus] = useState('IN_STOCK');
@@ -91,6 +100,17 @@ export default function Assets() {
       }
     },
   });
+
+  const createMutation = useMutation({
+    mutationFn: (input: CreateAssetInput) => createAsset(input),
+    onSuccess: () => {
+      setCreateOpen(false);
+      setCreateForm({ name: '', category: 'LAPTOP', status: 'IN_STOCK' });
+      refresh();
+    },
+  });
+
+  const vendorsQ = useQuery({ queryKey: ['vendors'], queryFn: () => listVendors() });
 
   const onImport = async () => {
     if (!file) return;
@@ -242,6 +262,20 @@ export default function Assets() {
             <Button
               type="button"
               onClick={() => {
+                setCreateForm({ name: '', category: 'LAPTOP', status: 'IN_STOCK' });
+                setCreateOpen(true);
+              }}
+              variant="primary"
+              size="lg"
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              Add Asset
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              type="button"
+              onClick={() => {
                 setImportOpen(true);
                 setFile(null);
                 setImportResult(null);
@@ -384,6 +418,131 @@ export default function Assets() {
       />
 
       <AssetSpecModal asset={selected} onClose={() => setSelected(null)} />
+
+      {createOpen && (
+        <Modal title="Add Asset" onClose={() => setCreateOpen(false)}>
+          <form
+            className="space-y-4"
+            onSubmit={(ev) => {
+              ev.preventDefault();
+              if (!createForm.name.trim()) return;
+              createMutation.mutate({
+                ...createForm,
+                name: createForm.name.trim(),
+              });
+            }}
+          >
+            <div>
+              <label className={labelCls}>Name</label>
+              <input
+                className={inputCls}
+                placeholder="e.g. Dell Latitude 7420"
+                value={createForm.name ?? ''}
+                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Category</label>
+                <Select
+                  value={createForm.category ?? 'LAPTOP'}
+                  onChange={(v) => setCreateForm((f) => ({ ...f, category: v as Asset['category'] }))}
+                  options={ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Serial Number</label>
+                <input
+                  className={inputCls}
+                  placeholder="Optional"
+                  value={createForm.serial_number ?? ''}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, serial_number: e.target.value || undefined }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
+              <Select
+                value={createForm.status ?? 'IN_STOCK'}
+                onChange={(v) => setCreateForm((f) => ({ ...f, status: v as Asset['status'] }))}
+                options={ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Purchase Date</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={createForm.purchase_date ?? ''}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, purchase_date: e.target.value || undefined }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Warranty Expiry</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={createForm.warranty_expiry ?? ''}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, warranty_expiry: e.target.value || undefined }))}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Location</label>
+              <Select
+                value={createForm.location_id ?? ''}
+                onChange={(v) => setCreateForm((f) => ({ ...f, location_id: v || null }))}
+                options={[
+                  { value: '', label: '— unplaced —' },
+                  ...(locationsQ.data ?? []).map((l) => ({
+                    value: l.id,
+                    label: [l.site, l.building, l.floor, l.room].filter(Boolean).join(' / ') || l.id.slice(0, 8),
+                  })),
+                ]}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Vendor</label>
+              <Select
+                value={createForm.vendor_id ?? ''}
+                onChange={(v) => setCreateForm((f) => ({ ...f, vendor_id: v || null }))}
+                options={[
+                  { value: '', label: '— none —' },
+                  ...(vendorsQ.data ?? []).map((v) => ({ value: v.id, label: v.name })),
+                ]}
+              />
+            </div>
+            {createMutation.isError && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {(createMutation.error as Error).message}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                loading={createMutation.isPending}
+                disabled={!createForm.name.trim()}
+                variant="primary"
+                size="lg"
+                className="flex-1"
+              >
+                Add Asset
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setCreateOpen(false)}
+                variant="secondary"
+                size="lg"
+                className="border-edge"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {importOpen && (
         <Modal title="Import assets (CSV)" onClose={() => setImportOpen(false)}>
