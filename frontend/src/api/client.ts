@@ -1,5 +1,6 @@
 import type {
   Asset,
+  AssetDocument,
   AuditLogEntry,
   AuthUser,
   CannedResponse,
@@ -19,6 +20,7 @@ import type {
   CreateUserInput,
   DashboardMetrics,
   ImpactResult,
+  InvoiceParseResult,
   License,
   LicenseAlerts,
   LicenseAllocation,
@@ -329,6 +331,38 @@ export const importAssetsCsv = (csvText: string) =>
     headers: { 'Content-Type': 'text/csv' },
     body: csvText,
   });
+
+// ---- invoice-parse asset creation ----
+// CRITICAL: the Content-Type must NOT be set — `apiFetch` forces
+// application/json when a body is present, which would break multipart. Setting
+// it to undefined lets the browser add `multipart/form-data; boundary=…`.
+
+/** POST an invoice PDF; backend OCR/parses it into editable drafts. */
+export const parseInvoicePdf = (file: File) =>
+  apiFetch<InvoiceParseResult>('/assets/parse-invoice', {
+    method: 'POST',
+    headers: { 'Content-Type': undefined as unknown as string },
+    body: (() => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return fd;
+    })(),
+  });
+
+/** Bind a staged (parsed) document to the just-created asset. */
+export const linkInvoiceDocument = (docId: string, assetId: string) =>
+  apiFetch<{ ok: boolean }>(`/assets/parse-invoice/${docId}/link/${assetId}`, {
+    method: 'POST',
+  });
+
+/** List documents attached to an asset. */
+export const listAssetDocuments = (assetId: string) =>
+  apiFetch<AssetDocument[]>(`/assets/${assetId}/documents`);
+
+/** Absolute href to download an asset document. */
+export const assetDocumentUrl = (assetId: string, docId: string) =>
+  `/api/v1/assets/${assetId}/documents/${docId}/download`;
+
 
 /** Export the filtered asset registry as assets.csv — pass ids to export a selection. */
 export const exportAssetsCsv = async (params?: {
