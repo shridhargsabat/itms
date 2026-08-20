@@ -39,6 +39,14 @@ export default function PaginationFooter({
     BUTTON.ghost +
     ' h-8 rounded-lg border border-edge2 text-secondary hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
+  // Next is the forward CTA: accent-filled (`primary`) when there's a next
+  // page, ghost/disabled on the last page. Prev stays ghost (disabled on p1).
+  const canPrev = page > 1;
+  const canNext = pages > 0 && page < pages;
+  const nextBtn = canNext
+    ? BUTTON.primary + ' h-8 rounded-lg px-2'
+    : `${navBtn} px-2`;
+
   return (
     <div className={TABLE_SPEC.footer}>
       <span>
@@ -62,11 +70,11 @@ export default function PaginationFooter({
           type="button"
           aria-label="Previous page"
           className={`${navBtn} px-2`}
-          disabled={page <= 1}
+          disabled={!canPrev}
           onClick={() => onPageChange?.(page - 1)}
         >
-          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          <span>Prev</span>
+          <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="leading-none">Prev</span>
         </Button>
         <span className="min-w-[76px] text-center tabular-nums">
           {pages > 0 ? `Page ${page} of ${pages}` : ''}
@@ -74,12 +82,12 @@ export default function PaginationFooter({
         <Button
           type="button"
           aria-label="Next page"
-          className={`${navBtn} px-2`}
-          disabled={pages === 0 || page >= pages}
+          className={nextBtn}
+          disabled={!canNext}
           onClick={() => onPageChange?.(page + 1)}
         >
-          <span>Next</span>
-          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          <span className="leading-none">Next</span>
+          <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
         </Button>
       </div>
     </div>
