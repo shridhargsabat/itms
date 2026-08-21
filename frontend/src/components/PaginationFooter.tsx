@@ -56,7 +56,7 @@ export default function PaginationFooter({
       </span>
       <div className="flex items-center gap-2">
         <Select
-          className="w-auto"
+          className="w-auto shrink-0"
           triggerClassName="h-8 px-2.5 py-0 text-xs"
           value={String(pageSize)}
           onChange={(v) => onPageSizeChange?.(Number(v))}
@@ -76,7 +76,7 @@ export default function PaginationFooter({
           <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="leading-none">Prev</span>
         </Button>
-        <span className="min-w-[76px] text-center tabular-nums">
+        <span className="whitespace-nowrap text-center tabular-nums">
           {pages > 0 ? `Page ${page} of ${pages}` : ''}
         </span>
         <Button
