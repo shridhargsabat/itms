@@ -54,10 +54,10 @@ export default function PaginationFooter({
           ? `Showing ${from}–${to} of ${total}`
           : `${rowsLength} row${rowsLength === 1 ? '' : 's'}`}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5 min-w-0">
         <Select
           className="w-auto shrink-0"
-          triggerClassName="h-8 px-2.5 py-0 text-xs"
+          triggerClassName="h-8 px-1.5 py-0 text-xs"
           value={String(pageSize)}
           onChange={(v) => onPageSizeChange?.(Number(v))}
           options={[
@@ -76,7 +76,7 @@ export default function PaginationFooter({
           <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="leading-none">Prev</span>
         </Button>
-        <span className="whitespace-nowrap text-center tabular-nums">
+        <span className="order-last basis-full text-center tabular-nums sm:order-none sm:basis-auto">
           {pages > 0 ? `Page ${page} of ${pages}` : ''}
         </span>
         <Button
