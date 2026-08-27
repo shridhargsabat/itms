@@ -1,0 +1,26 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install sonar-scanner
+        run: |
+          curl -sSL https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux-x64.zip -o sonar-scanner.zip
+          unzip -q sonar-scanner.zip
+          rm sonar-scanner.zip
+          echo "$PWD/sonar-scanner-6.2.1.4610-linux-x64/bin" >> $GITHUB_PATH
+
+      - name: Run SonarQube analysis
+        run: sonar-scanner -Dsonar.token=${{ secrets.SONAR_TOKEN }}
