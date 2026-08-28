@@ -2,9 +2,9 @@ name: Semgrep SAST
 
 on:
   pull_request:
-    branches: [main]
+    branches: [dev, uat, main]
   push:
-    branches: [main]
+    branches: [dev, uat, main]
 
 jobs:
   semgrep:
@@ -12,13 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Semgrep
-        run: python3 -m pip install semgrep
+      - name: Setup Python
+        run: |
+          apt-get update && apt-get install -y python3-pip
+          python3 -m pip install --break-system-packages semgrep
       - name: Run Semgrep
         env:
           SEMGREP_RULES: >-
             p/default
-            p/typescript
+                        p/typescript
             p/owasp-top-ten
             p/security-audit
             p/secrets
