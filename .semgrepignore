@@ -1,0 +1,12 @@
+# Test files
+**/test_*
+**/tests/**
+
+# Generated
+**/node_modules/**
+**/dist/**
+**/build/**
+**/target/**
+
+# Third-party
+**/vendor/**
