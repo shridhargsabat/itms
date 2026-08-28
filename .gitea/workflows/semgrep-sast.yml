@@ -10,10 +10,10 @@ jobs:
   semgrep:
     name: Static Security Scan
     runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
     steps:
       - uses: actions/checkout@v4
+      - name: Install Semgrep
+        run: pip install semgrep
       - name: Run Semgrep
         env:
           SEMGREP_RULES: >-
@@ -23,12 +23,6 @@ jobs:
             p/security-audit
             p/secrets
         run: semgrep ci --sarif --output semgrep-results.sarif || true
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep-results.sarif
-        continue-on-error: true
       - name: Fail on high-severity
         if: always()
         run: |
@@ -58,7 +52,7 @@ jobs:
           ")
           echo "Critical: $CRITICAL, High: $HIGH"
           if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 5 ]; then
-            echo "❌ Too many high-severity findings. Fix before merging."
+            echo "Too many high-severity findings. Fix before merging."
             exit 1
           fi
-          echo "✅ Security scan passed."
+          echo "Security scan passed."
