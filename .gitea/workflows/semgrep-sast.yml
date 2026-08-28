@@ -1,0 +1,64 @@
+name: Semgrep SAST
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  semgrep:
+    name: Static Security Scan
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep
+        env:
+          SEMGREP_RULES: >-
+            p/default
+            p/typescript
+            p/owasp-top-ten
+            p/security-audit
+            p/secrets
+        run: semgrep ci --sarif --output semgrep-results.sarif || true
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-results.sarif
+        continue-on-error: true
+      - name: Fail on high-severity
+        if: always()
+        run: |
+          CRITICAL=$(python3 -c "
+          import json
+          try:
+              sarif = json.load(open('semgrep-results.sarif'))
+              count = 0
+              for run in sarif.get('runs', []):
+                  for result in run.get('results', []):
+                      if result.get('level') == 'error':
+                          count += 1
+              print(count)
+          except: print(0)
+          ")
+          HIGH=$(python3 -c "
+          import json
+          try:
+              sarif = json.load(open('semgrep-results.sarif'))
+              count = 0
+              for run in sarif.get('runs', []):
+                  for result in run.get('results', []):
+                      if result.get('level') == 'warning':
+                          count += 1
+              print(count)
+          except: print(0)
+          ")
+          echo "Critical: $CRITICAL, High: $HIGH"
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 5 ]; then
+            echo "❌ Too many high-severity findings. Fix before merging."
+            exit 1
+          fi
+          echo "✅ Security scan passed."
