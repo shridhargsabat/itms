@@ -1,16 +1,62 @@
 import { useEffect, useState } from 'react';
-import { applyTheme, getThemeMode, onThemeChanged, watchSystemTheme, type ThemeMode } from '@/lib/theme';
-import ThemeManager, { THEMES } from '@/components/ThemeManager';
+import { Moon, Palette, Sparkles, Sun } from 'lucide-react';
+import {
+  applyTheme,
+  getThemeMode,
+  onThemeChanged,
+  setThemeMode,
+  watchSystemTheme,
+  type ThemeMode,
+} from '@/lib/theme';
 import { Button } from '@/components/Button';
 
+interface ThemeInfo {
+  label: string;
+  next: ThemeMode;
+  nextLabel: string;
+  icon: typeof Sun;
+}
+
+const THEME_CYCLE: Record<ThemeMode, ThemeInfo> = {
+  light: {
+    label: 'Light',
+    next: 'dark',
+    nextLabel: 'Dark',
+    icon: Sun,
+  },
+  dark: {
+    label: 'Dark',
+    next: 'system',
+    nextLabel: 'Auto',
+    icon: Moon,
+  },
+  system: {
+    label: 'Auto',
+    next: 'light',
+    nextLabel: 'Light',
+    icon: Sparkles,
+  },
+  ledgerly: {
+    label: 'Ledgerly',
+    next: 'light',
+    nextLabel: 'Light',
+    icon: Palette,
+  },
+  'ledgerly-light': {
+    label: 'Ledgerly Light',
+    next: 'light',
+    nextLabel: 'Light',
+    icon: Sparkles,
+  },
+};
+
 /**
- * Header theme control. Clicking opens the theme manager (live previews,
- * apply button) instead of blind cycling — the user asked for a manager
- * where they can see the palette before applying.
+ * Header theme control (#169).
+ * One-click theme switcher cycling Light -> Dark -> Auto.
+ * Settings retains the full ThemeManager modal for browsing all themes.
  */
 export default function ThemeToggle({ className }: { className?: string }) {
   const [mode, setMode] = useState<ThemeMode>(getThemeMode());
-  const [managerOpen, setManagerOpen] = useState(false);
 
   useEffect(() => {
     applyTheme(mode);
@@ -20,23 +66,29 @@ export default function ThemeToggle({ className }: { className?: string }) {
     return onThemeChanged(() => setMode(getThemeMode()));
   }, [mode]);
 
-  const meta = THEMES.find((t) => t.value === mode) ?? THEMES[3];
-  const Icon = meta.icon;
+  const info = THEME_CYCLE[mode] ?? THEME_CYCLE.system;
+  const Icon = info.icon;
+
+  const handleClick = () => {
+    const current = getThemeMode();
+    const nextMode = THEME_CYCLE[current]?.next ?? 'light';
+    setThemeMode(nextMode);
+    setMode(nextMode);
+  };
+
+  const labelText = `Theme: ${info.label} - click for ${info.nextLabel}`;
 
   return (
-    <>
-      <Button
-        type="button"
-        aria-label="Theme manager"
-        title={`Theme: ${meta.label} (open manager)`}
-        onClick={() => setManagerOpen(true)}
-        variant="secondary"
-        size="icon"
-        className={className}
-      >
-        <Icon className="h-4 w-4" />
-      </Button>
-      <ThemeManager open={managerOpen} onClose={() => setManagerOpen(false)} />
-    </>
+    <Button
+      type="button"
+      aria-label={labelText}
+      title={labelText}
+      onClick={handleClick}
+      variant="secondary"
+      size="icon"
+      className={className}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
   );
 }
