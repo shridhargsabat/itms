@@ -1,8 +1,8 @@
 /** Canonical table geometry — the ONE spec every ITMS table renders with.
  *  Header text-xs uppercase on bg-surface, cells py-3/px-4 text-sm, shell
- *  rounded-xl border, min-w-[640px] + ScrollX for consistent mobile behavior. */
+ *  rounded-xl glass-dense, min-w-[640px] + ScrollX for consistent mobile behavior. */
 export const TABLE_SPEC = {
-  shell: 'rounded-xl border border-edge',
+  shell: 'rounded-xl glass-dense',
   /* Vertical scroll lives on the ScrollX INNER container (the same element that does
      overflow-x) so the sticky header pins to that box's top (top:0 always). It MUST
      be on the single scrolling element — if the vertical scroll sat on an outer shell
