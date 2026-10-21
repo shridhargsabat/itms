@@ -82,8 +82,12 @@ jobs:
         run: |
           echo "🚀 Deploying ITMS — build+push both images, compose up --pull always..."
 
-          # Install Docker CLI (runner container is node:20-bullseye)
-          apt-get update -qq && apt-get install -y -qq docker.io 2>&1 | tail -3
+          # Install Docker CLI (runner container is node:20-bullseye).
+          # Bullseye is EOL: deb.debian.org 404s, so repoint ALL sources at the
+          # archive first (same proven recipe as the semgrep job).
+          sed -i 's|deb.debian.org|archive.debian.org|g; s|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
+          apt-get update -o Acquire::Check-Valid-Until=false -qq
+          apt-get install -y -qq -o Acquire::Check-Valid-Until=false docker.io 2>&1 | tail -3
 
           # Helper container with host Docker + filesystem access + the
           # itms-deploy-bot registry token. Mount /root/itms as the deploy
