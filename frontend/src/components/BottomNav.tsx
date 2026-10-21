@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { visibleNav } from '@/lib/nav';
+import { primaryNav, restGroups } from '@/lib/nav';
 import { getCachedUser } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/Button';
@@ -25,11 +25,12 @@ export default function BottomNav() {
     setMore(false);
   }, [pathname]);
 
-  const links = visibleNav(user);
-  if (links.length === 0) return null; // signed out / public page
-
-  const primary = links.slice(0, 4);
-  const rest = links.slice(4);
+  // Primaries follow the FROZEN pre-grouping order (never the tree order), so
+  // grouping can never reshuffle the bar. The sheet shows the same groups as
+  // the desktop sidebar minus the primaries (no empty sections).
+  const primary = primaryNav(user);
+  const groups = restGroups(user);
+  if (primary.length === 0 && groups.length === 0) return null; // signed out / public page
 
   const cell = (active: boolean) =>
     'flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition-colors ' +
@@ -37,8 +38,8 @@ export default function BottomNav() {
 
   return (
     <>
-      {/* "More" sheet — every remaining section */}
-      {more && rest.length > 0 && (
+      {/* "More" sheet — every remaining section, grouped like the sidebar */}
+      {more && groups.length > 0 && (
         <div className="lg:hidden fixed inset-0 z-[55]">
           <div
             className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -51,25 +52,34 @@ export default function BottomNav() {
             <p className="px-5 pb-2 pt-1 text-[9px] uppercase tracking-[0.2em] text-muted">
               All sections
             </p>
-            <div className="grid grid-cols-3 gap-2 px-4 pb-4 sm:grid-cols-4">
-              {rest.map(({ to, label, icon: Icon, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  onClick={() => setMore(false)}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex flex-col items-center gap-1.5 rounded-xl py-3 text-center transition-colors',
-                      isActive
-                        ? 'bg-accent/15 text-accent'
-                        : 'text-secondary hover:bg-elevated2 hover:text-primary',
-                    )
-                  }
-                >
-                  <Icon className="h-5 w-5" strokeWidth={2} />
-                  <span className="text-[10.5px] leading-tight tracking-wide">{label}</span>
-                </NavLink>
+            <div className="pb-4">
+              {groups.map((group) => (
+                <div key={group.id}>
+                  <p className="px-5 pb-1 pt-3 text-[9px] uppercase tracking-[0.2em] text-muted">
+                    {group.label}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 px-4 pb-1 sm:grid-cols-4">
+                    {group.children.map(({ to, label, icon: Icon, end }) => (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        end={end}
+                        onClick={() => setMore(false)}
+                        className={({ isActive }) =>
+                          cn(
+                            'flex flex-col items-center gap-1.5 rounded-xl py-3 text-center transition-colors',
+                            isActive
+                              ? 'bg-accent/15 text-accent'
+                              : 'text-secondary hover:bg-elevated2 hover:text-primary',
+                          )
+                        }
+                      >
+                        <Icon className="h-5 w-5" strokeWidth={2} />
+                        <span className="text-[10.5px] leading-tight tracking-wide">{label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -103,7 +113,7 @@ export default function BottomNav() {
               )}
             </NavLink>
           ))}
-          {rest.length > 0 && (
+          {groups.length > 0 && (
             <Button
               type="button"
               onClick={() => setMore((v) => !v)}
