@@ -207,7 +207,7 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
   } else if (drafts.length === 0) {
     body = (
       <div className="flex flex-col items-center gap-4 py-10 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-edge bg-elevated">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl glass-card">
           <Upload className="h-6 w-6 text-accent" />
         </div>
         <p className="text-sm font-medium text-primary">Upload an invoice PDF</p>
@@ -249,7 +249,7 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
           return (
             <div
               key={i}
-              className="rounded-xl border border-edge bg-elevated/40 p-4"
+              className="rounded-xl glass-card p-4"
             >
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-secondary">
@@ -338,7 +338,7 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
                 {draft.unitCost != null && (
                   <div>
                     <label className={labelCls}>Unit Cost</label>
-                    <p className="rounded-lg border border-dashed border-edge bg-surface px-3 py-2 text-sm text-secondary">
+                    <p className="rounded-lg glass-dense border-dashed px-3 py-2 text-sm text-secondary">
                       <span className="font-medium text-primary">
                         {draft.unitCost.toLocaleString(undefined, {
                           style: 'currency',
@@ -393,7 +393,7 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
         })}
 
         {rawPreview && (
-          <details className="group rounded-lg border border-edge bg-elevated/40">
+          <details className="group rounded-lg glass-dense">
             <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs font-medium text-secondary">
               Extracted text
             </summary>

@@ -29,7 +29,7 @@ export default function Account() {
       <h1 className="text-xl font-bold text-primary">Account</h1>
       <p className="mt-1 text-sm text-muted">Update your sign-in password.</p>
       <form
-        className="mt-6 space-y-4 rounded-2xl border border-edge bg-surface p-6"
+        className="mt-6 space-y-4 rounded-2xl glass-card p-6"
         onSubmit={(e) => {
           e.preventDefault();
           if (pw.length < 8) { setErr('Password must be at least 8 characters.'); return; }

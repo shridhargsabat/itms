@@ -25,13 +25,13 @@ export default function Reports() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-edge bg-surface/60 p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl glass-card p-3">
         <label className="flex items-center gap-2 text-xs text-secondary">
           Look back
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            className="h-8 rounded-lg border border-edge2 bg-base px-2 text-xs outline-none focus:border-accent"
+            className="h-8 rounded-lg glass-dense px-2 text-xs outline-none focus:border-accent"
           >
             <option value={30}>30 days</option>
             <option value={90}>90 days</option>
@@ -44,7 +44,7 @@ export default function Reports() {
           <select
             value={minCount}
             onChange={(e) => setMinCount(Number(e.target.value))}
-            className="h-8 rounded-lg border border-edge2 bg-base px-2 text-xs outline-none focus:border-accent"
+            className="h-8 rounded-lg glass-dense px-2 text-xs outline-none focus:border-accent"
           >
             <option value={2}>≥ 2 tickets</option>
             <option value={3}>≥ 3 tickets</option>
@@ -57,7 +57,7 @@ export default function Reports() {
 
       <div className="space-y-2">
         {report.data?.map((r) => (
-          <div key={`${r.title}|${r.assetTag ?? ''}`} className="rounded-xl border border-edge bg-surface/60 p-4">
+          <div key={`${r.title}|${r.assetTag ?? ''}`} className="rounded-xl glass-card p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -77,13 +77,13 @@ export default function Reports() {
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {r.ticketNumbers.map((n) => (
-                <span key={n} className="rounded bg-elevated/70 px-1.5 py-0.5 font-mono text-[10px] text-secondary">{n}</span>
+                <span key={n} className="rounded bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-secondary">{n}</span>
               ))}
             </div>
           </div>
         ))}
         {!report.isLoading && (report.data?.length ?? 0) === 0 && (
-          <div className="rounded-xl border border-dashed border-edge2 p-8 text-center">
+          <div className="rounded-xl glass-card border-dashed p-8 text-center">
             <TriangleAlert className="mx-auto mb-2 h-6 w-6 text-muted" />
             <p className="text-xs text-muted">No repeat patterns in this window — the service desk is healthy.</p>
           </div>

@@ -86,7 +86,7 @@ export default function CMDB() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-        <div className="min-w-0 rounded-xl border border-edge bg-surface/60 p-3">
+        <div className="min-w-0 rounded-xl glass-card p-3">
           <div className="mb-2 flex items-center gap-2 px-2 py-1">
             <Network className="h-4 w-4 text-secondary" />
             <h2 className="text-xs font-semibold uppercase tracking-wide text-secondary">
@@ -130,12 +130,12 @@ export default function CMDB() {
 
         <div className="min-w-0 space-y-4">
           {impact.isLoading && (
-            <div className="flex h-40 items-center justify-center rounded-xl border border-edge bg-surface/60 text-muted">
+            <div className="flex h-40 items-center justify-center rounded-xl glass-card text-muted">
               <LoaderCircle className="h-5 w-5 animate-spin" />
             </div>
           )}
           {impact.data && (
-            <div className="rounded-xl border border-edge bg-surface/60">
+            <div className="rounded-xl glass-card">
               <div className="border-b border-edge px-5 py-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs text-accent">
@@ -184,7 +184,7 @@ export default function CMDB() {
             </div>
           )}
 
-          <div className="rounded-xl border border-edge bg-surface/60">
+          <div className="rounded-xl glass-card">
             <div className="flex items-center gap-2 border-b border-edge px-5 py-4">
               <GitBranch className="h-4 w-4 text-secondary" />
               <h2 className="text-sm font-semibold text-primary">Relationships</h2>
@@ -202,7 +202,7 @@ export default function CMDB() {
                   return (
                     <div
                       key={e.id}
-                      className="flex flex-wrap items-center gap-2 rounded-lg border border-edge bg-base px-3 py-2 text-xs"
+                      className="flex flex-wrap items-center gap-2 rounded-lg glass-dense px-3 py-2 text-xs"
                     >
                       <span className="font-mono text-accent">
                         {parent?.asset_tag ?? e.parent_asset_id}

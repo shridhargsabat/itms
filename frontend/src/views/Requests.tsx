@@ -129,7 +129,7 @@ export default function Requests() {
       </div>
 
       {/* tabs */}
-      <div className="flex gap-1 rounded-xl border border-edge bg-surface p-1">
+      <div className="flex gap-1 rounded-xl glass-dense p-1">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -205,7 +205,7 @@ function RequestCard({
 }) {
   const [confirmReject, setConfirmReject] = useState(false);
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-edge bg-surface p-4">
+    <div className="flex flex-col gap-2 rounded-xl glass-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-[10px] text-muted">{r.request_number}</span>
@@ -409,7 +409,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
 
         {item && (
           <>
-            <div className="rounded-lg border border-edge bg-elevated/40 p-3 text-[11px] text-secondary">
+            <div className="rounded-lg glass-dense p-3 text-[11px] text-secondary">
               {item.description}
               {item.approval_required && (
                 <span className="mt-1 flex items-center gap-1 text-amber-400">

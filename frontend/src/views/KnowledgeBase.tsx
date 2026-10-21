@@ -137,14 +137,14 @@ export default function KnowledgeBase() {
           <div className="space-y-2">
             {articles.isLoading && <p className="text-sm text-muted">Loading…</p>}
             {!articles.isLoading && (articles.data?.items.length ?? 0) === 0 && (
-              <p className="rounded-xl border border-dashed border-edge p-8 text-center text-sm text-muted">
+              <p className="rounded-xl glass-card border-dashed p-8 text-center text-sm text-muted">
                 No articles yet{isStaff ? ' — capture your first resolved ticket via “Convert to article”' : ''}.
               </p>
             )}
             {articles.data?.items.map((a) => (
               <div key={a.id} className={cn(
-                'rounded-xl border bg-surface/60 p-4',
-                a.id === openId ? 'border-indigo-500/60 ring-1 ring-indigo-500/40' : 'border-edge',
+                'rounded-xl glass-card p-4',
+                a.id === openId && 'border-indigo-500/60 ring-1 ring-indigo-500/40',
               )}>
                 <div className="flex items-start gap-3">
                   <FileText className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
@@ -190,7 +190,7 @@ export default function KnowledgeBase() {
         ) : (
           <div className="space-y-2">
             {canned.data?.map((c) => (
-              <div key={c.id} className="rounded-xl border border-edge bg-surface/60 p-4">
+              <div key={c.id} className="rounded-xl glass-card p-4">
                 <div className="flex items-start gap-3">
                   <Zap className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
                   <div className="min-w-0 flex-1">
@@ -207,7 +207,7 @@ export default function KnowledgeBase() {
               </div>
             ))}
             {canned.data?.length === 0 && (
-              <p className="rounded-xl border border-dashed border-edge p-8 text-center text-sm text-muted">
+              <p className="rounded-xl glass-card border-dashed p-8 text-center text-sm text-muted">
                 No canned responses yet.
               </p>
             )}
@@ -247,7 +247,7 @@ function ArticleForm({ article, onClose }: { article: KbArticle | null; onClose:
   });
 
   return (
-    <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+    <div className="mt-4 rounded-xl glass-card p-4">
       <h2 className="text-sm font-bold text-primary">{article ? 'Edit article' : 'New article'}</h2>
       <div className="mt-3 space-y-3">
         <select value={type} onChange={(e) => setType(e.target.value)} className={cn(inputCls, 'w-48')}>
@@ -293,7 +293,7 @@ function CannedForm({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+    <div className="mt-4 rounded-xl glass-card p-4">
       <h2 className="text-sm font-bold text-primary">New canned response</h2>
       <div className="mt-3 space-y-3">
         <input className={inputCls} placeholder="Title (e.g. Password reset steps)" value={title}

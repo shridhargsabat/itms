@@ -89,7 +89,7 @@ export default function Masters() {
               'flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-3.5 text-sm font-medium transition-colors',
               tab === t.id
                 ? 'border-indigo-500/50 bg-accent/10 text-accent'
-                : 'border-edge bg-surface/60 text-secondary hover:border-edge2 hover:text-primary',
+                : 'glass-dense text-secondary hover:text-primary',
             )}
           >
             {t.id === 'users' ? <Users className="h-4 w-4" /> : <Database className="h-4 w-4" />}
@@ -297,7 +297,7 @@ function UsersTab() {
       </div>
 
       {users.isLoading ? (
-        <div className="flex items-center justify-center rounded-xl border border-edge bg-surface/40 py-16">
+        <div className="flex items-center justify-center rounded-xl glass-card py-16">
           <LoaderCircle className="h-6 w-6 animate-spin text-muted" />
         </div>
       ) : (
@@ -442,7 +442,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
 
   return (
     <div className="space-y-3">
-      <ScrollX className="rounded-xl border border-edge" innerClassName="max-h-[55vh] overflow-y-auto">
+      <ScrollX className="rounded-xl glass-dense" innerClassName="max-h-[55vh] overflow-y-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b border-edge bg-surface text-[11px] uppercase tracking-wide text-muted">
             <tr>
@@ -609,7 +609,7 @@ function TemplatesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-edge bg-surface/60 p-4">
+      <div className="rounded-xl glass-card p-4">
         <h2 className="text-sm font-semibold text-primary">{editing ? 'Edit template' : 'New template'}</h2>
         <p className="mt-0.5 text-xs text-muted">Standard intakes — requesters pick these in the New Ticket form.</p>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
@@ -654,7 +654,7 @@ function TemplatesTab() {
 
       <div className="space-y-2">
         {templates.data?.map((t) => (
-          <div key={t.id} className={cn('rounded-xl border bg-surface/60 p-3.5', t.active ? 'border-edge' : 'border-edge opacity-60')}>
+          <div key={t.id} className={cn('rounded-xl glass-card p-3.5', !t.active && 'opacity-60')}>
             <div className="flex flex-wrap items-center gap-2">
               <ClipboardList className="h-4 w-4 text-secondary" />
               <span className="text-sm font-semibold text-primary">{t.name}</span>
@@ -760,7 +760,7 @@ function VendorsTab() {
 
       <div className="space-y-2">
         {vendors.data?.map((v) => (
-          <div key={v.id} className="rounded-xl border border-edge bg-surface/60">
+          <div key={v.id} className="rounded-xl glass-card">
             <div className="flex items-center justify-between gap-3 p-3">
               <button className="min-w-0 flex-1 text-left" onClick={() => setExpanded(expanded === v.id ? null : v.id)}>
                 <div className="flex items-center gap-2">
@@ -791,29 +791,29 @@ function VendorsTab() {
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(editing ? { id: editing.id, input: form } : { input: form }); }}>
             <div>
               <label className="mb-1 block text-xs font-medium text-secondary">Name *</label>
-              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-secondary">Contact name</label>
-                <input value={form.contact_name ?? ''} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+                <input value={form.contact_name ?? ''} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-secondary">Contact email</label>
-                <input type="email" value={form.contact_email ?? ''} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+                <input type="email" value={form.contact_email ?? ''} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-secondary">Contact phone</label>
-                <input value={form.contact_phone ?? ''} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+                <input value={form.contact_phone ?? ''} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-secondary">Support link</label>
-                <input value={form.support_link ?? ''} onChange={(e) => setForm({ ...form, support_link: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+                <input value={form.support_link ?? ''} onChange={(e) => setForm({ ...form, support_link: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
               </div>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-secondary">AMC / renewal date</label>
-              <input type="date" value={form.amc_expiry ?? ''} onChange={(e) => setForm({ ...form, amc_expiry: e.target.value })} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+              <input type="date" value={form.amc_expiry ?? ''} onChange={(e) => setForm({ ...form, amc_expiry: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="flex justify-end gap-2 pt-1">
@@ -858,9 +858,9 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
         <Button onClick={() => setAdding(!adding)} variant="text" className="text-[11px]">{adding ? 'Cancel' : '+ Add claim'}</Button>
       </div>
       {adding && (
-        <form className="mb-3 space-y-2 rounded-lg border border-edge2 bg-base p-3" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
-          <textarea required placeholder="Issue / fault (e.g. 'Power port dead — sent for RMA')" value={issue} onChange={(e) => setIssue(e.target.value)} className="w-full rounded-lg border border-edge2 bg-base px-3 py-2 text-sm outline-none focus:border-accent" rows={2} />
-          <input placeholder="Outcome (optional — e.g. 'Motherboard replaced')" value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent" />
+        <form className="mb-3 space-y-2 rounded-lg glass-dense p-3" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
+          <textarea required placeholder="Issue / fault (e.g. 'Power port dead — sent for RMA')" value={issue} onChange={(e) => setIssue(e.target.value)} className="w-full rounded-lg glass-dense px-3 py-2 text-sm outline-none focus:border-accent" rows={2} />
+          <input placeholder="Outcome (optional — e.g. 'Motherboard replaced')" value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
           <label className="flex items-center gap-2 text-xs text-secondary">
             <input type="checkbox" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} className="accent-indigo-500" /> Replacement unit provided
           </label>
@@ -869,7 +869,7 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
       )}
       <div className="space-y-1.5">
         {claims.data?.map((c) => (
-          <div key={c.id} className="flex items-start justify-between gap-3 rounded-lg bg-elevated/50 px-3 py-2">
+          <div key={c.id} className="flex items-start justify-between gap-3 rounded-lg glass-dense px-3 py-2">
             <div className="min-w-0">
               <div className="text-xs">{c.issue}</div>
               <div className="mt-0.5 text-[11px] text-muted">
@@ -964,7 +964,7 @@ function LocationsTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search site / building / floor / room…"
-          className="h-9 min-w-0 flex-1 rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent"
+          className="h-9 min-w-0 flex-1 rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent"
         />
         <Button
           onClick={() => { setEditing(null); setForm(EMPTY_LOCATION); setError(''); setOpen(true); }}
@@ -978,7 +978,7 @@ function LocationsTab() {
 
       {error && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">{error}</p>}
 
-      <div className="max-h-[55vh] overflow-x-auto overflow-y-auto rounded-xl border border-edge">
+      <div className="max-h-[55vh] overflow-x-auto overflow-y-auto rounded-xl glass-dense">
         <table className="w-full text-left text-sm">
           <thead className="bg-surface text-[11px] uppercase tracking-wide text-muted">
             <tr>
@@ -989,7 +989,7 @@ function LocationsTab() {
           </thead>
           <tbody className="divide-y divide-edge/60">
             {rows.map((l) => (
-              <tr key={l.id} className="hover:bg-elevated/40">
+              <tr key={l.id} className="hover:bg-elevated">
                 <td className="px-3 py-2">
                   <button className="text-left hover:text-accent" onClick={() => setDetail(l)}>
                     {fmtLocation(l) || '—'}
@@ -1026,7 +1026,7 @@ function LocationsTab() {
                   onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
                   placeholder={`e.g. ${k === 'site' ? 'Main Plant' : k === 'building' ? 'Factory A' : k === 'floor' ? 'Floor 2' : 'Server Room'}`}
                   autoFocus={k === 'site'}
-                  className="h-9 w-full rounded-lg border border-edge2 bg-base px-3 text-sm outline-none focus:border-accent"
+                  className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent"
                 />
               </label>
             ))}
@@ -1052,7 +1052,7 @@ function LocationsTab() {
             <p className="text-xs text-secondary">{detail.asset_count} asset{detail.asset_count === 1 ? '' : 's'} at this location</p>
             <div className="max-h-80 space-y-1 overflow-y-auto">
               {detailAssets.data?.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-lg bg-elevated/50 px-3 py-2 text-xs">
+                <div key={a.id} className="flex items-center justify-between rounded-lg glass-dense px-3 py-2 text-xs">
                   <span className="font-mono">{a.asset_tag}</span>
                   <span className="truncate px-2 text-secondary">{a.name}</span>
                   <span className="text-secondary">{a.status}</span>

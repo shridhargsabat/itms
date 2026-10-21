@@ -45,13 +45,13 @@ function BucketSection({
         <meta.icon className="h-4 w-4" /> {meta.label}
         <span className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary">{total}</span>
       </h2>
-      <div className="overflow-hidden rounded-xl border border-edge bg-surface">
+      <div className="overflow-hidden rounded-xl glass-card">
         {pageRows.map((a, i) => (
           <button
             key={a.id}
             type="button"
             onClick={() => onOpen(a.asset_tag)}
-            className={`block w-full text-left transition-colors hover:bg-elevated/60 ${
+            className={`block w-full text-left transition-colors hover:bg-elevated ${
               i > 0 ? 'border-t border-edge/60' : ''
             }`}
           >
@@ -144,7 +144,7 @@ export default function WarrantyView() {
       {loading ? (
         <p className="py-10 text-center text-sm text-muted">Loading warranty alerts…</p>
       ) : groups.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-edge py-14 text-center">
+        <div className="rounded-xl glass-card border-dashed py-14 text-center">
           <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
           <p className="mt-3 text-sm font-medium text-primary">No warranty alerts right now</p>
           <p className="mt-1 text-xs text-muted">Everything has ≥ 90 days of warranty (or none recorded).</p>

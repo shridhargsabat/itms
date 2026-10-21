@@ -187,14 +187,14 @@ export default function Labels() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-edge bg-surface/60 p-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl glass-card p-3">
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search tag / name / serial…"
-            className="h-9 w-full rounded-lg border border-edge2 bg-base pl-9 pr-3 text-sm outline-none focus:border-accent"
+            className="h-9 w-full rounded-lg glass-dense pl-9 pr-3 text-sm outline-none focus:border-accent"
           />
         </div>
         <Select value={category} onChange={setCategory} options={[{ value: 'ALL', label: 'All categories' }, ...getCategories(rows).map((c) => ({ value: c, label: c }))]} />
