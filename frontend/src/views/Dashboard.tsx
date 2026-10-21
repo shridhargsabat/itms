@@ -71,7 +71,7 @@ function OverdueTickets() {
   const rows = data?.items ?? [];
   if (isLoading || rows.length === 0) return null;
   return (
-    <section className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+    <section className="rounded-2xl glass-card border-red-500/20 bg-red-500/5 p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-primary">SLA Overdue</h2>
         <Button
@@ -89,7 +89,7 @@ function OverdueTickets() {
             key={t.id}
             type="button"
             onClick={() => navigate(`/tickets?open=${t.id}`)}
-            className="flex items-center gap-3 rounded-xl border border-edge bg-surface/70 p-2.5 text-left transition-colors hover:bg-elevated/40"
+            className="flex items-center gap-3 rounded-xl glass-card p-2.5 text-left transition-colors"
           >
             <span className="font-mono text-xs text-red-400">{t.ticket_number}</span>
             <span className="min-w-0 flex-1 truncate text-sm text-secondary">{t.title}</span>
@@ -251,7 +251,7 @@ export default function Dashboard() {
       {/* Sticky actions row: the + New Ticket / + Add Asset buttons must stay
           visible while scrolling (phones resumed mid-page reported them as
           'missing' when they were scrolled above the fold). */}
-      <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-edge2/80 bg-base/60 px-6 py-2 backdrop-blur-xl backdrop-saturate-150 lg:top-0 lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6 lg:py-4">
+      <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 glass-card border-x-0 border-t-0 px-6 py-2 lg:top-0 lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6 lg:py-4">
         <div>
           <h1 className="text-xl font-semibold text-primary">Dashboard</h1>
           <p className="mt-0.5 text-sm text-secondary">
@@ -350,7 +350,7 @@ export default function Dashboard() {
           </div>
         </BentoCard>
 
-        {/* KPI chips: unchanged card markup, whole-card links. The last two
+        {/* KPI chips: glass-card links. The last two
             chips go 2-col wide on desktop (admin) to fill the row below the
             hero+assets band without dead cells. */}
         {CHIPS.filter((c) => !c.admin || isAdmin).map(({ label, key, icon: Icon, accent, to, wide }, i) => (
@@ -358,7 +358,7 @@ export default function Dashboard() {
             key={key}
             to={to}
             className={cn(
-              'group animate-fade-up min-w-0 rounded-xl border border-edge bg-surface/60 p-4 transition-all duration-150 hover:border-edge2/80 hover:bg-surface active:scale-[0.98] sm:p-5',
+              'group animate-fade-up min-w-0 rounded-xl glass-card p-4 transition-all duration-150 active:scale-[0.98] sm:p-5',
               wide && isAdmin && 'lg:col-span-2',
             )}
             style={{ animationDelay: `${Math.min(i + 2, 8) * 70}ms` }}

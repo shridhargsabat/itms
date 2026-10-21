@@ -322,7 +322,7 @@ export default function Tickets() {
             >
               Export
             </Button>
-            <div className="col-span-2 flex overflow-hidden rounded-lg border border-edge2 sm:col-auto">
+            <div className="col-span-2 flex overflow-hidden rounded-lg glass-dense sm:col-auto">
               <button
                 type="button"
                 onClick={() => setView('table')}
@@ -403,7 +403,7 @@ export default function Tickets() {
                 {TICKET_STATUSES.map((st) => {
                   const items = rows.filter((t) => t.status === st);
                   return (
-                    <div key={st} className="min-w-[240px] snap-start rounded-xl border border-edge bg-surface/50 p-3 md:min-w-0">
+                    <div key={st} className="min-w-[240px] snap-start rounded-xl glass-dense p-3 md:min-w-0">
                       <div className="mb-3 flex items-center justify-between px-1">
                         <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
                           {st.replace('_', ' ')}
@@ -419,7 +419,7 @@ export default function Tickets() {
                             type="button"
                             onClick={() => setSelectedId(t.id)}
                             className={cn(
-                              'animate-list-in w-full rounded-lg border border-edge bg-base p-3 text-left transition-colors hover:border-edge2',
+                              'animate-list-in w-full rounded-lg glass-card p-3 text-left transition-colors',
                               selectedId === t.id && 'border-indigo-500/60',
                             )}
                             style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
@@ -456,7 +456,7 @@ export default function Tickets() {
               className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => setSelectedId(null)}
             />
-            <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-edge bg-surface shadow-2xl">
+            <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
               <div className="flex items-start justify-between border-b border-edge px-5 py-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -484,7 +484,7 @@ export default function Tickets() {
                 </button>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-5">
-            <div className="mt-3 rounded-lg border border-edge bg-surface/60 p-2.5">
+            <div className="mt-3 rounded-lg glass-card p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
                   SLA · {SLA_HOURS[selected.priority] ?? 24}h policy
@@ -516,7 +516,7 @@ export default function Tickets() {
                 </span>
               </div>
               {selected.asset_id && (
-                <div className="flex items-center gap-2 rounded-lg border border-edge bg-base px-3 py-2">
+                <div className="flex items-center gap-2 rounded-lg glass-card px-3 py-2">
                   <Link2 className="h-4 w-4 shrink-0 text-accent" />
                   <div className="min-w-0">
                     <p className="truncate text-xs text-primary">
@@ -660,7 +660,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
       {attachments.length > 0 && (
         <div className="mb-3 flex flex-col gap-1.5">
           {attachments.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 rounded-lg border border-edge bg-elevated/30 px-2.5 py-1.5">
+            <div key={a.id} className="flex items-center gap-2 rounded-lg glass-dense px-2.5 py-1.5">
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-accent" />
               <Button
                 type="button"
@@ -702,7 +702,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           if (e.kind === 'comment') {
             const c = comments.find((x) => x.id === e.key.slice(2))!;
             return (
-              <div key={e.key} className="rounded-lg border border-edge bg-elevated/20 p-2">
+              <div key={e.key} className="rounded-lg glass-dense p-2">
                 <div className="flex items-center gap-2 text-[10px] text-muted">
                   <span className="font-medium text-secondary">{c.author_name ?? 'Unknown'}</span>
                   <span className="font-mono">{formatDate(c.created_at)}</span>
@@ -805,7 +805,7 @@ function SuggestionPanel({ query }: { query: string }) {
   });
   if (debounced.length < 3 || !suggestions.data?.length) return null;
   return (
-    <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2.5">
+    <div className="rounded-lg glass-card border-indigo-500/20 bg-indigo-500/5 p-2.5">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">
         Maybe this already exists in the KB?
       </p>
@@ -876,7 +876,7 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
         Canned response
       </Button>
       {open && (
-        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-80 overflow-y-auto rounded-xl border border-edge bg-surface p-1 shadow-xl">
+        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-80 overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl">
           {canned.data.map((c) => (
             <button
               key={c.id}
