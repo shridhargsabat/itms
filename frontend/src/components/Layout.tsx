@@ -169,7 +169,11 @@ export default function Layout() {
           )}
         </div>
 
-        <nav className="flex-1 space-y-1 p-2">
+        {/* min-h-0 + overflow-y-auto: the nav scrolls internally so the footer
+            (user card, collapse/sign-out, theme toggle) stays pinned even when
+            16 items exceed a short viewport (#173: the toggle was pushed below
+            the fold on hover-peek, which also renders the user card). */}
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
           {visibleNav(user).map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
