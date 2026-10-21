@@ -49,11 +49,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Backend - Install Rust toolchain + build deps
+      - name: Backend - Install Rust toolchain
         run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends \
-            curl build-essential gcc libc6-dev pkg-config 2>&1 | tail -2
+          # node:20-bullseye already ships curl/gcc/cc/make/pkg-config (verified
+          # in-image 2026-10-21) and Bullseye apt is EOL-broken (deb.debian.org
+          # 404s), so there is deliberately NO apt-get here. Fail loud with the
+          # tool name if the job image ever changes underneath us.
+          for t in curl gcc cc make pkg-config; do
+            command -v "$t" >/dev/null || { echo "missing build tool: $t" >&2; exit 1; }
+          done
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
             -o /tmp/rustup-init.sh
           sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain stable
