@@ -82,8 +82,9 @@ echo "==> Deployed ${PROJECT} with backend+frontend ${TAG}"
 
 # ── 6. Smoke test ───────────────────────────────────────────────────────
 echo "==> Waiting for backend health..."
+# /healthz answers HTTP 200 with a PLAIN 'ok' body (text/plain, not JSON).
 for i in $(seq 1 30); do
-  if docker exec "$PROJECT-backend" wget -qO- http://localhost:8080/api/v1/healthz 2>/dev/null | grep -q '"ok"\|"status"'; then
+  if [ "$(docker exec "$PROJECT-backend" wget -qO- http://localhost:8080/api/v1/healthz 2>/dev/null)" = "ok" ]; then
     echo "==> Healthz OK (attempt $i)"
     break
   fi
@@ -92,13 +93,13 @@ for i in $(seq 1 30); do
 done
 
 echo "==> Smoke: /api/v1/dashboard/metrics ..."
-if curl -sf --max-time 10 http://localhost:8080/api/v1/dashboard/metrics >/dev/null 2>&1; then
-  echo "==> metrics endpoint OK"
+# No host port is exposed, so probe from inside the backend container. HTTP 200
+# or 401 both prove the API stack answers (/metrics is auth-gated by design).
+METRICS_CODE="$(docker exec "$PROJECT-backend" wget -S -O /dev/null http://localhost:8080/api/v1/dashboard/metrics 2>&1 | grep -oE 'HTTP/[0-9.]+ [0-9]{3}' | tail -1 | awk '{print $2}')"
+if [ "$METRICS_CODE" = "200" ] || [ "$METRICS_CODE" = "401" ]; then
+  echo "==> metrics endpoint OK (HTTP ${METRICS_CODE})"
 else
-  # fall back to routing through the backend container (no host port exposed)
-  docker exec "$PROJECT-backend" wget -qO- http://localhost:8080/api/v1/dashboard/metrics 2>/dev/null >/dev/null \
-    && echo "==> metrics endpoint OK (via backend container)" \
-    || { echo "!! metrics endpoint smoke failed" >&2; }
+  echo "!! metrics endpoint smoke failed (HTTP ${METRICS_CODE:-none})" >&2
 fi
 
 # ── 7. Freshness guard (non-blocking, loud warning) ─────────────────────

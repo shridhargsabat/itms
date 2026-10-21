@@ -14,7 +14,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup Python + Semgrep
         run: |
-          apt-get update -qq && apt-get install -y -qq python3-pip > /dev/null
+          # Bullseye is EOL: deb.debian.org 404s. Repoint ALL sources at the
+          # archive (proven in-image 2026-10-21) and skip the expired Release check.
+          sed -i 's|deb.debian.org|archive.debian.org|g; s|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
+          apt-get update -o Acquire::Check-Valid-Until=false -qq
+          apt-get install -y -qq -o Acquire::Check-Valid-Until=false python3-pip > /dev/null
           python3 -m pip install --upgrade pip > /dev/null 2>&1
           python3 -m pip install semgrep
       - name: Run Semgrep
