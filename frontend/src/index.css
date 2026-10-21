@@ -123,7 +123,7 @@
 }
 
 @utility glass-chrome {
-  background: color-mix(in srgb, var(--t-surface) 62%, transparent);
+  background: color-mix(in srgb, var(--t-surface) 68%, transparent);
   -webkit-backdrop-filter: blur(24px) saturate(170%);
   backdrop-filter: blur(24px) saturate(170%);
   border: 1px solid var(--t-glass-edge);
