@@ -154,10 +154,10 @@ export function visibleNavGroups(user: MaybeUser): NavGroup[] {
 
 /**
  * Flat role-filtered leaf list in the FROZEN pre-grouping order.
- * Transitional helper (flat sidebar + contract tests); tree consumers should
- * use visibleNavGroups / primaryNav / restGroups instead.
+ * Private helper behind primaryNav — tree consumers use visibleNavGroups /
+ * primaryNav / restGroups instead.
  */
-export function visibleNav(user: MaybeUser): NavChild[] {
+function visibleNav(user: MaybeUser): NavChild[] {
   return MOBILE_LEAF_ORDER.map(childByPath).filter((c) => isVisible(c, user));
 }
 
