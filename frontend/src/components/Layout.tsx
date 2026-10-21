@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import ThemeToggle from '@/components/ThemeToggle';
 import { Button } from '@/components/Button';
@@ -13,7 +13,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { visibleNav } from '@/lib/nav';
+import SidebarNav from '@/components/SidebarNav';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateToast from '@/components/UpdateToast';
 import BottomNav from '@/components/BottomNav';
@@ -46,6 +46,13 @@ export default function Layout() {
       localStorage.setItem('itms_sidebar_collapsed', next ? '1' : '0');
       return next;
     });
+  };
+
+  // Rail parent click: expand a user-collapsed sidebar (group opening is
+  // handled inside SidebarNav so the click both widens and reveals).
+  const expandSidebar = () => {
+    setCollapsed(false);
+    localStorage.setItem('itms_sidebar_collapsed', '0');
   };
 
   const signOut = async () => {
@@ -171,29 +178,10 @@ export default function Layout() {
 
         {/* min-h-0 + overflow-y-auto: the nav scrolls internally so the footer
             (user card, collapse/sign-out, theme toggle) stays pinned even when
-            16 items exceed a short viewport (#173: the toggle was pushed below
+            15 items exceed a short viewport (#173: the toggle was pushed below
             the fold on hover-peek, which also renders the user card). */}
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-          {visibleNav(user).map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              title={collapsed && !hovering ? label : undefined}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  wide ? '' : 'justify-center px-0',
-                  isActive
-                    ? 'bg-elevated text-primary'
-                    : 'text-secondary hover:bg-elevated/60 hover:text-primary',
-                )
-              }
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {wide && <span className="truncate">{label}</span>}
-            </NavLink>
-          ))}
+          <SidebarNav wide={wide} user={user} onExpandSidebar={expandSidebar} />
         </nav>
 
         {wide && user && (
