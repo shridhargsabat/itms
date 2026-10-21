@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Monitor, Moon, Palette, Sparkles, Sun } from 'lucide-react';
+import { Check, Moon, Palette, Sparkles, Sun } from 'lucide-react';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/Button';
 import { cn } from '@/lib/utils';
@@ -12,15 +12,17 @@ export interface ThemeMeta {
   icon: typeof Sun;
   /** Classes to apply on a wrapper to render the theme (tokens cascade). */
   wrapperClass: string;
+  glass: boolean;
 }
 
 export const THEMES: ThemeMeta[] = [
   {
     value: 'light',
     label: 'Light',
-    description: 'Bright white surfaces, slate text, indigo accent.',
+    description: 'Frosted-glass light, forced bright white surfaces, slate text, indigo accent.',
     icon: Sun,
     wrapperClass: 'theme-light',
+    glass: true,
   },
   {
     value: 'ledgerly-light',
@@ -28,13 +30,15 @@ export const THEMES: ThemeMeta[] = [
     description: 'Warm-paper light, deep-teal accent — the elegant Ledgerly look in daylight.',
     icon: Sparkles,
     wrapperClass: 'ledgerly-light',
+    glass: false,
   },
   {
     value: 'dark',
     label: 'Dark',
-    description: 'Slate dark surfaces, indigo accent (classic ITMS).',
+    description: 'Frosted-glass slate dark, forced slate dark surfaces, indigo accent (classic ITMS).',
     icon: Moon,
     wrapperClass: 'dark',
+    glass: true,
   },
   {
     value: 'ledgerly',
@@ -42,13 +46,15 @@ export const THEMES: ThemeMeta[] = [
     description: 'Warm-paper dark, teal accent — copied from Ledgerly.',
     icon: Palette,
     wrapperClass: 'dark ledgerly-dark',
+    glass: false,
   },
   {
     value: 'system',
-    label: 'System',
-    description: 'Follow your device (light when the OS is light, dark otherwise).',
-    icon: Monitor,
+    label: 'Liquid Glass (Auto)',
+    description: 'Apple-style frosted glass that follows your device (light/dark). The default ITMS look.',
+    icon: Sparkles,
     wrapperClass: 'theme-light',
+    glass: true,
   },
 ];
 
@@ -66,7 +72,23 @@ function ThemePreview({ theme }: { theme: ThemeMeta }) {
       className={cn('rounded-lg border p-2.5', theme.wrapperClass)}
       style={{ borderColor: 'var(--t-edge)', backgroundColor: 'var(--t-base)' }}
     >
-      <div className="rounded-md border p-2" style={{ borderColor: 'var(--t-edge)', backgroundColor: 'var(--t-surface)' }}>
+      <div
+        className="rounded-md border p-2"
+        style={
+          theme.glass
+            ? {
+                borderColor: 'var(--t-edge)',
+                background: 'color-mix(in srgb, var(--t-surface) 76%, transparent)',
+                backdropFilter: 'blur(12px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(12px) saturate(150%)',
+                boxShadow: 'inset 0 1px 0 var(--t-glass-hi)',
+              }
+            : {
+                borderColor: 'var(--t-edge)',
+                backgroundColor: 'var(--t-surface)',
+              }
+        }
+      >
         <div className="flex items-center justify-between">
           <div className="h-1.5 w-12 rounded-full" style={{ backgroundColor: 'var(--t-elevated2)' }} />
           <div

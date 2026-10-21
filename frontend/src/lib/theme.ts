@@ -1,6 +1,11 @@
 /**
  * Theme manager: light / dark / ledgerly / system (default system).
  *
+ * In Liquid Glass mode, 'system' renders the Apple-style frosted glass look
+ * that auto-follows the device color scheme (light/dark). Forced 'light' and
+ * 'dark' also render frosted glass. 'ledgerly' and 'ledgerly-light' remain
+ * opaque warm-paper alternatives.
+ *
  * Two sources, one goal:
  * - localStorage ('itms_theme') is the fast-path cache — FOUC script +
  *   first paint read it synchronously, offline works.
