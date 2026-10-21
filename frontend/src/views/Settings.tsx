@@ -65,7 +65,7 @@ export default function Settings() {
       </div>
 
       {/* Theme manager — user-level preference, synced across devices */}
-      <div className="rounded-xl border border-edge bg-surface p-5">
+      <div className="rounded-xl glass-card p-5">
         <div className="flex items-center justify-between gap-3">
           <CurrentThemeSummary />
           <Button
@@ -78,13 +78,13 @@ export default function Settings() {
             Change theme
           </Button>
         </div>
-        <p className="mt-3 rounded-lg border border-edge bg-base p-2 text-xs text-muted">
+        <p className="mt-3 rounded-lg glass-dense p-2 text-xs text-muted">
           Your theme follows your account — change it on any device and it syncs everywhere.
         </p>
       </div>
       <ThemeManager open={themeOpen} onClose={() => setThemeOpen(false)} />
 
-      <div className="rounded-xl border border-edge bg-surface p-5">
+      <div className="rounded-xl glass-card p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-accent" />
@@ -111,7 +111,7 @@ export default function Settings() {
             SSO is enabled — the login page shows “Continue with Google”. Local logins stay available as fallback.
           </p>
         ) : (
-          <p className="mt-3 rounded-lg border border-edge bg-base p-2 text-xs text-muted">
+          <p className="mt-3 rounded-lg glass-dense p-2 text-xs text-muted">
             Disabled — local accounts remain the only way in. (Recommended until you've added your Google client below.)
           </p>
         )}
@@ -123,7 +123,7 @@ export default function Settings() {
               value={clientId ?? cfg.client_id}
               onChange={(e) => setClientId(e.target.value)}
               placeholder="1234567890-xxxx.apps.googleusercontent.com"
-              className="h-10 w-full rounded-lg border border-edge2 bg-base px-3 font-mono text-xs outline-none focus:border-accent"
+              className="h-10 w-full rounded-lg glass-dense px-3 font-mono text-xs outline-none focus:border-accent"
             />
           </div>
           <div>
@@ -133,7 +133,7 @@ export default function Settings() {
               onChange={(e) => setClientSecret(e.target.value)}
               placeholder={cfg.has_secret ? '•••••••• (leave blank to keep)' : 'GOCSPX-…'}
               type="password"
-              className="h-10 w-full rounded-lg border border-edge2 bg-base px-3 font-mono text-xs outline-none focus:border-accent"
+              className="h-10 w-full rounded-lg glass-dense px-3 font-mono text-xs outline-none focus:border-accent"
             />
           </div>
           <div>
@@ -144,7 +144,7 @@ export default function Settings() {
               value={domains ?? cfg.allowed_domains.join(', ')}
               onChange={(e) => setDomains(e.target.value)}
               placeholder="e.g. sonalapparels.in, itms.local"
-              className="h-10 w-full rounded-lg border border-edge2 bg-base px-3 font-mono text-xs outline-none focus:border-accent"
+              className="h-10 w-full rounded-lg glass-dense px-3 font-mono text-xs outline-none focus:border-accent"
             />
             <p className="mt-1 text-[11px] text-muted">
               Security default: SSO never auto-creates accounts — it only links to existing users by email. A domain
@@ -152,7 +152,7 @@ export default function Settings() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-edge bg-base p-3">
+          <div className="rounded-lg glass-dense p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-secondary">Authorized redirect URI (Google Cloud → OAuth client → add this)</p>
             <p className="mt-1 select-all break-all font-mono text-[11px] text-accent">{redirectUri}</p>
           </div>

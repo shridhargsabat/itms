@@ -20,8 +20,8 @@ export const BUTTON = {
     'select-none whitespace-nowrap',
 
   /* variants */
-  primary: 'bg-accent text-white hover:bg-accent/90',
-  secondary: 'border border-edge2 bg-surface text-secondary hover:bg-elevated hover:text-primary',
+  primary: 'bg-accent text-white hover:bg-accent/90 shadow-[inset_0_1px_0_var(--t-glass-hi)]',
+  secondary: 'glass-dense text-secondary hover:bg-elevated hover:text-primary',
   ghost: 'text-secondary hover:bg-elevated hover:text-primary',
   danger: 'bg-red-500 text-white hover:bg-red-600',
   text: 'text-accent hover:underline',

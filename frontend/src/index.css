@@ -35,6 +35,9 @@
   --t-muted: #64748b;
   --t-accent: #4f46e5;
   --t-accent-strong: #4338ca;
+  --t-glass-hi: rgb(255 255 255 / 0.55);   /* specular top highlight, light */
+  --t-glass-edge: rgb(255 255 255 / 0.45); /* refractive edge, light */
+  --t-glass-shadow: rgb(15 23 42 / 0.14);
 }
 
 .dark {
@@ -50,6 +53,9 @@
   --t-muted: #8494ab;
   --t-accent: #818cf8;
   --t-accent-strong: #6366f1;
+  --t-glass-hi: rgb(255 255 255 / 0.16);
+  --t-glass-edge: rgb(255 255 255 / 0.12);
+  --t-glass-shadow: rgb(0 0 0 / 0.45);
 }
 
 /* Ledgerly dark ("warm paper") — palette copied verbatim from /root/money-management/frontend/src/styles.css [data-theme='dark'] */
@@ -67,6 +73,7 @@
   --t-muted: #98938a;
   --t-accent: #2fb5a0;
   --t-accent-strong: #3cc9b3;
+  --t-glass-hi: rgb(255 255 255 / 0.06); --t-glass-edge: var(--t-edge2); --t-glass-shadow: rgb(0 0 0 / 0.45);
 }
 
 /* Ledgerly light ("warm paper") — derived from Ledgerly's :root light palette
@@ -89,6 +96,7 @@
   --t-muted: #6f6a61;
   --t-accent: #0e7c6b;
   --t-accent-strong: #0b5d51;
+  --t-glass-hi: rgb(255 255 255 / 0.50); --t-glass-edge: var(--t-edge2); --t-glass-shadow: rgb(15 23 42 / 0.14);
 }
 
 /* Theme-manager preview reset: force the LIGHT palette inside a wrapper even
@@ -109,6 +117,29 @@
   --t-muted: #64748b;
   --t-accent: #4f46e5;
   --t-accent-strong: #4338ca;
+  --t-glass-hi: rgb(255 255 255 / 0.55);
+  --t-glass-edge: rgb(255 255 255 / 0.45);
+  --t-glass-shadow: rgb(15 23 42 / 0.14);
+}
+
+@utility glass-chrome {
+  background: color-mix(in srgb, var(--t-surface) 68%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid var(--t-glass-edge);
+  box-shadow: inset 0 1px 0 var(--t-glass-hi), 0 18px 44px -12px var(--t-glass-shadow);
+}
+@utility glass-card {
+  background: color-mix(in srgb, var(--t-surface) 76%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid var(--t-glass-edge);
+  box-shadow: inset 0 1px 0 var(--t-glass-hi), 0 12px 32px -12px var(--t-glass-shadow);
+}
+@utility glass-dense {
+  background: color-mix(in srgb, var(--t-surface) 90%, transparent);
+  border: 1px solid var(--t-glass-edge);
+  box-shadow: inset 0 1px 0 var(--t-glass-hi), 0 8px 24px -12px var(--t-glass-shadow);
 }
 
 @layer base {
@@ -311,6 +342,19 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-chrome, .glass-card, .glass-dense {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: var(--t-surface); box-shadow: none;
+  }
+}
+@media print {
+  .glass-chrome, .glass-card, .glass-dense {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    background: #fff !important; box-shadow: none !important;
   }
 }
 

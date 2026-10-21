@@ -27,7 +27,7 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
   if (done) {
     return (
       <div className="mx-auto mt-24 w-full max-w-md px-4">
-        <div className="rounded-2xl border border-edge bg-surface p-6 text-center">
+        <div className="rounded-2xl glass-card p-6 text-center">
           <p className="text-lg font-semibold text-primary">Check your notifications</p>
           <p className="mt-2 text-sm text-muted">
             If an account exists for <span className="font-medium text-primary">{email}</span>, a
@@ -42,7 +42,7 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
 
   return (
     <div className="mx-auto mt-24 w-full max-w-md px-4">
-      <div className="rounded-2xl border border-edge bg-surface p-6">
+      <div className="rounded-2xl glass-card p-6">
         <h1 className="text-xl font-bold text-primary">Reset your password</h1>
         <p className="mt-1 text-sm text-muted">
           Enter your ITMS email and we'll send you a reset link (valid 30 minutes).
@@ -99,7 +99,7 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
   if (done) {
     return (
       <div className="mx-auto mt-24 w-full max-w-md px-4">
-        <div className="rounded-2xl border border-edge bg-surface p-6 text-center">
+        <div className="rounded-2xl glass-card p-6 text-center">
           <p className="text-lg font-semibold text-primary">Password updated 🎉</p>
           <p className="mt-2 text-sm text-muted">Signing you in shortly…</p>
         </div>
@@ -109,7 +109,7 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
 
   return (
     <div className="mx-auto mt-24 w-full max-w-md px-4">
-      <div className="rounded-2xl border border-edge bg-surface p-6">
+      <div className="rounded-2xl glass-card p-6">
         <h1 className="text-xl font-bold text-primary">Set a new password</h1>
         <p className="mt-1 text-sm text-muted">At least 8 characters. Link valid 30 minutes.</p>
         <form

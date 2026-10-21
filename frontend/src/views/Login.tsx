@@ -68,7 +68,7 @@ export default function Login() {
       {/* glass card */}
       <div className="animate-fade-up relative w-full max-w-md">
         <div className="animate-pulse-ring rounded-2xl p-px">
-          <div className="rounded-2xl border border-edge/80 bg-surface/70 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="rounded-2xl glass-card p-8">
             <div className="mb-7 flex flex-col items-center gap-3">
               <div className="relative">
                 <span className="animate-ping-slow absolute inset-0 rounded-2xl bg-accent/30" />
@@ -104,7 +104,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="w-full rounded-lg border border-edge2 bg-base/70 px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg glass-dense px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -118,7 +118,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-lg border border-edge2 bg-base/70 px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg glass-dense px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <button
@@ -148,7 +148,7 @@ export default function Login() {
                 </div>
                 <a
                   href="/api/v1/auth/oauth/start"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-edge2 bg-surface text-sm font-medium text-primary transition-colors hover:bg-elevated"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg glass-dense text-sm font-medium text-primary transition-colors hover:bg-elevated"
                 >
                   <KeyRound className="h-4 w-4" /> Continue with Google
                 </a>
@@ -170,7 +170,7 @@ export default function Login() {
             <button
               onClick={onDemoClick}
               disabled={demoMutation.isPending}
-              className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-edge2 text-sm font-medium text-primary transition-all hover:border-indigo-500/50 hover:bg-elevated/60 active:scale-[0.97] disabled:opacity-60"
+              className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg glass-dense text-sm font-medium text-primary transition-all hover:border-indigo-500/50 hover:bg-elevated active:scale-[0.97] disabled:opacity-60"
             >
               {demoMutation.isPending ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />

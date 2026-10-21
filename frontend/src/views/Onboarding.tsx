@@ -183,7 +183,7 @@ export default function Onboarding() {
       </div>
 
       {/* Type tabs */}
-      <div className="flex gap-1 rounded-xl border border-edge bg-surface p-1">
+      <div className="flex gap-1 rounded-xl glass-dense p-1">
         {(['ONBOARDING', 'OFFBOARDING'] as const).map((t) => (
           <button
             key={t}
@@ -212,7 +212,7 @@ export default function Onboarding() {
           </div>
         )}
         {!events.isLoading && list.length === 0 && (
-          <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-secondary">
+          <div className="rounded-xl glass-card border-dashed p-10 text-center text-sm text-secondary">
             No {tab.toLowerCase()} events yet.
           </div>
         )}
@@ -220,7 +220,7 @@ export default function Onboarding() {
           <button
             key={ev.id}
             onClick={() => setSelectedId(ev.id)}
-            className="flex flex-col gap-2 rounded-xl border border-edge bg-surface p-4 text-left transition hover:border-edge2"
+            className="flex flex-col gap-2 rounded-xl glass-card p-4 text-left transition hover:border-edge2"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -489,12 +489,12 @@ function EventDetailModal({
 
         <div className="flex flex-col gap-3">
           {tasks.length === 0 && (
-            <p className="rounded-lg border border-dashed border-edge p-4 text-center text-xs text-secondary">No checklist tasks yet.</p>
+            <p className="rounded-lg glass-dense border-dashed p-4 text-center text-xs text-secondary">No checklist tasks yet.</p>
           )}
           {tasks.map((t) => {
             const overdue = t.status === 'PENDING' && t.due_date && t.due_date < new Date().toISOString().slice(0, 10);
             return (
-              <div key={t.id} className={cn('rounded-xl border p-3 transition', t.status === 'DONE' ? 'border-edge bg-elevated/40 opacity-80' : 'border-edge bg-surface', overdue && 'border-red-500/40')}>
+              <div key={t.id} className={cn('rounded-xl glass-dense p-3 transition', t.status === 'DONE' && 'opacity-80', overdue && 'border-red-500/40')}>
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => onToggle({ task: t, done: t.status !== 'DONE' })}

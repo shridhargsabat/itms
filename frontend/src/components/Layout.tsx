@@ -109,7 +109,7 @@ export default function Layout() {
       <UpdateToast />
       <BottomNav />
       {/* Mobile top bar (sidebar is hidden <lg): brand + user + logout */}
-      <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-edge/60 bg-base/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg lg:hidden">
+      <header className="sticky top-0 z-40 flex items-center gap-2 glass-chrome px-4 pt-[env(safe-area-inset-top)] lg:hidden">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
           <Network className="h-5 w-5" />
         </span>
@@ -144,7 +144,7 @@ export default function Layout() {
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
         className={cn(
-          'fixed inset-y-0 left-0 hidden flex-col border-r border-edge bg-surface/80 backdrop-blur transition-all duration-300 lg:flex',
+          'fixed inset-y-0 left-0 hidden flex-col glass-chrome transition-all duration-300 lg:flex',
           wide ? 'w-60' : 'w-16',
           // Transient hover peek overlays the page (higher z + shadow, content not pushed).
           hovering && collapsed && 'z-[60] shadow-2xl',

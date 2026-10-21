@@ -87,8 +87,8 @@ export default function Notifications() {
             type="button"
             onClick={() => open(n)}
             className={cn(
-              'flex items-start gap-3 rounded-xl border p-3 text-left transition-colors',
-              n.read_at ? 'border-edge bg-surface/40' : 'border-accent/30 bg-accent/5 hover:bg-accent/10',
+              'flex items-start gap-3 rounded-xl p-3 text-left transition-colors',
+              n.read_at ? 'glass-card opacity-75' : 'glass-card border-accent/40 bg-accent/10 hover:bg-accent/15',
             )}
           >
             <span className="mt-0.5 text-lg">{KIND_ICON[n.kind] ?? '🔔'}</span>

@@ -307,7 +307,7 @@ export default function Assets() {
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-5 flex flex-wrap items-center gap-2 border-b border-edge2 bg-surface/95 px-6 py-2.5 backdrop-blur lg:mx-0 lg:mt-0 lg:rounded-t-xl lg:border lg:px-4">
+        <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-5 flex flex-wrap items-center gap-2 glass-chrome border-x-0 border-t-0 px-6 py-2.5 lg:mx-0 lg:mt-0 lg:rounded-t-xl lg:border lg:px-4">
           <span className="text-sm font-medium text-primary">
             {selectedIds.size} selected
           </span>
@@ -417,7 +417,7 @@ export default function Assets() {
                 setFile(e.target.files?.[0] ?? null);
                 setImportResult(null);
               }}
-              className="block w-full cursor-pointer rounded-lg border border-dashed border-edge2 bg-elevated/40 p-3 text-sm text-secondary file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:text-white hover:border-accent/50"
+              className="block w-full cursor-pointer rounded-lg glass-dense border-dashed p-3 text-sm text-secondary file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:text-white hover:border-accent/50"
             />
             {file && (
               <p className="text-xs text-secondary">
@@ -455,7 +455,7 @@ export default function Assets() {
                     {importResult.failed.map((f) => (
                       <div
                         key={f.row}
-                        className="rounded-lg border border-red-500/20 bg-elevated/60 px-3 py-2 text-xs"
+                        className="rounded-lg glass-dense border-red-500/20 px-3 py-2 text-xs"
                       >
                         <div className="flex items-start gap-2">
                           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />

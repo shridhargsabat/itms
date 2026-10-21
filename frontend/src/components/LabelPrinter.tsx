@@ -162,7 +162,7 @@ function LabelPrinterMachine({
   return (
     <div
       className={cn(
-        'relative isolate w-full overflow-hidden rounded-[1.5rem] border border-edge bg-elevated p-3 pb-6 shadow-[0_20px_36px_-20px_rgba(2,6,23,0.45),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(2,6,23,0.15)]',
+        'relative isolate w-full overflow-hidden rounded-[1.5rem] glass-card p-3 pb-6 shadow-[0_20px_36px_-20px_rgba(2,6,23,0.45),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(2,6,23,0.15)]',
         className,
       )}
       {...props}

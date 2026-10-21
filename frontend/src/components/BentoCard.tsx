@@ -16,7 +16,7 @@ export default function BentoCard({
     <div
       {...rest}
       className={cn(
-        'min-w-0 rounded-2xl border border-edge bg-surface/60 p-4 transition-all duration-150 hover:border-edge2/80 hover:bg-surface sm:p-5',
+        'min-w-0 rounded-2xl glass-card p-4 transition-all duration-150 sm:p-5',
         className,
       )}
     >

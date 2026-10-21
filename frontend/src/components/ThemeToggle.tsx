@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { applyTheme, getThemeMode, onThemeChanged, watchSystemTheme, type ThemeMode } from '@/lib/theme';
-import { cn } from '@/lib/utils';
 import ThemeManager, { THEMES } from '@/components/ThemeManager';
 import { Button } from '@/components/Button';
 
@@ -33,7 +32,7 @@ export default function ThemeToggle({ className }: { className?: string }) {
         onClick={() => setManagerOpen(true)}
         variant="secondary"
         size="icon"
-        className={cn('border-edge bg-elevated/60', className)}
+        className={className}
       >
         <Icon className="h-4 w-4" />
       </Button>

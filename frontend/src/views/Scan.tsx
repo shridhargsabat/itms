@@ -157,14 +157,14 @@ export default function Scan() {
       )}
 
       {camError && (
-        <form onSubmit={manualSubmit} className="space-y-2 rounded-xl border border-edge bg-surface/60 p-3">
+        <form onSubmit={manualSubmit} className="space-y-2 rounded-xl glass-card p-3">
           <label className="block text-xs font-medium text-secondary">Manual tag lookup</label>
           <div className="flex gap-2">
             <input
               value={manual}
               onChange={(e) => setManual(e.target.value)}
               placeholder="e.g. AST-0012 or serial"
-              className="h-9 min-w-0 flex-1 rounded-lg border border-edge2 bg-base px-3 font-mono text-sm outline-none focus:border-accent"
+              className="h-9 min-w-0 flex-1 rounded-lg glass-dense px-3 font-mono text-sm outline-none focus:border-accent"
             />
             <Button type="submit" variant="primary" size="sm" className="shrink-0">Enter</Button>
           </div>
@@ -172,7 +172,7 @@ export default function Scan() {
       )}
 
       {/* Audit run card */}
-      <div className="rounded-xl border border-edge bg-surface/60 p-4">
+      <div className="rounded-xl glass-card p-4">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-secondary"><Flag className="h-3.5 w-3.5" /> Audit run</h2>
           {run && expected > 0 && !ended && (
@@ -192,15 +192,15 @@ export default function Scan() {
           </p>
         ) : ended ? (
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg border border-edge2 bg-base p-3">
+            <div className="rounded-lg glass-dense p-3">
               <div className="text-xl font-semibold text-emerald-400">{pct}%</div>
               <div className="text-[10px] text-muted">found</div>
             </div>
-            <div className="rounded-lg border border-edge2 bg-base p-3">
+            <div className="rounded-lg glass-dense p-3">
               <div className="text-xl font-semibold">{found}</div>
               <div className="text-[10px] text-muted">of {expected} expected</div>
             </div>
-            <div className={`rounded-lg border bg-base p-3 ${missing > 0 ? 'border-amber-500/40 text-amber-400' : 'border-emerald-500/40 text-emerald-400'}`}>
+            <div className={`rounded-lg glass-dense p-3 ${missing > 0 ? 'border-amber-500/40 text-amber-400' : 'border-emerald-500/40 text-emerald-400'}`}>
               <div className="text-xl font-semibold">{missing}</div>
               <div className="text-[10px] text-muted">missing ({missing > 0 ? 'investigate ghosts' : 'all present'})</div>
             </div>
@@ -213,7 +213,7 @@ export default function Scan() {
         ) : (
           <div className="mt-3 space-y-1.5">
             {targets.slice(0, 3).map((t) => (
-              <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg bg-elevated/50 px-3 py-2 text-xs">
+              <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg glass-dense px-3 py-2 text-xs">
                 <span className="font-mono">{t.tag}</span>
                 <span className="truncate text-secondary">{t.name}</span>
                 {foundTags.has(t.tag) ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" /> : <XCircle className="h-4 w-4 shrink-0 text-muted" />}

@@ -8,9 +8,10 @@ export default function AnimatedBackground() {
     <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden bg-transparent">
       {/* aurora blobs */}
       <div className="absolute inset-0">
-        <div className="animate-aurora absolute -left-32 -top-40 h-[480px] w-[480px] rounded-full bg-accent/25 blur-[110px]" />
-        <div className="animate-aurora-slow absolute -bottom-48 -right-24 h-[520px] w-[520px] rounded-full bg-accent/20 blur-[120px]" />
-        <div className="animate-aurora absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/15 blur-[100px]" />
+        <div className="animate-aurora absolute -left-32 -top-40 h-[480px] w-[480px] rounded-full bg-accent/35 blur-[130px]" />
+        <div className="animate-aurora-slow absolute -bottom-48 -right-24 h-[520px] w-[520px] rounded-full bg-accent/30 blur-[140px]" />
+        <div className="animate-aurora absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/25 blur-[120px]" />
+        <div className="animate-aurora-slow absolute right-1/4 top-1/4 h-64 w-64 rounded-full bg-teal-400/20 blur-[110px]" />
       </div>
 
       {/* faint grid */}

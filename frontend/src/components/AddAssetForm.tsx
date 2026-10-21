@@ -68,7 +68,7 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
     <div className="space-y-4">
       {/* segmented mode toggle — the manual form below stays exactly
           as it was whenever 'manual' mode is active. */}
-      <div className="grid grid-cols-2 gap-1 rounded-lg border border-edge bg-elevated p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-lg glass-dense p-1">
         <button
           type="button"
           onClick={() => setMode('manual')}
