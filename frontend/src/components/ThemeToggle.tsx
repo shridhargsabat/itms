@@ -51,11 +51,13 @@ const THEME_CYCLE: Record<ThemeMode, ThemeInfo> = {
 };
 
 /**
- * Header theme control (#169, #179).
+ * Header/footer theme control (#169, #179, #185).
  * One-click Liquid Glass switcher cycling Light -> Dark -> Auto.
  * Settings retains the full ThemeManager modal for browsing all themes.
+ * showLabel renders the current mode name (wide sidebar footer); icon-only
+ * everywhere else (header, collapsed rail).
  */
-export default function ThemeToggle({ className }: { className?: string }) {
+export default function ThemeToggle({ className, showLabel }: { className?: string; showLabel?: boolean }) {
   const [mode, setMode] = useState<ThemeMode>(getThemeMode());
 
   useEffect(() => {
@@ -88,7 +90,8 @@ export default function ThemeToggle({ className }: { className?: string }) {
       size="icon"
       className={className}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className={showLabel ? 'h-5 w-5 shrink-0' : 'h-4 w-4'} />
+      {showLabel && <span className="truncate">{info.label}</span>}
     </Button>
   );
 }

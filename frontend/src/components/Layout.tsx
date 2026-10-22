@@ -203,6 +203,8 @@ export default function Layout() {
             type="button"
             onClick={toggleSidebar}
             variant="ghost"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
               'w-full justify-start gap-3 px-3 py-2 text-sm',
               wide ? '' : 'justify-center px-0',
@@ -211,11 +213,9 @@ export default function Layout() {
             {collapsed ? (
               <PanelLeftOpen className="h-5 w-5 shrink-0" />
             ) : (
-              <>
-                <PanelLeftClose className="h-5 w-5 shrink-0" />
-                <span>Collapse</span>
-              </>
+              <PanelLeftClose className="h-5 w-5 shrink-0" />
             )}
+            {wide && <span>{collapsed ? 'Expand' : 'Collapse'}</span>}
           </Button>
           <Button
             type="button"
@@ -257,7 +257,7 @@ export default function Layout() {
             </Button>
           )}
           <div className={cn('mt-1', wide && 'px-2')}>
-            <ThemeToggle className={cn('w-full', wide ? 'h-9' : 'h-9 w-9')} />
+            <ThemeToggle showLabel={wide} className={cn('w-full', wide ? 'h-9 justify-start gap-3 px-3 py-2 text-sm' : 'h-9 w-9')} />
           </div>
           {wide && (
             <p className="mt-2 px-2 text-center text-[10px] text-muted">build {__BUILD_SHA__}</p>
