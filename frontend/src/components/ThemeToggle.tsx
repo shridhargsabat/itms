@@ -19,13 +19,13 @@ interface ThemeInfo {
 
 const THEME_CYCLE: Record<ThemeMode, ThemeInfo> = {
   light: {
-    label: 'Light',
+    label: 'Liquid Glass Light',
     next: 'dark',
-    nextLabel: 'Dark',
+    nextLabel: 'Liquid Glass Dark',
     icon: Sun,
   },
   dark: {
-    label: 'Dark',
+    label: 'Liquid Glass Dark',
     next: 'system',
     nextLabel: 'Auto',
     icon: Moon,
@@ -33,26 +33,26 @@ const THEME_CYCLE: Record<ThemeMode, ThemeInfo> = {
   system: {
     label: 'Auto',
     next: 'light',
-    nextLabel: 'Light',
+    nextLabel: 'Liquid Glass Light',
     icon: Sparkles,
   },
   ledgerly: {
     label: 'Ledgerly',
     next: 'light',
-    nextLabel: 'Light',
+    nextLabel: 'Liquid Glass Light',
     icon: Palette,
   },
   'ledgerly-light': {
     label: 'Ledgerly Light',
     next: 'light',
-    nextLabel: 'Light',
+    nextLabel: 'Liquid Glass Light',
     icon: Sparkles,
   },
 };
 
 /**
- * Header theme control (#169).
- * One-click theme switcher cycling Light -> Dark -> Auto.
+ * Header theme control (#169, #179).
+ * One-click Liquid Glass switcher cycling Light -> Dark -> Auto.
  * Settings retains the full ThemeManager modal for browsing all themes.
  */
 export default function ThemeToggle({ className }: { className?: string }) {

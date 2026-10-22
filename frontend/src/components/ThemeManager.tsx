@@ -18,9 +18,25 @@ export interface ThemeMeta {
 export const THEMES: ThemeMeta[] = [
   {
     value: 'light',
-    label: 'Light',
-    description: 'Frosted-glass light, forced bright white surfaces, slate text, indigo accent.',
+    label: 'Liquid Glass Light',
+    description: 'Apple-style frosted glass, forced light. Bright white surfaces, slate text, indigo accent.',
     icon: Sun,
+    wrapperClass: 'theme-light',
+    glass: true,
+  },
+  {
+    value: 'dark',
+    label: 'Liquid Glass Dark',
+    description: 'Apple-style frosted glass, forced dark. Slate surfaces, indigo accent (classic ITMS).',
+    icon: Moon,
+    wrapperClass: 'dark',
+    glass: true,
+  },
+  {
+    value: 'system',
+    label: 'Liquid Glass (Auto)',
+    description: 'Apple-style frosted glass that follows your device (light/dark). The default ITMS look.',
+    icon: Sparkles,
     wrapperClass: 'theme-light',
     glass: true,
   },
@@ -33,28 +49,12 @@ export const THEMES: ThemeMeta[] = [
     glass: false,
   },
   {
-    value: 'dark',
-    label: 'Dark',
-    description: 'Frosted-glass slate dark, forced slate dark surfaces, indigo accent (classic ITMS).',
-    icon: Moon,
-    wrapperClass: 'dark',
-    glass: true,
-  },
-  {
     value: 'ledgerly',
     label: 'Ledgerly',
     description: 'Warm-paper dark, teal accent — copied from Ledgerly.',
     icon: Palette,
     wrapperClass: 'dark ledgerly-dark',
     glass: false,
-  },
-  {
-    value: 'system',
-    label: 'Liquid Glass (Auto)',
-    description: 'Apple-style frosted glass that follows your device (light/dark). The default ITMS look.',
-    icon: Sparkles,
-    wrapperClass: 'theme-light',
-    glass: true,
   },
 ];
 
