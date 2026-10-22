@@ -6,7 +6,7 @@
       // Apply the saved theme before first paint (prevents dark/light flash).
       (function () {
         try {
-          var m = localStorage.getItem('itms_theme') || 'system';
+          var m = localStorage.getItem('itms_theme') || 'light';
           var d = document.documentElement;
           if (m === 'ledgerly') {
             d.classList.add('dark', 'ledgerly-dark');
@@ -15,7 +15,7 @@
           } else {
             var dark =
               m === 'dark' ||
-              (m !== 'light' &&
+              (m === 'system' &&
                 window.matchMedia('(prefers-color-scheme: dark)').matches);
             if (dark) d.classList.add('dark');
           }
@@ -25,7 +25,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#020617" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ITMS" />

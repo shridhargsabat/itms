@@ -19,7 +19,7 @@ export const THEMES: ThemeMeta[] = [
   {
     value: 'light',
     label: 'Liquid Glass Light',
-    description: 'Apple-style frosted glass, forced light. Bright white surfaces, slate text, indigo accent.',
+    description: 'Apple-style frosted glass, forced light. Bright white surfaces, slate text, indigo accent. The default ITMS look.',
     icon: Sun,
     wrapperClass: 'theme-light',
     glass: true,
@@ -35,7 +35,7 @@ export const THEMES: ThemeMeta[] = [
   {
     value: 'system',
     label: 'Liquid Glass (Auto)',
-    description: 'Apple-style frosted glass that follows your device (light/dark). The default ITMS look.',
+    description: 'Apple-style frosted glass that follows your device (light/dark).',
     icon: Sparkles,
     wrapperClass: 'theme-light',
     glass: true,
