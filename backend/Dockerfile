@@ -23,8 +23,17 @@ COPY migrations ./migrations
 # CRITICAL: cache-mount contents are EPHEMERAL — they do NOT land in the image
 # layer, so COPY --from=builder /app/target/... in the next stage finds
 # nothing. Copy the built binaries to a NON-cache path inside this RUN.
+# sqlx::migrate! embeds ./migrations at COMPILE time, but cargo cannot see that
+# dependency: with the persistent target cache below, a migrations-only change
+# (no .rs edits) looks "fresh" (git checkout leaves src mtimes untouched),
+# cargo skips the recompile, and the STALE binary — with the old migration
+# set — ships under the new tag (#187: 0022 never applied). Touching the
+# binary roots forces the final crates to relink whenever this layer reruns
+# (deps stay cached: seconds, not minutes). The touch MUST live inside the
+# cargo RUN: a separate RUN would cache-hit alongside COPY src.
 RUN --mount=type=cache,id=itms-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=itms-cargo-target,target=/app/target \
+    touch src/main.rs src/bin/seed.rs src/bin/hashpass.rs && \
     cargo build --release --bin server --bin seed && \
     mkdir -p /app/dist && \
     cp /app/target/release/server /app/target/release/seed /app/dist/
