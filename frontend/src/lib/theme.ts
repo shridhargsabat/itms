@@ -1,5 +1,5 @@
 /**
- * Theme manager: light / dark / ledgerly / system (default system).
+ * Theme manager: light (default) / dark / ledgerly / ledgerly-light / system.
  *
  * In Liquid Glass mode, 'system' renders the Apple-style frosted glass look
  * that auto-follows the device color scheme (light/dark). Forced 'light' and
@@ -32,7 +32,7 @@ export function isThemeMode(v: unknown): v is ThemeMode {
 
 export function getThemeMode(): ThemeMode {
   const v = localStorage.getItem(KEY);
-  return isThemeMode(v) ? v : 'system';
+  return isThemeMode(v) ? v : 'light';
 }
 
 export function getResolvedTheme(): 'light' | 'dark' | 'ledgerly' | 'ledgerly-light' {
@@ -84,11 +84,11 @@ export function setThemeMode(mode: ThemeMode) {
 /**
  * Server → local hydration. Called after login / /auth/me / SSO: the per-user
  * pref is authoritative on every device, so it overrides the local cache.
- * Unknown/absent values fall back to 'system' (never trusts client input).
+ * Unknown/absent values fall back to 'light' (never trusts client input).
  */
 export function hydrateThemeFromUser(user?: { theme?: string } | null) {
   const v = user?.theme;
-  const mode = isThemeMode(v) ? v : 'system';
+  const mode = isThemeMode(v) ? v : 'light';
   if (localStorage.getItem(KEY) !== mode) {
     localStorage.setItem(KEY, mode);
     applyTheme(mode);
