@@ -82,22 +82,22 @@ jobs:
         run: |
           echo "🚀 Deploying ITMS — build+push both images, compose up --pull always..."
 
-          # Install Docker CLI (runner container is node:20-bullseye).
-          # Bullseye is EOL: deb.debian.org 404s, so repoint ALL sources at the
-          # archive first (same proven recipe as the semgrep job).
-          sed -i 's|deb.debian.org|archive.debian.org|g; s|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
-          # archive.debian.org flakes (runner egress) failed deploys with apt
-          # exit 100 (#189): retry the update+install up to 3 times. The `if`
-          # guard matters: this step runs under bash -e, and a bare failing
-          # &&-chain would exit the whole step on the first flake.
-          for i in 1 2 3; do
-            if apt-get update -o Acquire::Check-Valid-Until=false -qq \
-              && apt-get install -y -qq -o Acquire::Check-Valid-Until=false docker.io 2>&1 | tail -3; then
-              break
-            fi
-            [ "$i" = 3 ] && { echo "!! apt install docker.io failed 3 times, giving up" >&2; exit 1; }
-            echo ".. apt attempt $i failed, retrying in 15s" >&2; sleep 15
-          done
+          # Docker CLI for launching the helper (runner container is
+          # node:20-bullseye, which has none). Used to be apt-get install
+          # docker.io — but that pulls ~100MB over the degraded
+          # archive.debian.org route (~25 min per deploy, #191). The static
+          # CLI from download.docker.com is ~250x faster (~1s) and needs no
+          # apt sources at all. Pin verified 2026-10-22 (TLS fetch, binary
+          # runs); bump DOCKER_VER + pin together when upgrading.
+          DOCKER_VER=24.0.7
+          DOCKER_SHA256=984d59a77fa6acab97ea725a966facd33725e0e09c2fee975397fe1c6379bd3d
+          curl -fsSL --retry 3 --retry-all-errors -o /tmp/docker.tgz \
+            "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VER}.tgz"
+          echo "${DOCKER_SHA256}  /tmp/docker.tgz" | sha256sum -c -
+          tar -xzOf /tmp/docker.tgz docker/docker > /usr/local/bin/docker
+          chmod +x /usr/local/bin/docker
+          rm -f /tmp/docker.tgz
+          docker --version
 
           # Helper container with host Docker + filesystem access + the
           # itms-deploy-bot registry token. Mount /root/itms as the deploy
