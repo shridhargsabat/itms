@@ -86,8 +86,18 @@ jobs:
           # Bullseye is EOL: deb.debian.org 404s, so repoint ALL sources at the
           # archive first (same proven recipe as the semgrep job).
           sed -i 's|deb.debian.org|archive.debian.org|g; s|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
-          apt-get update -o Acquire::Check-Valid-Until=false -qq
-          apt-get install -y -qq -o Acquire::Check-Valid-Until=false docker.io 2>&1 | tail -3
+          # archive.debian.org flakes (runner egress) failed deploys with apt
+          # exit 100 (#189): retry the update+install up to 3 times. The `if`
+          # guard matters: this step runs under bash -e, and a bare failing
+          # &&-chain would exit the whole step on the first flake.
+          for i in 1 2 3; do
+            if apt-get update -o Acquire::Check-Valid-Until=false -qq \
+              && apt-get install -y -qq -o Acquire::Check-Valid-Until=false docker.io 2>&1 | tail -3; then
+              break
+            fi
+            [ "$i" = 3 ] && { echo "!! apt install docker.io failed 3 times, giving up" >&2; exit 1; }
+            echo ".. apt attempt $i failed, retrying in 15s" >&2; sleep 15
+          done
 
           # Helper container with host Docker + filesystem access + the
           # itms-deploy-bot registry token. Mount /root/itms as the deploy
