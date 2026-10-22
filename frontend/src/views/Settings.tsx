@@ -11,7 +11,7 @@ import { getThemeMode, onThemeChanged, type ThemeMode } from '@/lib/theme';
 function CurrentThemeSummary() {
   const [mode, setMode] = useState<ThemeMode>(getThemeMode());
   useEffect(() => onThemeChanged(() => setMode(getThemeMode())), []);
-  const meta = THEMES.find((t) => t.value === mode) ?? THEMES[3];
+  const meta = THEMES.find((t) => t.value === mode) ?? THEMES.find((t) => t.value === 'system') ?? THEMES[0];
   const Icon = meta.icon;
   return (
     <div className="flex items-center gap-2">
