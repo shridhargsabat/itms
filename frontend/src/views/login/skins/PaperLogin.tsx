@@ -143,15 +143,7 @@ export default function PaperLogin() {
                 </button>
               </div>
             </div>
-            <div className="mb-5 mt-1 flex items-center justify-between text-[13.5px]">
-              <label className="flex cursor-pointer items-center gap-2 text-secondary">
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="h-[15px] w-[15px] accent-accent"
-                />{' '}
-                Remember me
-              </label>
+            <div className="mb-5 mt-1 flex items-center justify-end text-[13.5px]">
               <Link
                 to="/forgot-password"
                 className="font-medium text-accent hover:underline"
