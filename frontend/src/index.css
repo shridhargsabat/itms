@@ -131,6 +131,20 @@
    against --t-base. Paper/shell are light (no .dark); console/bold/terminal
    pair with .dark (see index.html FOUC script + theme registry). */
 
+/* Legacy font vars — explicit per legacy theme, equal to the current
+   Tailwind preflight stack, so `body { font-family: var(--t-font-body) }`
+   renders legacy themes pixel-identically. Separate rule: legacy blocks
+   above are never edited. (.dark inherits these from :root.)
+   ORDER MATTERS: this rule sits BEFORE the .theme-* blocks. Theme classes
+   live on <html> (= :root), so at equal (0,1,0) specificity the later rule
+   wins — the theme blocks must come last or every theme computes the
+   system stack instead of Fraunces / Space Grotesk / JetBrains Mono. */
+:root, .ledgerly-dark, .ledgerly-light, .theme-light {
+  --t-font-display: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --t-font-body: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --t-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
 /* Paper — warm paper light. Mockup 001: paper #f6f5f1, ink #1c1917,
    ink-soft #57534e, line #e2ddd2, moss #2f6b3c. Opaque: glass tokens read
    near-solid; not in the freeze list. */
@@ -255,16 +269,6 @@
   --t-font-display: JetBrains Mono, ui-monospace, monospace;
   --t-font-body: JetBrains Mono, ui-monospace, monospace;
   --t-font-mono: JetBrains Mono, ui-monospace, monospace;
-}
-
-/* Legacy font vars — explicit per legacy theme, equal to the current
-   Tailwind preflight stack, so `body { font-family: var(--t-font-body) }`
-   renders legacy themes pixel-identically. Separate rule: legacy blocks
-   above are never edited. (.dark inherits these from :root.) */
-:root, .ledgerly-dark, .ledgerly-light, .theme-light {
-  --t-font-display: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --t-font-body: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --t-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 /* Font utilities: Tailwind v4 generates font-display / font-body /
