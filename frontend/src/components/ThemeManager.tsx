@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Moon, Palette, Sparkles, Sun } from 'lucide-react';
+import { Check, FileText, Moon, Palette, Shell, Sparkles, SquareTerminal, Sun, Terminal, Zap } from 'lucide-react';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/Button';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,46 @@ export const THEMES: ThemeMeta[] = [
     description: 'Warm-paper dark, teal accent — copied from Ledgerly.',
     icon: Palette,
     wrapperClass: 'dark ledgerly-dark',
+    glass: false,
+  },
+  {
+    value: 'paper',
+    label: 'Paper',
+    description: 'Warm-paper light, ink text — a calm reading-room light theme.',
+    icon: FileText,
+    wrapperClass: 'theme-paper',
+    glass: false,
+  },
+  {
+    value: 'console',
+    label: 'Console',
+    description: 'Near-black developer dark — a focused terminal feel.',
+    icon: Terminal,
+    wrapperClass: 'dark theme-console',
+    glass: false,
+  },
+  {
+    value: 'bold',
+    label: 'Bold',
+    description: 'High-contrast neon dark — vivid accent on deep violet-black.',
+    icon: Zap,
+    wrapperClass: 'dark theme-bold',
+    glass: false,
+  },
+  {
+    value: 'shell',
+    label: 'Shell',
+    description: 'Clean neutral light — crisp white surfaces, minimal chrome.',
+    icon: Shell,
+    wrapperClass: 'theme-shell',
+    glass: false,
+  },
+  {
+    value: 'terminal',
+    label: 'Terminal',
+    description: 'Green-phosphor dark — a retro terminal glow on deep green-black.',
+    icon: SquareTerminal,
+    wrapperClass: 'dark theme-terminal',
     glass: false,
   },
 ];
@@ -139,6 +179,42 @@ export default function ThemeManager({
     onClose();
   };
 
+  const NEW_ORDER: ThemeMode[] = ['paper', 'console', 'bold', 'shell', 'terminal'];
+  const CLASSIC_ORDER: ThemeMode[] = ['light', 'dark', 'system', 'ledgerly-light', 'ledgerly'];
+  const sections = [
+    { heading: 'New', values: NEW_ORDER },
+    { heading: 'Classic', values: CLASSIC_ORDER },
+  ];
+
+  const renderCard = (t: ThemeMeta) => {
+    const active = t.value === selected;
+    return (
+      <button
+        key={t.value}
+        type="button"
+        role="radio"
+        aria-checked={active}
+        onClick={() => setSelected(t.value)}
+        className={cn(
+          'rounded-xl border p-3 text-left transition-all',
+          active
+            ? 'border-accent bg-accent/10 ring-2 ring-accent/60'
+            : 'border-edge bg-base hover:border-edge2',
+        )}
+      >
+        <ThemePreview theme={t} />
+        <div className="mt-2 flex items-center gap-2">
+          <t.icon className={cn('h-4 w-4', active ? 'text-accent' : 'text-secondary')} />
+          <span className="text-sm font-semibold text-primary">{t.label}</span>
+          {active && <Check className="ml-auto h-4 w-4 text-accent" />}
+        </div>
+        <p className="mt-0.5 text-[11px] leading-snug text-muted">{t.description}</p>
+      </button>
+    );
+  };
+
+  const byValue = (v: ThemeMode) => THEMES.find((t) => t.value === v)!;
+
   return (
     <Modal title={title} onClose={onClose}>
       <p className="text-xs text-secondary">
@@ -147,34 +223,14 @@ export default function ThemeManager({
         your account and follows you across devices.
       </p>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {THEMES.map((t) => {
-          const active = t.value === selected;
-          return (
-            <button
-              key={t.value}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => setSelected(t.value)}
-              className={cn(
-                'rounded-xl border p-3 text-left transition-all',
-                active
-                  ? 'border-accent bg-accent/10 ring-2 ring-accent/60'
-                  : 'border-edge bg-base hover:border-edge2',
-              )}
-            >
-              <ThemePreview theme={t} />
-              <div className="mt-2 flex items-center gap-2">
-                <t.icon className={cn('h-4 w-4', active ? 'text-accent' : 'text-secondary')} />
-                <span className="text-sm font-semibold text-primary">{t.label}</span>
-                {active && <Check className="ml-auto h-4 w-4 text-accent" />}
-              </div>
-              <p className="mt-0.5 text-[11px] leading-snug text-muted">{t.description}</p>
-            </button>
-          );
-        })}
-      </div>
+      {sections.map((s) => (
+        <div key={s.heading} className="mt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{s.heading}</h3>
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {s.values.map((v) => renderCard(byValue(v)))}
+          </div>
+        </div>
+      ))}
 
       <div className="mt-5 flex items-center justify-end gap-2">
         <Button
