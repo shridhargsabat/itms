@@ -122,6 +122,166 @@
   --t-glass-shadow: rgb(15 23 42 / 0.14);
 }
 
+/* ---------- Task 3: five app-theme token palettes (additive-only) ----------
+   Anchors eyedropped from the login mockups in
+   .hermes/cache/scratch/itms-login-sketches (001-warm-paper,
+   002-dark-console, 003-bold-brand, 005-app-shell, 006-terminal).
+   Every block defines the same 15 color tokens + 3 font vars (see the
+   'css token contract' test). Muted/secondary clear AA, primary clears AAA
+   against --t-base. Paper/shell are light (no .dark); console/bold/terminal
+   pair with .dark (see index.html FOUC script + theme registry). */
+
+/* Paper — warm paper light. Mockup 001: paper #f6f5f1, ink #1c1917,
+   ink-soft #57534e, line #e2ddd2, moss #2f6b3c. Opaque: glass tokens read
+   near-solid; not in the freeze list. */
+.theme-paper {
+  color-scheme: light;
+  --t-base: #f6f5f1;
+  --t-surface: #ffffff;
+  --t-elevated: #efede6;
+  --t-elevated2: #e7e4dc;
+  --t-input: #ffffff;
+  --t-edge: #e2ddd2;
+  --t-edge2: #cfc9bb;
+  --t-primary: #1c1917;
+  --t-secondary: #57534e;
+  --t-muted: #6f6a61;
+  --t-accent: #2f6b3c;
+  --t-accent-strong: #1e4d2a;
+  --t-glass-hi: rgb(255 255 255 / 0.85);
+  --t-glass-edge: #d8d4c9;
+  --t-glass-shadow: rgb(15 23 42 / 0.14);
+  --t-font-display: Fraunces, Georgia, serif;
+  --t-font-body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-mono: JetBrains Mono, ui-monospace, monospace;
+}
+
+/* Console — dark ops console. Mockup 002: bg #09090b, panel #101014,
+   panel2 #141419, line #222228, txt #f4f4f5, mut #8b8b93, acc #10b981.
+   Uses the frozen glass recipe (see override below). */
+.theme-console {
+  color-scheme: dark;
+  --t-base: #09090b;
+  --t-surface: #101014;
+  --t-elevated: #141419;
+  --t-elevated2: #1d1d24;
+  --t-input: #09090b;
+  --t-edge: #222228;
+  --t-edge2: #35353e;
+  --t-primary: #f4f4f5;
+  --t-secondary: #b6b6bf;
+  --t-muted: #8b8b93;
+  --t-accent: #10b981;
+  --t-accent-strong: #0c8a62;
+  --t-glass-hi: rgb(255 255 255 / 0.12);
+  --t-glass-edge: #26262d;
+  --t-glass-shadow: rgb(0 0 0 / 0.5);
+  --t-font-display: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-mono: JetBrains Mono, ui-monospace, monospace;
+}
+
+/* Bold — brand-forward dark. Mockup 003: void #0d0716, card #140c22,
+   txt #f5f2ff, mut #a79fc0, lime #d4ff3f. Line/input derived by flattening
+   the mockup's translucent whites onto the void. Frozen glass recipe. */
+.theme-bold {
+  color-scheme: dark;
+  --t-base: #0d0716;
+  --t-surface: #140c22;
+  --t-elevated: #1d1230;
+  --t-elevated2: #281a40;
+  --t-input: #191322;
+  --t-edge: #2b2633;
+  --t-edge2: #4a3f66;
+  --t-primary: #f5f2ff;
+  --t-secondary: #cdc5e6;
+  --t-muted: #a79fc0;
+  --t-accent: #d4ff3f;
+  --t-accent-strong: #9cbd2e;
+  --t-glass-hi: rgb(255 255 255 / 0.14);
+  --t-glass-edge: rgb(255 255 255 / 0.12);
+  --t-glass-shadow: rgb(0 0 0 / 0.5);
+  --t-font-display: Space Grotesk, Inter, sans-serif;
+  --t-font-body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-mono: JetBrains Mono, ui-monospace, monospace;
+}
+
+/* Shell — app-shell light. Mockup 005: app bg #eef1f6, #ffffff cards,
+   edge #e2e8f0, ink #0f172a, label #334155, accent #4f46e5. Muted is
+   #5b6a82 (mockup #64748b is 4.20:1 here — lifted to clear AA).
+   Frozen glass recipe. */
+.theme-shell {
+  color-scheme: light;
+  --t-base: #eef1f6;
+  --t-surface: #ffffff;
+  --t-elevated: #e2e8f0;
+  --t-elevated2: #cbd5e1;
+  --t-input: #f8fafc;
+  --t-edge: #e2e8f0;
+  --t-edge2: #cbd5e1;
+  --t-primary: #0f172a;
+  --t-secondary: #334155;
+  --t-muted: #5b6a82;
+  --t-accent: #4f46e5;
+  --t-accent-strong: #4338ca;
+  --t-glass-hi: rgb(255 255 255 / 0.75);
+  --t-glass-edge: rgb(255 255 255 / 0.65);
+  --t-glass-shadow: rgb(15 23 42 / 0.14);
+  --t-font-display: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --t-font-body: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --t-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Terminal — phosphor terminal dark. Mockup 006: bg #0a0f0d, term #0d1512,
+   line #1d2b25, grn #4ade80, txt #d7e3dc. Secondary/muted lifted from
+   mockup mut #5f7a6e to clear AA. Opaque glass tokens; not frozen. */
+.theme-terminal {
+  color-scheme: dark;
+  --t-base: #0a0f0d;
+  --t-surface: #0d1512;
+  --t-elevated: #111d18;
+  --t-elevated2: #1a2b24;
+  --t-input: #0a0f0d;
+  --t-edge: #1d2b25;
+  --t-edge2: #2e4439;
+  --t-primary: #d7e3dc;
+  --t-secondary: #a9c3b6;
+  --t-muted: #8ba89a;
+  --t-accent: #4ade80;
+  --t-accent-strong: #22c55e;
+  --t-glass-hi: rgb(215 227 220 / 0.08);
+  --t-glass-edge: var(--t-edge2);
+  --t-glass-shadow: rgb(0 0 0 / 0.55);
+  --t-font-display: JetBrains Mono, ui-monospace, monospace;
+  --t-font-body: JetBrains Mono, ui-monospace, monospace;
+  --t-font-mono: JetBrains Mono, ui-monospace, monospace;
+}
+
+/* Legacy font vars — explicit per legacy theme, equal to the current
+   Tailwind preflight stack, so `body { font-family: var(--t-font-body) }`
+   renders legacy themes pixel-identically. Separate rule: legacy blocks
+   above are never edited. (.dark inherits these from :root.) */
+:root, .ledgerly-dark, .ledgerly-light, .theme-light {
+  --t-font-display: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --t-font-body: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --t-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Font utilities: Tailwind v4 generates font-display / font-body /
+   font-mono2 from these keys. (mono2: leaves the default font-mono
+   utility untouched.) Separate @theme block: the legacy one is unedited. */
+@theme {
+  --font-display: var(--t-font-display);
+  --font-body: var(--t-font-body);
+  --font-mono2: var(--t-font-mono);
+}
+
+@layer base {
+  body {
+    font-family: var(--t-font-body);
+  }
+}
+
 @utility glass-chrome {
   background: color-mix(in srgb, var(--t-surface) 52%, transparent);
   -webkit-backdrop-filter: blur(36px) saturate(180%);
@@ -396,5 +556,39 @@
     position: absolute;
     left: 0;
     top: 0;
+  }
+}
+
+/* ---------- Task 3: glass overrides + transparency guard (appended) -------
+   Append-only companions to the legacy rules above (which are unedited):
+   same specificity, later in the file, so they win ties. */
+
+/* Frozen glass recipe for the glass-using new themes (console/bold/shell).
+   Values copied from the legacy freeze overrides above. Paper/terminal are
+   opaque by design and stay out of this list. */
+.theme-console .glass-chrome, .theme-bold .glass-chrome, .theme-shell .glass-chrome {
+  background: color-mix(in srgb, var(--t-surface) 68%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: inset 0 1px 0 var(--t-glass-hi), 0 18px 44px -12px var(--t-glass-shadow);
+}
+.theme-console .glass-card, .theme-bold .glass-card, .theme-shell .glass-card {
+  background: color-mix(in srgb, var(--t-surface) 76%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: inset 0 1px 0 var(--t-glass-hi), 0 12px 32px -12px var(--t-glass-shadow);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  /* All five new themes join the guard at the same (0,2,0) specificity as
+     the legacy entries. glass-dense needs no per-theme entry (no freeze
+     overrides it, so the base guard above already covers every theme). */
+  .theme-paper .glass-chrome, .theme-paper .glass-card,
+  .theme-console .glass-chrome, .theme-console .glass-card,
+  .theme-bold .glass-chrome, .theme-bold .glass-card,
+  .theme-shell .glass-chrome, .theme-shell .glass-card,
+  .theme-terminal .glass-chrome, .theme-terminal .glass-card {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: var(--t-surface); box-shadow: none;
   }
 }
