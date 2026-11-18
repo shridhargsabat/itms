@@ -48,6 +48,36 @@ const THEME_CYCLE: Record<ThemeMode, ThemeInfo> = {
     nextLabel: 'Liquid Glass Light',
     icon: Sparkles,
   },
+  paper: {
+    label: 'Paper',
+    next: 'light',
+    nextLabel: 'Liquid Glass Light',
+    icon: Sun,
+  },
+  console: {
+    label: 'Console',
+    next: 'light',
+    nextLabel: 'Liquid Glass Light',
+    icon: Moon,
+  },
+  bold: {
+    label: 'Bold',
+    next: 'light',
+    nextLabel: 'Liquid Glass Light',
+    icon: Palette,
+  },
+  shell: {
+    label: 'Shell',
+    next: 'light',
+    nextLabel: 'Liquid Glass Light',
+    icon: Sun,
+  },
+  terminal: {
+    label: 'Terminal',
+    next: 'light',
+    nextLabel: 'Liquid Glass Light',
+    icon: Moon,
+  },
 };
 
 /**

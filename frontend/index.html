@@ -6,9 +6,19 @@
       // Apply the saved theme before first paint (prevents dark/light flash).
       (function () {
         try {
-          var m = localStorage.getItem('itms_theme') || 'light';
+          var m = localStorage.getItem('itms_theme') || 'paper';
           var d = document.documentElement;
-          if (m === 'ledgerly') {
+          if (m === 'paper') {
+            d.classList.add('theme-paper');
+          } else if (m === 'console') {
+            d.classList.add('dark', 'theme-console');
+          } else if (m === 'bold') {
+            d.classList.add('dark', 'theme-bold');
+          } else if (m === 'shell') {
+            d.classList.add('theme-shell');
+          } else if (m === 'terminal') {
+            d.classList.add('dark', 'theme-terminal');
+          } else if (m === 'ledgerly') {
             d.classList.add('dark', 'ledgerly-dark');
           } else if (m === 'ledgerly-light') {
             d.classList.add('ledgerly-light'); // light only — never .dark
