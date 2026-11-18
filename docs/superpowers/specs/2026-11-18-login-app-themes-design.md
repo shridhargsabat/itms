@@ -104,21 +104,44 @@ risk to legacy rendering, and every integration point already exists.
 - D4: Complete phase — all five themes ship together, not one-by-one.
 - D5: Scope is the whole app (all views recolor via tokens), not login-only.
 
-## Open design questions for the owner (answer before planning)
+## Builder-check resolutions (my calls — veto welcome)
 
-- Q1 (names): theme values `paper | console | bold | shell | terminal` — ok,
-  or prefer prefixed/longer slugs? (Affects `users.theme` strings forever.)
-- Q2 (toggle): with 10 themes, the one-click header `ThemeToggle` can't cycle
-  everything. Proposed: it cycles the 5 NEW themes only
-  (Paper→Console→Bold→Shell→Terminal→Paper); legacy modes remain reachable
-  via Settings → Theme manager (which lists all 10 grouped: "New" / "Classic").
-  Acceptable?
-- Q3 (fonts): Paper ships a serif display face (Fraunces or sibling),
-  Terminal/Bold/Console ship a mono face (JetBrains Mono), via `@fontsource`
-  npm packages (~100–300 KB added to the bundle). Acceptable weight?
-- Q4 (charts/maps): Dashboard/Reports/CMDB may use hardcoded colors outside
-  the token system (to be inventoried at plan time). If found, ok to rewire
-  them to `var(--t-*)` (invisible under legacy themes, correct under new)?
+- R1 (skin auth contract): EVERY skin carries EVERY auth path — password
+  form, demo button via the server-side demo mutation, Google OAuth entry
+  when the backend reports it enabled, forgot-password link, error +
+  `sso_failed` flash states, build-SHA footer. Mockup 006's hardcoded
+  `demo1234` MUST NOT ship; Terminal's `demo` affordance fires the same
+  demo mutation as the other skins. This defines the `useLogin()` API and
+  the per-skin acceptance checklist.
+- R2 (static, not live): Bold "live stats" = fixed numbers, Shell's blurred
+  dashboard = static fake markup, Terminal boot lines may type-in as pure
+  decoration but the form itself is real labeled inputs (no fake-typing
+  input paradigm). Follows from the no-new-API non-goal + C4.
+- R3 (faces): Paper = Fraunces/serif, Console = JetBrains Mono,
+  Bold = Space Grotesk (per mockup 003 — correcting the draft), Shell =
+  Inter/system, Terminal = JetBrains Mono. All via `@fontsource`.
+- R4 (slugs): locked as `paper | console | bold | shell | terminal` unless
+  vetoed. Short, permanent `users.theme` strings.
+- R5 (font weight): the ~100–300 KB `@fontsource` addition is accepted
+  unless vetoed.
+
+## Decisions (answered by owner 2026-11-18)
+
+- Q1 (names): `paper|console|bold|shell|terminal` — locked, no veto.
+- Q2 (toggle): **dropdown instead of cycle button** — the header
+  `ThemeToggle` becomes a compact theme menu listing all 10 themes
+  (grouped New/Classic); one click applies. No cycling.
+- Q3 (fonts): accepted, no veto. Faces per R3 via `@fontsource`.
+- Q4 (charts/maps): **yes, rewire** hardcoded colors to `var(--t-*)`
+  (verified invisible under legacy themes).
+- Q5 (font scope): **app-wide** — serif/mono faces apply across all views,
+  not login-only. Requires `--t-font-*` plumbing + typography verification
+  (20 views × 5 themes).
+- Q6 (logged-out switcher): **tiny theme menu on login** — visitors can
+  browse all five login skins (+ legacy login) without logging in. Writes
+  the same `itms_theme` cache (pre-auth: local only, no server push).
+- Q7 (login hydration): **keep server-wins** — on login the server pref
+  still overrides local; a skin→theme transition on login is accepted.
 
 ## What's left to the builder
 
