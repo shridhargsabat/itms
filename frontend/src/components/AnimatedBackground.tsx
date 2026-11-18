@@ -2,6 +2,10 @@
  * Ambient animated background shared by every screen (login + app shell):
  * drifting aurora blobs, a faint grid, and rising particles.
  * Fixed, pointer-events-none, sits behind content.
+ *
+ * Intentional non-token colors (no var(--t-*) exists for these; task-14 sweep):
+ * pastel mesh tints + slate grid (rgba(148,163,184,0.4)). Shared by ALL
+ * themes, so tokenizing would restyle legacy — kept literal deliberately.
  */
 export default function AnimatedBackground() {
   return (

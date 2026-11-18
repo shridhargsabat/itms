@@ -8,6 +8,11 @@ import { useLogin } from '../useLogin';
  * mockup 001-warm-paper. Opaque surfaces (no glass utilities), forest
  * brand panel, Fraunces display type via `font-display`, hairline borders.
  * All auth behavior comes from useLogin() — this file is presentation only.
+ *
+ * Intentional non-token colors (no var(--t-*) exists for these; task-14 sweep):
+ * forest brand panel + CTA (#14301f, hover #1d4229), on-brand ink (#f2efe6),
+ * panel tint ramp (#d8cfae/#cfc9b8/#8fae94/#b9b29e), dot texture
+ * (rgba(242,239,230,.07)). None duplicates a paper token.
  */
 export default function PaperLogin() {
   const {

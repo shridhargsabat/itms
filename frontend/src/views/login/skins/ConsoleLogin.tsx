@@ -9,6 +9,11 @@ import { useLogin } from '../useLogin';
  * primary, JetBrains Mono micro-labels via `font-mono2`, status line, grid
  * texture. All auth behavior comes from useLogin() — this file is
  * presentation only.
+ *
+ * Intentional non-token colors (no var(--t-*) exists for these; task-14 sweep):
+ * grid texture (rgba(255,255,255,.025)), on-accent ink (#04120c), Google G
+ * brand fills (legacy verbatim). Accent glow + dot halo are token-driven
+ * (var(--t-accent), pinned by the sweep test).
  */
 export default function ConsoleLogin() {
   const {
@@ -48,7 +53,7 @@ export default function ConsoleLogin() {
         className="pointer-events-none absolute left-1/2 top-[8%] h-[300px] w-[560px] max-w-[90vw] -translate-x-1/2"
         style={{
           background:
-            'radial-gradient(ellipse, rgba(16,185,129,.09), transparent 70%)',
+            'radial-gradient(ellipse, color-mix(in srgb, var(--t-accent) 9%, transparent), transparent 70%)',
         }}
       />
 
@@ -56,7 +61,7 @@ export default function ConsoleLogin() {
         <p className="mb-[22px] flex items-center justify-center gap-2 font-mono2 text-[11.5px] text-muted">
           <span
             aria-hidden
-            className="h-[7px] w-[7px] animate-pulse rounded-full bg-accent shadow-[0_0_8px_#10b981]"
+            className="h-[7px] w-[7px] animate-pulse rounded-full bg-accent shadow-[0_0_8px_var(--t-accent)]"
           />
           all systems operational · eu-west
         </p>

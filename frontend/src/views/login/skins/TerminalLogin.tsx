@@ -17,7 +17,7 @@ import { useLogin } from '../useLogin';
  * mockup lacks (R1 contract + binding constraint). All auth behavior comes
  * from useLogin() — this file is presentation only.
  *
- * Intentional non-token colors (no var(--t-*) exists for these; later sweep):
+ * Intentional non-token colors (no var(--t-*) exists for these; task-14 sweep):
  * traffic-light dots (#ff5f57/#febc2e/#28c840), run-button ink (#04120a),
  * Google G brand fills (legacy verbatim), warn/error/flash tailwind
  * red/amber treatments (Console dark-theme precedent).

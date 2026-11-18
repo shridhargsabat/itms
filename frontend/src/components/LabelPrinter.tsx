@@ -8,6 +8,13 @@ import {
 } from 'react';
 import { cn } from '@/lib/utils';
 
+/**
+ * NOTE (task-14 sweep): literal shadow rgba() values below (machine glow,
+ * screen inset, paper shadow) are intentional — no shadow-color token
+ * exists, and the printer is a fixed skeuomorphic illustration shared by
+ * all themes, so tokenizing would restyle legacy.
+ */
+
 export type LabelPrinterStage = 'processing' | 'printing' | 'complete';
 export type LabelFeedMotion = 'smooth' | 'stepped';
 export type LabelPaperEdge = 'zigzag' | 'straight';

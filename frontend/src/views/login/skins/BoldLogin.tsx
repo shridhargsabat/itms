@@ -11,8 +11,10 @@ import { useLogin } from '../useLogin';
  * no new API. All auth behavior comes from useLogin() — this file is
  * presentation only.
  *
- * Intentional non-token colors (no var(--t-*) exists for these; later sweep):
- * mesh-blob fills, mega-type gradient stops, fleet-bar gradients, lime ink.
+ * Intentional non-token colors (no var(--t-*) exists for these; task-14 sweep):
+ * mesh-blob fills, mega-type gradient stops, fleet-bar gradients (bar 1 lead
+ * stop is var(--t-accent), pinned by the sweep test), lime ink, Google G
+ * brand fills (legacy verbatim).
  */
 export default function BoldLogin() {
   const {
@@ -163,7 +165,7 @@ export default function BoldLogin() {
               <i
                 aria-hidden
                 className="block h-full rounded-full"
-                style={{ width: '86%', background: 'linear-gradient(90deg,#d4ff3f,#a3e635)' }}
+                style={{ width: '86%', background: 'linear-gradient(90deg,var(--t-accent),#a3e635)' }}
               />
             </div>
             <div

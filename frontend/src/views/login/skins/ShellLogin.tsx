@@ -11,10 +11,12 @@ import { useLogin } from '../useLogin';
  * state. All auth behavior comes from useLogin() — this file is
  * presentation only.
  *
- * Intentional non-token colors (no var(--t-*) exists for these; later sweep):
- * blurred-backdrop micro-grays (#94a3b8, #64748b), row dividers (#f1f5f9),
- * delta green (#16a34a), status pills (tailwind green/amber/blue-100/800),
- * error/flash treatments (paper light-theme precedent: red/amber-50/200).
+ * Intentional non-token colors (no var(--t-*) exists for these; task-14 sweep):
+ * active-nav ink (#fff — on-primary white), blurred-backdrop micro-grays
+ * (#94a3b8, #64748b), row dividers (#f1f5f9), delta green (#16a34a),
+ * status pills (tailwind green/amber/blue-100/800), Google G brand fills
+ * (legacy verbatim), error/flash treatments (paper light-theme precedent:
+ * red/amber-50/200).
  */
 export default function ShellLogin() {
   const {

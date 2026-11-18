@@ -64,3 +64,23 @@ describe('css token contract', () => {
     });
   });
 });
+
+describe('hardcoded-color sweep (task 14)', () => {
+  // NOTE: same fileURLToPath resolution as above. Block comments are
+  // stripped before matching so mockup-anchor hexes in file headers
+  // (e.g. Console's `#10b981`) don't trip the code assertions.
+  const skinsDir = resolve(dirname(fileURLToPath(import.meta.url)), '../views/login/skins');
+  const code = (f: string) =>
+    readFileSync(resolve(skinsDir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const consoleSrc = code('ConsoleLogin.tsx');
+  const boldSrc = code('BoldLogin.tsx');
+  it('console skin drives accent glow from var(--t-accent)', () => {
+    expect(consoleSrc).not.toMatch(/#10b981/);
+    expect(consoleSrc).not.toMatch(/rgba\(16,185,129/);
+    expect(consoleSrc).toContain('var(--t-accent)');
+  });
+  it('bold skin drives fleet-bar lead stop from var(--t-accent)', () => {
+    expect(boldSrc).not.toMatch(/#d4ff3f/);
+    expect(boldSrc).toContain('var(--t-accent)');
+  });
+});
