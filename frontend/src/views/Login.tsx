@@ -5,6 +5,7 @@ import LegacyLogin from './login/skins/LegacyLogin';
 import PaperLogin from './login/skins/PaperLogin';
 import ConsoleLogin from './login/skins/ConsoleLogin';
 import BoldLogin from './login/skins/BoldLogin';
+import ShellLogin from './login/skins/ShellLogin';
 export default function Login() {
   const [mode, setMode] = useState(getThemeMode());
   useEffect(() => onThemeChanged(() => setMode(getThemeMode())), []);
@@ -12,5 +13,6 @@ export default function Login() {
   if (skin === 'paper') return <PaperLogin />;
   if (skin === 'console') return <ConsoleLogin />;
   if (skin === 'bold') return <BoldLogin />;
+  if (skin === 'shell') return <ShellLogin />;
   return <LegacyLogin />;
 }
