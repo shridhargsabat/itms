@@ -45,4 +45,8 @@ docker compose exec backend /usr/local/bin/seed   # demo data
 
 ## Project management
 
-Milestones & issues track the build phases — see Gitea: https://gitea.ai-automation-hub.tech/shridhar.sabat/itms
+Issues and milestones live here on GitHub. Live demo: https://itms.ai-automation-hub.tech (seeded demo data, all demo logins use password `demo1234`).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
