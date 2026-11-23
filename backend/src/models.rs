@@ -185,6 +185,22 @@ pub struct DashboardMetricsScalars {
     pub overdue_tickets: i64,
 }
 
+/// One point of the dashboard velocity chart (Task 2).
+#[derive(Debug, Serialize)]
+pub struct VelocityPoint {
+    pub day: String,
+    pub incidents: i64,
+    pub requests: i64,
+    pub resolved: i64,
+}
+
+/// GET /dashboard/velocity response: echo of the range + ordered points.
+#[derive(Debug, Serialize)]
+pub struct VelocityResponse {
+    pub range: String,
+    pub points: Vec<VelocityPoint>,
+}
+
 // ---------------------------------------------------------------------------
 // Request bodies
 // ---------------------------------------------------------------------------

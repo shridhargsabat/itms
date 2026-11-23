@@ -54,6 +54,7 @@ import type {
   VendorClaim,
   VendorInput,
   ClaimInput,
+  VelocityResponse,
 } from '@/api/types';
 
 const TOKEN_KEY = 'itms_token';
@@ -236,6 +237,8 @@ export const setThemePref = (theme: string) =>
 
 // ---- dashboard ----
 export const getDashboardMetrics = () => apiFetch<DashboardMetrics>('/dashboard/metrics');
+export const getVelocity = (range: '7d' | '30d') =>
+  apiFetch<VelocityResponse>(`/dashboard/velocity?range=${range}`);
 export const getAuditLog = (params?: {
   limit?: number;
   offset?: number;
