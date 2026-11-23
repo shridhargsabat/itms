@@ -4,21 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { PriorityBadge } from '@/components/TicketBadge';
 import SlaChip from '@/components/SlaChip';
-import BentoCard, { BucketBar } from '@/components/BentoCard';
+import BentoCard from '@/components/BentoCard';
 import { Button } from '@/components/Button';
 import {
-  Timer,
   Activity,
-  Boxes,
-  ChevronRight,
+  AlertTriangle,
+  Monitor,
   Play,
   Plus,
-  BadgeCheck,
-  ClipboardList,
   ShieldCheck,
   Ticket,
-  TriangleAlert,
-  UserRoundCheck,
 } from 'lucide-react';
 import {
   Link } from 'react-router-dom';
@@ -26,41 +21,76 @@ import {
   createTicket, getAuditLog, getDashboardMetrics, getCachedUser, listOverdueTickets } from '@/api/client';
 import {
   PRIORITIES, TICKET_TYPES } from '@/api/types';
-import type { CreateTicketInput, DashboardMetrics, MetricBucket } from '@/api/types';
+import type { CreateTicketInput, DashboardMetrics } from '@/api/types';
 import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import AddAssetButton from '@/components/AddAssetButton';
-import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
+import { getResolvedTheme, onThemeChanged, setThemeMode } from '@/lib/theme';
+import { THEME_REGISTRY } from '@/lib/theme-registry';
 import {
   cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 
-/** Scalar metric keys rendered by the KPI chips (breakdown arrays excluded). */
-type ChipMetricKey = Exclude<keyof DashboardMetrics, 'tickets_by_priority' | 'assets_by_status'>;
-
-type Chip = {
+/** One KPI lens: whole lens is a Link, visual identical to the reference. */
+type KpiLens = {
   label: string;
-  key: ChipMetricKey;
-  icon: LucideIcon;
-  accent: string;
   to: string;
-  admin?: boolean;
-  /** Desktop: spans 2 columns (fills the row below the top band). */
-  wide?: boolean;
+  /** Solid dot color behind the icon (reference verbatim). */
+  dot: string;
+  icon: LucideIcon;
+  value: (m: DashboardMetrics) => number;
+  sub: (m: DashboardMetrics) => string;
 };
 
-const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
-
-const CHIPS: Chip[] = [
-  { label: 'Open Requests', key: 'open_requests', icon: ClipboardList, accent: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', to: '/requests' },
-  { label: 'SLA Overdue', key: 'overdue_tickets', icon: Timer, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/tickets?overdue=true', admin: true },
-  { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/tickets?priority=HIGH' },
-  { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', to: '/warranty' },
-  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/onboarding', wide: true },
-  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/licenses', admin: true, wide: true },
+const KPI_LENSES: KpiLens[] = [
+  { label: 'Total Assets', to: '/assets', dot: '#007AFF', icon: Monitor, value: (m) => m.asset_count, sub: (m) => `${m.in_stock_count} in stock` },
+  { label: 'Open Tickets', to: '/tickets?status=OPEN', dot: '#AF52DE', icon: Ticket, value: (m) => m.open_tickets, sub: (m) => `${m.high_priority_count} high priority` },
+  { label: 'SLA Escalated', to: '/tickets?overdue=true', dot: '#FF3B30', icon: AlertTriangle, value: (m) => m.overdue_tickets, sub: () => 'Breach monitor' },
+  { label: 'Warranty & License', to: '/warranty', dot: '#FF9500', icon: ShieldCheck, value: (m) => m.warranty_alerts_count + m.license_alerts, sub: () => 'Expiring ≤ 45d' },
 ];
 
+const SECONDARY_PILLS: Array<{ label: string; to: string; value: (m: DashboardMetrics) => number }> = [
+  { label: 'Onboarding Overdue', to: '/onboarding', value: (m) => m.onboarding_overdue },
+  { label: 'Open Requests', to: '/requests', value: (m) => m.open_requests },
+];
+
+/**
+ * Day / Night Glass quick toggle (reference toolbar). Active state follows
+ * the resolved theme (any surface can change it) via getResolvedTheme() +
+ * onThemeChanged; clicks push light/dark through setThemeMode (server push
+ * included — this is a logged-in surface).
+ */
+function DayNightToggle() {
+  const [resolved, setResolved] = useState(() => getResolvedTheme());
+
+  useEffect(() => onThemeChanged(() => setResolved(getResolvedTheme())), []);
+
+  const isNight = THEME_REGISTRY[resolved]?.dark ?? false;
+
+  return (
+    <div className="liquid-glass-pill flex items-center rounded-full p-1">
+      <button
+        type="button"
+        aria-pressed={!isNight}
+        onClick={() => setThemeMode('light')}
+        className={`rounded-full px-3 py-1 text-xs font-medium transition ${!isNight ? 'bg-white text-slate-900 shadow-xs' : 'text-white/70'}`}
+      >
+        Day Glass
+      </button>
+      <button
+        type="button"
+        aria-pressed={isNight}
+        onClick={() => setThemeMode('dark')}
+        className={`rounded-full px-3 py-1 text-xs font-medium transition ${isNight ? 'bg-white/25 text-white shadow-xs' : 'text-slate-600'}`}
+      >
+        Night Glass
+      </button>
+    </div>
+  );
+}
+
 function OverdueTickets() {
+  const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
   const isAdmin = getCachedUser()?.role === 'ADMIN';
   const { data, isLoading } = useQuery({
     queryKey: ['overdue-tickets'],
@@ -240,38 +270,36 @@ export default function Dashboard() {
     refetchInterval: paused ? false : 30_000,
   });
 
-  // Admin-only mutations (backend gated since PR #96) — hide the controls for other roles.
-  const isAdmin = getCachedUser()?.role === 'ADMIN';
-  const navigate = useNavigate();
-
-  // Breakdown buckets (absent on older backends — BucketBar renders nothing then).
-  const priorityBuckets: MetricBucket[] = metrics.data?.tickets_by_priority ?? [];
-  const statusBuckets: MetricBucket[] = metrics.data?.assets_by_status ?? [];
-
   return (
     <div className="space-y-6">
-      {/* Sticky actions row: the + New Ticket / + Add Asset buttons must stay
-          visible while scrolling (phones resumed mid-page reported them as
-          'missing' when they were scrolled above the fold). */}
-      <PageHeader
-        title="Dashboard"
-        description="Inventory, tickets and recent activity at a glance."
-        className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-6 bg-base/95 px-6 py-3 backdrop-blur lg:top-0 lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:border-edge lg:px-6"
-        actions={
-          <>
-            <Button
-              type="button"
-              onClick={() => setNewOpen(true)}
-              variant="primary"
-              size="lg"
-              leftIcon={<Plus className="h-4 w-4" />}
-            >
-              New Ticket
-            </Button>
-            <AddAssetButton />
-          </>
-        }
-      />
+      {/* Sticky floating toolbar: Day/Night toggle + actions stay visible
+          while scrolling (phones resumed mid-page reported them as 'missing'
+          when they were scrolled above the fold). Sticky offsets preserved
+          from the previous PageHeader row. */}
+      <header
+        data-testid="dashboard-toolbar"
+        className="liquid-glass-panel rounded-[26px] sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5 lg:top-0"
+      >
+        <div>
+          <div className="text-[11px] font-medium text-muted">
+            Inventory, tickets and recent activity at a glance.
+          </div>
+          <h1 className="text-lg font-semibold tracking-tight text-primary sm:text-xl">
+            Dashboard
+          </h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <DayNightToggle />
+          <AddAssetButton />
+          <button
+            type="button"
+            onClick={() => setNewOpen(true)}
+            className="liquid-glass-btn-primary flex items-center gap-1 px-4 py-2 text-xs font-semibold text-white"
+          >
+            <Plus className="h-3.5 w-3.5" /> New Ticket
+          </button>
+        </div>
+      </header>
 
       {metrics.isError && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
@@ -280,201 +308,142 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {/* Hero: Open Tickets (2×2). BentoCard, NOT a link — the BucketBar
-            segments drill into different filters, so the card body has no
-            single click target. */}
-        <BentoCard
-          className="animate-fade-up col-span-2 lg:row-span-2"
-          style={{ animationDelay: '0ms' }}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-[11px] font-medium uppercase tracking-wide text-secondary lg:text-xs">
-              Open Tickets
-            </p>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 sm:h-9 sm:w-9">
-              <Ticket className="h-4 w-4 sm:h-5 sm:w-5" />
-            </span>
-          </div>
-          {metrics.isLoading ? (
-            <div className="mt-4 h-10 w-28 animate-pulse rounded bg-elevated" />
-          ) : (
-            <p className="mt-2 text-3xl font-semibold text-primary" data-testid="hero-open-count">
-              <CountUp value={metrics.data?.open_tickets ?? 0} />
-            </p>
-          )}
-          <div className="mt-4">
-            <BucketBar
-              buckets={priorityBuckets}
-              total={metrics.data?.open_tickets ?? 0}
-              onSelect={(k) => navigate(`/tickets?status=OPEN&priority=${k}`)}
-            />
-          </div>
+      {/* KPI lenses: whole lens is a Link (drill-down nav preserved),
+          visual identical to the reference. */}
+      <section data-testid="kpi-lenses" className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        {KPI_LENSES.map((k) => (
           <Link
-            to="/tickets?priority=HIGH"
-            className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-secondary transition-colors hover:text-primary"
-          >
-            {metrics.data?.high_priority_count ?? 0} high priority
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-        </BentoCard>
-
-        {/* Assets (tall 2×2 — same size as the hero so the status breakdown
-            legend is readable): CountUp + status BucketBar. The IN_STOCK row
-            doubles as the former In Stock KPI. */}
-        <BentoCard
-          className="animate-fade-up col-span-2 lg:row-span-2"
-          data-testid="bento-assets"
-          style={{ animationDelay: '70ms' }}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-[11px] font-medium uppercase tracking-wide text-secondary lg:text-xs">
-              Total Assets
-            </p>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent sm:h-9 sm:w-9">
-              <Boxes className="h-4 w-4 sm:h-5 sm:w-5" />
-            </span>
-          </div>
-          {metrics.isLoading ? (
-            <div className="mt-4 h-10 w-24 animate-pulse rounded bg-elevated" />
-          ) : (
-            <p className="mt-2 text-3xl font-semibold text-primary" data-testid="asset-total-count">
-              <CountUp value={metrics.data?.asset_count ?? 0} />
-            </p>
-          )}
-          <div className="mt-4">
-            <BucketBar
-              buckets={statusBuckets}
-              total={metrics.data?.asset_count ?? 0}
-              onSelect={(k) => navigate(`/assets?status=${k}`)}
-            />
-          </div>
-        </BentoCard>
-
-        {/* KPI chips: glass-card links. The last two
-            chips go 2-col wide on desktop (admin) to fill the row below the
-            hero+assets band without dead cells. */}
-        {CHIPS.filter((c) => !c.admin || isAdmin).map(({ label, key, icon: Icon, accent, to, wide }, i) => (
-          <Link
-            key={key}
-            to={to}
-            className={cn(
-              'group animate-fade-up min-w-0 rounded-xl glass-card p-4 transition-all duration-150 active:scale-[0.98] sm:p-5',
-              wide && isAdmin && 'lg:col-span-2',
-            )}
-            style={{ animationDelay: `${Math.min(i + 2, 8) * 70}ms` }}
+            key={k.label}
+            to={k.to}
+            className="liquid-glass-panel min-w-0 rounded-[26px] p-5 transition-transform hover:-translate-y-0.5"
           >
             <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-[11px] font-medium uppercase tracking-wide text-secondary lg:text-xs">
-                {label}
-              </p>
-              <span
-                className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-110 sm:h-9 sm:w-9',
-                  accent,
-                )}
+              <span className="truncate text-xs font-medium text-secondary">{k.label}</span>
+              <div
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
+                style={{ backgroundColor: k.dot }}
               >
-                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-              </span>
+                <k.icon className="h-4 w-4" />
+              </div>
             </div>
             {metrics.isLoading ? (
-              <div className="mt-3 h-8 w-16 animate-pulse rounded bg-elevated" />
+              <div className="mt-3 h-9 w-20 animate-pulse rounded bg-elevated" />
             ) : (
-              <div className="mt-2 flex items-baseline justify-between gap-2">
-                <p className="text-3xl font-semibold text-primary">
-                  <CountUp value={metrics.data?.[key] ?? 0} />
-                </p>
-                <ChevronRight className="h-4 w-4 shrink-0 translate-x-[-4px] text-muted opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:text-secondary group-hover:opacity-100" />
+              <div className="mt-3 text-3xl font-bold tracking-tight text-primary">
+                <CountUp value={metrics.data ? k.value(metrics.data) : 0} />
               </div>
             )}
+            <div className="mt-1 truncate text-xs text-muted">
+              {metrics.data ? k.sub(metrics.data) : '—'}
+            </div>
           </Link>
         ))}
+      </section>
 
-        {/* Recent Activity (2×2): EXACT existing header + feed, unchanged
-            behavior (30s refetch, pause). p-0 keeps the inner px-5 rows at
-            their original edge-to-edge rhythm inside the bento shell. */}
-        <BentoCard
-          className="animate-fade-up col-span-2 p-0 sm:p-0 lg:col-span-4"
-          data-testid="bento-activity"
-          style={{ animationDelay: `${Math.min(8, 8) * 70}ms` }}
-        >
-          <div className="flex items-center gap-2 border-b border-edge px-5 py-4">
-            <Activity className="h-4 w-4 text-secondary" />
-            <h2 className="text-sm font-semibold text-primary">Recent Activity</h2>
-            <Button
-              type="button"
-              onClick={() => setPaused((p) => !p)}
-              title={paused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
-              variant="ghost"
-              className="ml-auto rounded-full border border-edge px-2 py-0.5 text-xs text-muted hover:border-edge2 hover:text-primary"
-            >
-              {paused ? (
-                <Play className="h-3 w-3" />
+      {/* Secondary metric pills. */}
+      <section data-testid="secondary-pills" className="flex flex-wrap gap-2">
+        {SECONDARY_PILLS.map((pill) => (
+          <Link
+            key={pill.to}
+            to={pill.to}
+            className="liquid-glass-pill flex min-w-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-secondary"
+          >
+            <span className="truncate">{pill.label}</span>
+            <span className="shrink-0 font-semibold tabular-nums text-primary">
+              {metrics.isLoading ? (
+                '…'
               ) : (
-                <>
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                  auto-refresh 30s
-                </>
+                <CountUp value={metrics.data ? pill.value(metrics.data) : 0} />
               )}
-              {paused && <span className="text-amber-400">paused</span>}
-            </Button>
-          </div>
-          <div className="divide-y divide-edge/60">
-            {audit.isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-5 py-3">
-                  <div className="h-3 w-36 animate-pulse rounded bg-elevated" />
-                  <div className="h-3 w-24 animate-pulse rounded bg-elevated" />
-                  <div className="h-3 w-32 animate-pulse rounded bg-elevated" />
-                </div>
-              ))}
-            {(audit.data?.items ?? []).map((e, i) => (
-              <div
-                key={e.id}
-                className="animate-list-in flex flex-col gap-1 px-5 py-3 text-sm sm:flex-row sm:items-center sm:gap-3"
-                style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="shrink-0 text-xs text-muted">{formatDate(e.created_at)}</span>
-                  <span className="min-w-0 truncate text-secondary">
-                    {e.actor_name ?? 'system'}
-                  </span>
-                </div>
-                <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    title={e.action}
-                    className={cn(
-                      'shrink-0 rounded px-2 py-0.5 font-mono text-xs',
-                      e.action.includes('DELETE') || e.action.includes('DISABLE')
-                        ? 'bg-red-500/15 text-red-400'
-                        : 'bg-elevated text-secondary',
-                    )}
-                  >
-                    {e.action}
-                  </span>
-                  <span className="min-w-0 truncate text-xs text-muted">
-                    {e.target_type} ·{' '}
-                    <span className="font-mono text-accent" title={e.target_id}>{e.target_id}</span>
-                  </span>
-                </div>
+            </span>
+          </Link>
+        ))}
+      </section>
+
+      {/* Recent Activity: EXACT existing header + feed, unchanged
+          behavior (30s refetch, pause). p-0 keeps the inner px-5 rows at
+          their original edge-to-edge rhythm inside the bento shell. */}
+      <BentoCard
+        className="animate-fade-up p-0 sm:p-0"
+        data-testid="bento-activity"
+        style={{ animationDelay: `${Math.min(8, 8) * 70}ms` }}
+      >
+        <div className="flex items-center gap-2 border-b border-edge px-5 py-4">
+          <Activity className="h-4 w-4 text-secondary" />
+          <h2 className="text-sm font-semibold text-primary">Recent Activity</h2>
+          <Button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            title={paused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+            variant="ghost"
+            className="ml-auto rounded-full border border-edge px-2 py-0.5 text-xs text-muted hover:border-edge2 hover:text-primary"
+          >
+            {paused ? (
+              <Play className="h-3 w-3" />
+            ) : (
+              <>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                auto-refresh 30s
+              </>
+            )}
+            {paused && <span className="text-amber-400">paused</span>}
+          </Button>
+        </div>
+        <div className="divide-y divide-edge/60">
+          {audit.isLoading &&
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-5 py-3">
+                <div className="h-3 w-36 animate-pulse rounded bg-elevated" />
+                <div className="h-3 w-24 animate-pulse rounded bg-elevated" />
+                <div className="h-3 w-32 animate-pulse rounded bg-elevated" />
               </div>
             ))}
-            {!audit.isLoading && (audit.data?.items ?? []).length === 0 && (
-              <div className="px-5 py-4">
-                <EmptyState
-                  icon={Activity}
-                  title="No recent activity"
-                  description="No audit entries yet. Asset updates and ticket changes will show up here automatically."
-                />
+          {(audit.data?.items ?? []).map((e, i) => (
+            <div
+              key={e.id}
+              className="animate-list-in flex flex-col gap-1 px-5 py-3 text-sm sm:flex-row sm:items-center sm:gap-3"
+              style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="shrink-0 text-xs text-muted">{formatDate(e.created_at)}</span>
+                <span className="min-w-0 truncate text-secondary">
+                  {e.actor_name ?? 'system'}
+                </span>
               </div>
-            )}
-          </div>
-        </BentoCard>
-
-        {/* SLA Overdue list (admin): unchanged section, full-width grid cell. */}
-        <div className="col-span-2 min-w-0 lg:col-span-4">
-          <OverdueTickets />
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  title={e.action}
+                  className={cn(
+                    'shrink-0 rounded px-2 py-0.5 font-mono text-xs',
+                    e.action.includes('DELETE') || e.action.includes('DISABLE')
+                      ? 'bg-red-500/15 text-red-400'
+                      : 'bg-elevated text-secondary',
+                  )}
+                >
+                  {e.action}
+                </span>
+                <span className="min-w-0 truncate text-xs text-muted">
+                  {e.target_type} ·{' '}
+                  <span className="font-mono text-accent" title={e.target_id}>{e.target_id}</span>
+                </span>
+              </div>
+            </div>
+          ))}
+          {!audit.isLoading && (audit.data?.items ?? []).length === 0 && (
+            <div className="px-5 py-4">
+              <EmptyState
+                icon={Activity}
+                title="No recent activity"
+                description="No audit entries yet. Asset updates and ticket changes will show up here automatically."
+              />
+            </div>
+          )}
         </div>
+      </BentoCard>
+
+      {/* SLA Overdue list (admin): unchanged section, moved below the new rows. */}
+      <div className="min-w-0">
+        <OverdueTickets />
       </div>
 
       {newOpen && (
