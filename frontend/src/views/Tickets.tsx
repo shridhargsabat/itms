@@ -210,6 +210,15 @@ export default function Tickets() {
   const rows = data?.items ?? [];
   const selected = rows.find((t) => t.id === selectedId) ?? null;
 
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedId(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected]);
+
   // any filter change or view switch resets to page 1
   useEffect(() => {
     reset();
@@ -438,7 +447,7 @@ export default function Tickets() {
                             onClick={() => setSelectedId(t.id)}
                             className={cn(
                               'animate-list-in w-full rounded-lg glass-card liquid-glass-subcard p-3 text-left transition-colors',
-                              selectedId === t.id && 'border-indigo-500/60',
+                              selectedId === t.id && 'border-accent/60',
                             )}
                             style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                           >
@@ -823,7 +832,7 @@ function SuggestionPanel({ query }: { query: string }) {
   });
   if (debounced.length < 3 || !suggestions.data?.length) return null;
   return (
-    <div className="rounded-lg glass-card border-indigo-500/20 bg-indigo-500/5 p-2.5">
+    <div className="rounded-lg glass-card border-accent/20 bg-accent/5 p-2.5">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">
         Maybe this already exists in the KB?
       </p>
@@ -835,7 +844,7 @@ function SuggestionPanel({ query }: { query: string }) {
             className="block truncate text-xs text-secondary hover:text-accent hover:underline"
             title={a.body}
           >
-            <span className="mr-1.5 rounded bg-indigo-500/15 px-1 py-0.5 text-[9px] font-medium text-accent">
+            <span className="mr-1.5 rounded bg-accent/15 px-1 py-0.5 text-[9px] font-medium text-accent">
               {a.ticket_type}
             </span>
             {a.title}

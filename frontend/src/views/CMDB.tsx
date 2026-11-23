@@ -85,7 +85,7 @@ export default function CMDB() {
         description="Configuration items and dependency impact analysis."
       />
 
-      <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[420px_1fr]">
         <div className="min-w-0 rounded-xl glass-card liquid-glass-panel rounded-[26px] p-3">
           <div className="mb-2 flex items-center gap-2 px-2 py-1">
             <Network className="h-4 w-4 text-secondary" />
@@ -109,10 +109,10 @@ export default function CMDB() {
               />
             </div>
           ) : (
-            <div className="max-h-[70vh] overflow-y-auto p-1">
-              {/* CMDB carve-out: the CI table lives in a narrow 300px sidebar and
-                  slices the in-memory topology graph (unpaginated by design —
-                  the graph is loaded whole). */}
+            <div className="p-1">
+              {/* CMDB carve-out: the CI table lives in the left column and
+                  slices the in-memory topology graph (DataTable owns the
+                  internal scroll container + sticky header + footer). */}
               <DataTable<TopologyNode>
                 columns={ciColumns}
                 rows={allNodes.slice((ciPage - 1) * ciPageSize, ciPage * ciPageSize)}

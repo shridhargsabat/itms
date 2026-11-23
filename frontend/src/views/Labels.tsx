@@ -186,7 +186,7 @@ export default function Labels() {
     <div className="mx-auto max-w-5xl space-y-5">
       <PageHeader
         title="QR Labels"
-        description="Pick assets and print an A4 label sheet, or start an audit run for the factory floor."
+        description="Pick assets and print an A4 label sheet (38×21 mm, 3×8 grid), or start an audit run for the factory floor (target: 5% monthly, 100% annual, <3% ghost)."
         actions={
           <>
             <Button
@@ -250,8 +250,6 @@ export default function Labels() {
         onPageSizeChange={setPageSize}
       />
       )}
-
-      <p className="text-[11px] text-muted">Labels: 38×21 mm (A4 3×8 grid) · audit guidance: 5% monthly, 100% annual, &lt;3% ghost target</p>
 
       {printAsset && (
         <Modal title={`Print label — ${printAsset.asset_tag}`} onClose={closePrint}>

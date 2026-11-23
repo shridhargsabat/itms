@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CalendarDays, FileText, History, IndianRupee, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
 import { assignAsset, assetDocumentUrl, createClaim, getAssetLifecycle, getCachedUser, listAssetDocuments, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
@@ -94,6 +94,15 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
       setClaimIssue('');
     },
   });
+
+  useEffect(() => {
+    if (!asset) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [asset, onClose]);
 
   if (!asset) return null;
 

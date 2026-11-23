@@ -88,3 +88,53 @@ describe('Task 6 glass badge overrides in index.css', () => {
     expect(block).not.toMatch(/(?<!\()\.(theme|ledgerly)-[a-z-]+/);
   });
 });
+
+describe('Task 11 glass table & filter-bar parity', () => {
+  const css = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../index.css'),
+    'utf8',
+  );
+
+  it('TABLE_SPEC shell clips corner overflow and tbody uses bg-surface instead of bg-base', async () => {
+    const { TABLE_SPEC } = await import('./tableSpec');
+    expect(TABLE_SPEC.shell).toContain('overflow-hidden');
+    expect(TABLE_SPEC.shell).toContain('glass-card');
+    expect(TABLE_SPEC.tbody).toContain('bg-surface');
+    expect(TABLE_SPEC.tbody).not.toContain('bg-base');
+  });
+
+  it('FilterBar uses glass-card surface tier instead of flat bg-surface', async () => {
+    const { default: FilterBar } = await import('./FilterBar');
+    const { container } = render(
+      <FilterBar>
+        <span>Filter Child</span>
+      </FilterBar>,
+    );
+    const bar = container.firstElementChild as HTMLElement;
+    expect(bar.className).toContain('glass-card');
+  });
+
+  it('scopes translucent table header, body, and row hover rules under light and dark glass guard chains', () => {
+    expect(css).toContain('table thead');
+    expect(css).toContain('table tbody');
+    expect(css).toContain('table tbody tr:hover');
+    // Verify Task 6+ and Task 10+ R9 guard-chain invariant still holds
+    const block6 = css.slice(css.indexOf('Task 6:'));
+    expect(block6).not.toMatch(/(?<!\()\.(theme|ledgerly)-[a-z-]+/);
+  });
+
+  it('unifies Liquid Glass --t-accent with Apple blue and removes hardcoded indigo from Tickets and Masters', () => {
+    expect(css).toContain('--t-accent: #0066D6');
+    expect(css).toContain('--t-accent: #0A84FF');
+    const ticketsSrc = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../views/Tickets.tsx'),
+      'utf8',
+    );
+    const mastersSrc = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../views/Masters.tsx'),
+      'utf8',
+    );
+    expect(ticketsSrc).not.toContain('indigo-500');
+    expect(mastersSrc).not.toContain('indigo-500');
+  });
+});

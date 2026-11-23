@@ -5,6 +5,7 @@ import { getRepeatIncidents } from '@/api/client';
 import EmptyState from '@/components/EmptyState';
 import FilterBar from '@/components/FilterBar';
 import PageHeader from '@/components/PageHeader';
+import Select from '@/components/Select';
 
 /**
  * Reports hub — Phase 2 (#49 repeat-incident detection, problem-lite).
@@ -27,32 +28,36 @@ export default function Reports() {
       />
 
       <FilterBar>
-        <label className="flex items-center gap-2 text-xs text-secondary">
-          Look back
-          <select
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-            className="h-8 rounded-lg glass-dense px-2 text-xs outline-none focus:border-accent"
-          >
-            <option value={30}>30 days</option>
-            <option value={90}>90 days</option>
-            <option value={180}>6 months</option>
-            <option value={365}>12 months</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-xs text-secondary">
-          Show groups with
-          <select
-            value={minCount}
-            onChange={(e) => setMinCount(Number(e.target.value))}
-            className="h-8 rounded-lg glass-dense px-2 text-xs outline-none focus:border-accent"
-          >
-            <option value={2}>≥ 2 tickets</option>
-            <option value={3}>≥ 3 tickets</option>
-            <option value={5}>≥ 5 tickets</option>
-          </select>
-          occurrences
-        </label>
+        <div className="flex items-center gap-2 text-xs text-secondary">
+          <span>Look back</span>
+          <Select
+            className="w-32"
+            triggerClassName="h-8 py-1 text-xs"
+            value={String(days)}
+            onChange={(v) => setDays(Number(v))}
+            options={[
+              { value: '30', label: '30 days' },
+              { value: '90', label: '90 days' },
+              { value: '180', label: '6 months' },
+              { value: '365', label: '12 months' },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-2 text-xs text-secondary">
+          <span>Show groups with</span>
+          <Select
+            className="w-36"
+            triggerClassName="h-8 py-1 text-xs"
+            value={String(minCount)}
+            onChange={(v) => setMinCount(Number(v))}
+            options={[
+              { value: '2', label: '≥ 2 tickets' },
+              { value: '3', label: '≥ 3 tickets' },
+              { value: '5', label: '≥ 5 tickets' },
+            ]}
+          />
+          <span>occurrences</span>
+        </div>
         {report.isFetching && <span className="text-[11px] text-muted">refreshing…</span>}
       </FilterBar>
 

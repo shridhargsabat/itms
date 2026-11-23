@@ -57,7 +57,7 @@ const TABS: { id: MasterFamily | 'users' | 'templates' | 'vendors' | 'locations'
 const ROLES = ['ADMIN', 'AGENT', 'EMPLOYEE'];
 
 const ROLE_STYLE: Record<string, string> = {
-  ADMIN: 'bg-accent/10 text-accent border-indigo-500/30',
+  ADMIN: 'bg-accent/10 text-accent border-accent/30',
   AGENT: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
   EMPLOYEE: 'bg-elevated/10 text-secondary border-edge2/30',
 };
@@ -233,7 +233,7 @@ function UsersTab() {
       {
         key: 'id',
         header: '',
-        className: 'sticky right-0 w-28 border-l border-edge bg-inherit',
+        className: 'sticky right-0 w-28 border-l border-edge/60 bg-surface',
         render: (u) => (
           <div className="flex items-center gap-1">
             <Button
@@ -683,7 +683,7 @@ function TemplatesTab() {
             <div className="flex flex-wrap items-center gap-2">
               <ClipboardList className="h-4 w-4 text-secondary" />
               <span className="text-sm font-semibold text-primary">{t.name}</span>
-              <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-accent">{t.ticket_type}</span>
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">{t.ticket_type}</span>
               <span className="rounded-full bg-elevated px-2 py-0.5 text-[10px] text-muted">{t.priority}</span>
               {!t.active && <span className="text-[10px] text-muted">inactive</span>}
               <div className="ml-auto flex items-center gap-1.5">
@@ -803,7 +803,7 @@ function VendorsTab() {
               <div className="flex shrink-0 items-center gap-1">
                 <Button onClick={() => startEdit(v)} variant="ghost" size="icon" className="p-2 text-muted hover:text-accent" title="Edit"><Pencil className="h-4 w-4" /></Button>
                 {isAdmin && (
-                  <Button onClick={() => { if (confirm(`Delete vendor ${v.name}?`)) remove.mutate(v.id); }} variant="ghost" size="icon" className="p-2 text-muted hover:bg-red-500/10 hover:text-red-400" title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                  <DeleteButton onConfirm={() => remove.mutate(v.id)} label={v.name} />
                 )}
               </div>
             </div>
@@ -895,7 +895,7 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
           <textarea required placeholder="Issue / fault (e.g. 'Power port dead — sent for RMA')" value={issue} onChange={(e) => setIssue(e.target.value)} className={cn(inputCls, 'min-h-[56px] resize-y')} rows={2} />
           <input placeholder="Outcome (optional — e.g. 'Motherboard replaced')" value={outcome} onChange={(e) => setOutcome(e.target.value)} className={inputCls} />
           <label className="flex items-center gap-2 text-xs text-secondary">
-            <input type="checkbox" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} className="accent-indigo-500" /> Replacement unit provided
+            <input type="checkbox" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} className="accent-accent" /> Replacement unit provided
           </label>
           <Button type="submit" loading={add.isPending} variant="primary" size="sm">{add.isPending ? 'Saving…' : 'Log claim'}</Button>
         </form>
