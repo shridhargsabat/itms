@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Search, Ticket, X } from 'lucide-react';
@@ -55,7 +56,9 @@ export default function ServiceQueue() {
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key !== 'Escape') return;
+      if (e.defaultPrevented || document.querySelector('[role="listbox"]')) return;
+      close();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -145,19 +148,20 @@ export default function ServiceQueue() {
         )}
       </section>
 
-      {selected && (
-        <>
-          <div
-            data-testid="service-queue-scrim"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
-            onClick={close}
-          />
-          <div
-            data-testid="service-queue-drawer"
-            role="dialog"
-            aria-label={`Inspect ${selected.ticket_number}`}
-            className="liquid-glass-panel fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto p-6"
-          >
+      {selected &&
+        createPortal(
+          <>
+            <div
+              data-testid="service-queue-scrim"
+              className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
+              onClick={close}
+            />
+            <div
+              data-testid="service-queue-drawer"
+              role="dialog"
+              aria-label={`Inspect ${selected.ticket_number}`}
+              className="liquid-glass-panel fixed inset-y-0 right-0 z-[60] w-full max-w-md overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            >
             <div className="flex flex-col justify-between gap-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -209,15 +213,16 @@ export default function ServiceQueue() {
                 </div>
               </div>
               <Link
-                to="/tickets"
+                to={`/tickets?open=${selected.id}`}
                 className="text-xs font-semibold text-[#007AFF] hover:underline"
               >
                 Open in Service Desk →
               </Link>
             </div>
           </div>
-        </>
-      )}
+          </>,
+          document.body,
+        )}
     </>
   );
 }

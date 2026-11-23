@@ -19,7 +19,10 @@ interface ModalProps {
 export default function Modal({ title, onClose, children }: ModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (e.defaultPrevented || document.querySelector('[role="listbox"]')) return;
+        onClose();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

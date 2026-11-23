@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -113,7 +114,7 @@ export default function Tickets() {
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') selectTicket(null);
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="listbox"]')) selectTicket(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -268,7 +269,8 @@ export default function Tickets() {
 
       <FilterBar>
         <div className="relative min-w-0 flex-1 basis-full sm:basis-56"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={search} onChange={(e) => update('search', e.target.value)} placeholder="Search tickets..." aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
-        <div className="flex overflow-hidden rounded-lg glass-dense">
+        <div className="grid w-full grid-cols-2 gap-2 sm:contents">
+        <div className="flex w-full justify-center overflow-hidden rounded-lg glass-dense sm:w-auto">
           <button
             type="button"
             onClick={() => setView('table')}
@@ -314,6 +316,7 @@ export default function Tickets() {
             ...TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') })),
           ]}
         />
+        </div>
       </FilterBar>
 
       <div className="min-w-0">
@@ -363,7 +366,7 @@ export default function Tickets() {
                           {items.length}
                         </span>
                       </div>
-                      <div className="space-y-2">
+                      <div className="max-h-[calc(100dvh-19rem)] space-y-2 overflow-y-auto pr-1">
                         {items.map((t, i) => (
                           <button
                             key={t.id}
@@ -401,14 +404,15 @@ export default function Tickets() {
           )}
         </div>
 
-        {selected && (
-          <div className="fixed inset-0 z-[60]">
+        {selected &&
+          createPortal(
+            <div className="fixed inset-0 z-[60]">
             <div
               className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => selectTicket(null)}
             />
             <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
-              <div className="flex items-start justify-between border-b border-edge px-5 py-4">
+              <div className="flex items-start justify-between border-b border-edge px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-xs text-accent">{selected.ticket_number}</span>
@@ -434,7 +438,7 @@ export default function Tickets() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              <div className="flex-1 space-y-4 overflow-y-auto px-5 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="mt-3 rounded-lg glass-card liquid-glass-subcard p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
@@ -459,12 +463,7 @@ export default function Tickets() {
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex items-center gap-2 text-secondary">
                 <User className="h-4 w-4 shrink-0 text-muted" />
-                <span className="truncate">
-                  {selected.requester_name}
-                  <span className="ml-1 font-mono text-[10px] text-muted">
-                    ({selected.requester_id})
-                  </span>
-                </span>
+                <span className="truncate">{selected.requester_name}</span>
               </div>
               {selected.asset_id && (
                 <div className="flex items-center gap-2 rounded-lg glass-card liquid-glass-subcard px-3 py-2">
@@ -488,7 +487,7 @@ export default function Tickets() {
 
             <TicketThread ticketId={selected.id} isAdmin={getCachedUser()?.role === 'ADMIN'} />
 
-            <div className="mt-5 grid grid-cols-2 gap-3 border-t border-edge pt-4">
+            <div className="mt-5 grid grid-cols-1 gap-3 border-t border-edge pt-4 sm:grid-cols-2">
               <div>
                 <label className={labelCls}>Priority</label>
                 <Select
@@ -564,8 +563,9 @@ export default function Tickets() {
             </div>
               </div>
             </div>
-          </div>
-        )}
+            </div>,
+            document.body,
+          )}
 
       {newOpen && (
         <Modal title="New Ticket" onClose={() => setNewOpen(false)}>
@@ -843,7 +843,7 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
         Canned response
       </Button>
       {open && (
-        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-80 overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl">
+        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-[min(20rem,calc(100vw-2.5rem))] overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl">
           {canned.data.map((c) => (
             <button
               key={c.id}

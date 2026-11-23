@@ -142,8 +142,11 @@ describe('ServiceQueue (task 9)', () => {
     ).toBeInTheDocument();
     expect(within(drawer).getByRole('link', { name: /open in service desk/i })).toHaveAttribute(
       'href',
-      '/tickets',
+      '/tickets?open=t1',
     );
+    // Portaled above header/nav stacking contexts.
+    expect(drawer.parentElement).toBe(document.body);
+    expect(drawer).toHaveClass('z-[60]');
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByTestId('service-queue-drawer')).not.toBeInTheDocument();
