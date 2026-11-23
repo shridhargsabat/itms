@@ -1,5 +1,5 @@
 /**
- * Theme registry: single source of truth for all 10 theme modes.
+ * Theme registry: single source of truth for all 12 theme modes.
  *
  * Consumed by Tasks 2, 6, 12, 13. Legacy entries (group 'classic') copy
  * labels verbatim from ThemeManager.tsx and theme colors from theme.ts —
@@ -16,9 +16,11 @@ export type ThemeMode =
   | 'console'
   | 'bold'
   | 'shell'
-  | 'terminal';
+  | 'terminal'
+  | 'clarity'
+  | 'clarity-dark';
 
-export type SkinName = 'legacy' | 'paper' | 'console' | 'bold' | 'shell' | 'terminal';
+export type SkinName = 'legacy' | 'paper' | 'console' | 'bold' | 'shell' | 'terminal' | 'clarity';
 
 export interface ThemeMeta {
   value: ThemeMode;
@@ -132,6 +134,26 @@ export const THEME_REGISTRY: Record<ThemeMode, ThemeMeta> = {
     classes: ['dark', 'theme-terminal'],
     themeColor: '#0a0f0d',
     skin: 'terminal',
+    glass: false,
+  },
+  clarity: {
+    value: 'clarity',
+    label: 'Clarity',
+    group: 'new',
+    dark: false,
+    classes: ['theme-clarity'],
+    themeColor: '#f6f7f9',
+    skin: 'clarity',
+    glass: false,
+  },
+  'clarity-dark': {
+    value: 'clarity-dark',
+    label: 'Clarity Dark',
+    group: 'new',
+    dark: true,
+    classes: ['dark', 'theme-clarity-dark'],
+    themeColor: '#0b0d10',
+    skin: 'clarity',
     glass: false,
   },
 };
