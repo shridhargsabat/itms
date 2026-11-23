@@ -257,7 +257,7 @@ export default function Layout() {
             </Button>
           )}
           <div className={cn('mt-1', wide && 'px-2')}>
-            <ThemeToggle showLabel={wide} className={cn('w-full', wide ? 'h-9 justify-start gap-3 px-3 py-2 text-sm' : 'h-9 w-9')} />
+            <ThemeToggle showLabel={wide} direction="up" className={cn('w-full', wide ? 'h-9 justify-start gap-3 px-3 py-2 text-sm' : 'h-9 w-9')} />
           </div>
           {wide && (
             <p className="mt-2 px-2 text-center text-[10px] text-muted">build {__BUILD_SHA__}</p>

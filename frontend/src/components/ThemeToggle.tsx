@@ -48,8 +48,11 @@ const GROUPS: Array<{ heading: 'New' | 'Classic'; modes: RegistryMeta[] }> = [
  * via setThemeMode — these are logged-in surfaces).
  * showLabel renders the current mode name (wide sidebar footer); icon-only
  * everywhere else (header, collapsed rail).
+ * direction controls which way the menu opens: the sidebar footer sits at
+ * the bottom of the viewport so it must open upward ('up'); the header
+ * toggle opens downward ('down', default).
  */
-export default function ThemeToggle({ className, showLabel }: { className?: string; showLabel?: boolean }) {
+export default function ThemeToggle({ className, showLabel, direction = 'down' }: { className?: string; showLabel?: boolean; direction?: 'up' | 'down' }) {
   const [mode, setMode] = useState<ThemeMode>(getThemeMode());
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -114,7 +117,10 @@ export default function ThemeToggle({ className, showLabel }: { className?: stri
           role="menu"
           aria-label="Theme"
           onKeyDown={closeOnEscape}
-          className="absolute right-0 top-full z-50 mt-2 max-h-96 w-60 overflow-auto rounded-xl border border-edge bg-surface p-1.5 shadow-xl"
+          className={cn(
+            'absolute z-50 max-h-96 w-60 overflow-auto rounded-xl border border-edge bg-surface p-1.5 shadow-xl',
+            direction === 'up' ? 'bottom-full left-0 mb-2' : 'right-0 top-full mt-2',
+          )}
         >
           {GROUPS.map((g) => (
             <div key={g.heading}>

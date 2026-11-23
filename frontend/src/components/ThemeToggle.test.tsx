@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ThemeToggle from './ThemeToggle';
 vi.mock('@/api/client', () => ({ setThemePref: () => Promise.resolve() }));
+afterEach(cleanup);
 describe('theme dropdown', () => {
   it('lists all 10 themes grouped, applies on click', () => {
     render(<ThemeToggle />);
@@ -18,5 +19,18 @@ describe('theme dropdown', () => {
     expect(screen.getByRole('menuitemradio', { name: 'Ledgerly' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Console/ }));
     expect(localStorage.getItem('itms_theme')).toBe('console');
+  });
+  it('opens downward by default, upward with direction="up"', () => {
+    const { unmount } = render(<ThemeToggle />);
+    fireEvent.click(screen.getByRole('button', { name: /theme/i }));
+    const down = screen.getByRole('menu');
+    expect(down.className).toContain('top-full');
+    expect(down.className).toContain('right-0');
+    unmount();
+    render(<ThemeToggle direction="up" />);
+    fireEvent.click(screen.getByRole('button', { name: /theme/i }));
+    const up = screen.getByRole('menu');
+    expect(up.className).toContain('bottom-full');
+    expect(up.className).toContain('left-0');
   });
 });
