@@ -31,6 +31,8 @@ const SAMPLE_ASSET: Asset = {
   assigned_user_name: 'Aarav Gupta',
   purchase_date: '2026-01-15',
   warranty_expiry: '2029-01-15',
+  unit_cost: null,
+  expected_eol: null,
   specs: {},
   created_at: '2026-01-15T00:00:00Z',
   updated_at: '2026-01-15T00:00:00Z',
