@@ -274,6 +274,8 @@ function UsersTab() {
     <div className="space-y-4">
       <FilterBar>
         <input
+          type="search"
+          inputMode="search"
           className={cn(inputCls, 'w-full sm:w-56')}
           placeholder="Search name or email…"
           value={search}

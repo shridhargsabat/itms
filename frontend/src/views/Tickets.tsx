@@ -268,7 +268,7 @@ export default function Tickets() {
       />
 
       <FilterBar>
-        <div className="relative min-w-0 flex-1 basis-full sm:basis-56"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={search} onChange={(e) => update('search', e.target.value)} placeholder="Search tickets..." aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-56"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={search} type="search" inputMode="search" onChange={(e) => update('search', e.target.value)} placeholder="Search tickets..." aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
         <div className="grid w-full grid-cols-2 gap-2 sm:contents">
         <div className="flex w-full justify-center overflow-hidden rounded-lg glass-dense sm:w-auto">
           <button
@@ -433,7 +433,7 @@ export default function Tickets() {
                   type="button"
                   onClick={() => selectTicket(null)}
                   aria-label="Close"
-                  className="rounded-md p-1 text-secondary transition-colors hover:bg-elevated hover:text-primary"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg p-2 text-secondary transition-colors hover:bg-elevated hover:text-primary"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -843,7 +843,7 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
         Canned response
       </Button>
       {open && (
-        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-[min(20rem,calc(100vw-2.5rem))] overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl">
+        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-80 max-w-[calc(100dvw-2.5rem)] overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl">
           {canned.data.map((c) => (
             <button
               key={c.id}
