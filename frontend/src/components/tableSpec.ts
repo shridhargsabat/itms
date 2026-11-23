@@ -1,8 +1,8 @@
 /** Canonical table geometry — the ONE spec every ITMS table renders with.
  *  Header text-xs uppercase on bg-surface, cells py-3/px-4 text-sm, shell
- *  rounded-xl glass-dense, min-w-[640px] + ScrollX for consistent mobile behavior. */
+ *  overflow-hidden rounded-2xl glass-card, min-w-[640px] + ScrollX for consistent mobile behavior. */
 export const TABLE_SPEC = {
-  shell: 'rounded-xl glass-dense',
+  shell: 'overflow-hidden rounded-2xl glass-card',
   /* Vertical scroll lives on the ScrollX INNER container (the same element that does
      overflow-x) so the sticky header pins to that box's top (top:0 always). It MUST
      be on the single scrolling element — if the vertical scroll sat on an outer shell
@@ -15,17 +15,17 @@ export const TABLE_SPEC = {
      NOTE: do NOT add transform/filter/will-change here — they create a containing block
      that breaks position:sticky on th. */
   tableScroll: 'max-h-[55vh] overflow-y-auto lg:max-h-none',
-  emptyShell: 'rounded-xl border border-dashed border-edge p-10 text-center text-sm text-muted',
+  emptyShell: 'rounded-2xl border border-dashed border-edge p-10 text-center text-sm text-muted',
   head: 'bg-surface text-xs uppercase tracking-wide text-secondary',
-  /* sticky top-0 pins the header inside the shell's vertical scroll box; opaque bg so
+  /* sticky top-0 pins the header inside the shell's vertical scroll box; opaque-enough bg so
      body rows never show through; z-10 above body cells + the ScrollX right-edge fade
      (fade stays z-[5]) but below modals/menus/top-bar (z-[40,60,70]). */
-  th: 'sticky top-0 z-10 bg-surface px-4 py-3 font-medium',
+  th: 'sticky top-0 z-10 border-b border-edge/60 bg-surface px-4 py-3 font-medium',
   td: 'px-4 py-3',
   table: 'w-full text-left text-sm',
-  tbody: 'divide-y divide-edge bg-base',
+  tbody: 'divide-y divide-edge/60 bg-surface',
   checkboxCell: 'px-3 py-3',
   footer:
-    'sticky bottom-[3.5rem] z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-edge bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur lg:bottom-0',
+    'sticky bottom-[3.5rem] z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-2xl border-t border-edge/60 bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur lg:bottom-0',
   minWidth: 'min-w-[640px]',
 } as const;
