@@ -20,13 +20,15 @@ describe('fouc parity', () => {
     expect(html).toContain(`'theme-console'`);
     expect(html).toContain(`'theme-terminal'`);
   });
-  it('maps all five theme classes with correct dark pairings', () => {
+  it('maps all seven theme classes with correct dark pairings', () => {
     // Light themes carry no .dark; dark themes pair theme class with .dark.
     expect(html).toContain(`d.classList.add('theme-paper')`);
     expect(html).toContain(`d.classList.add('theme-shell')`);
+    expect(html).toContain(`d.classList.add('theme-clarity')`);
     expect(html).toContain(`d.classList.add('dark', 'theme-console')`);
     expect(html).toContain(`d.classList.add('dark', 'theme-bold')`);
     expect(html).toContain(`d.classList.add('dark', 'theme-terminal')`);
+    expect(html).toContain(`d.classList.add('dark', 'theme-clarity-dark')`);
   });
   it('falls unknown stored values through to the paper branch', () => {
     // Missing values default via `|| 'paper'`, but an invalid string (e.g.
@@ -38,7 +40,7 @@ describe('fouc parity', () => {
     // static #ffffff until React mounts.
     expect(html).toContain(`meta[name="theme-color"]`);
     expect(html).toContain(`setAttribute('content'`);
-    ['#f6f5f1', '#09090b', '#0d0716', '#0a0f0d', '#141311', '#020617'].forEach((c) =>
+    ['#f6f5f1', '#09090b', '#0d0716', '#0a0f0d', '#141311', '#020617', '#f6f7f9', '#0b0d10'].forEach((c) =>
       expect(html).toContain(c));
     // The meta tag must precede the script — the script queries it during parse.
     expect(html.indexOf('<meta name="theme-color"')).toBeLessThan(html.indexOf('itms_theme'));

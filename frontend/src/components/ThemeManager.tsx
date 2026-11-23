@@ -96,6 +96,22 @@ export const THEMES: ThemeMeta[] = [
     wrapperClass: 'dark theme-terminal',
     glass: false,
   },
+  {
+    value: 'clarity',
+    label: 'Clarity',
+    description: 'Precision light UI for focused IT operations.',
+    icon: Sun,
+    wrapperClass: 'theme-clarity',
+    glass: false,
+  },
+  {
+    value: 'clarity-dark',
+    label: 'Clarity Dark',
+    description: 'Precision dark UI for focused IT operations.',
+    icon: Moon,
+    wrapperClass: 'dark theme-clarity-dark',
+    glass: false,
+  },
 ];
 
 /**
@@ -179,7 +195,7 @@ export default function ThemeManager({
     onClose();
   };
 
-  const NEW_ORDER: ThemeMode[] = ['paper', 'console', 'bold', 'shell', 'terminal'];
+  const NEW_ORDER: ThemeMode[] = ['paper', 'console', 'bold', 'shell', 'terminal', 'clarity', 'clarity-dark'];
   const CLASSIC_ORDER: ThemeMode[] = ['light', 'dark', 'system', 'ledgerly-light', 'ledgerly'];
   const sections = [
     { heading: 'New', values: NEW_ORDER },

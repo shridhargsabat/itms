@@ -26,6 +26,8 @@ const MODE_ICONS: Record<ThemeMode, typeof Sun> = {
   bold: Zap,
   shell: Shell,
   terminal: SquareTerminal,
+  clarity: Sun,
+  'clarity-dark': Moon,
 };
 
 const GROUPS: Array<{ heading: 'New' | 'Classic'; modes: RegistryMeta[] }> = [
@@ -35,7 +37,7 @@ const GROUPS: Array<{ heading: 'New' | 'Classic'; modes: RegistryMeta[] }> = [
 
 /**
  * Pre-auth theme menu for /login.
- * Tiny fixed-corner chip so visitors can browse all 10 skins without
+ * Tiny fixed-corner chip so visitors can browse all 12 skins without
  * logging in. Mirrors the accessible dropdown pattern in ThemeToggle,
  * but applies via setThemeModeLocal ONLY — never any network call
  * pre-auth. Styling is theme-agnostic (fixed dark chip) so it stays

@@ -26,20 +26,22 @@ describe('login theme menu', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
-  it('lists all 10 themes grouped new/classic, legacy included', () => {
+  it('lists all 12 themes grouped new/classic, legacy included', () => {
     render(<LoginThemeMenu />);
     fireEvent.click(screen.getByRole('button', { name: /login theme/i }));
     expect(screen.getByText('New')).toBeInTheDocument();
     expect(screen.getByText('Classic')).toBeInTheDocument();
     const items = screen.getAllByRole('menuitemradio');
-    expect(items).toHaveLength(10);
+    expect(items).toHaveLength(12);
     ['Paper', 'Console', 'Bold', 'Shell', 'Terminal', 'Liquid Glass Light', 'Liquid Glass Dark',
-      'Ledgerly Light'].forEach((label) =>
+      'Ledgerly Light', 'Clarity Dark'].forEach((label) =>
       expect(screen.getByRole('menuitemradio', { name: new RegExp(label) })).toBeInTheDocument());
     // Exact-string matches: 'Liquid Glass (Auto)' contains regex-significant
     // parens, and /Ledgerly/ would also match 'Ledgerly Light'.
+    // Same for /Clarity/ vs 'Clarity Dark'.
     expect(screen.getByRole('menuitemradio', { name: 'Liquid Glass (Auto)' })).toBeInTheDocument();
     expect(screen.getByRole('menuitemradio', { name: 'Ledgerly' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitemradio', { name: 'Clarity' })).toBeInTheDocument();
   });
   it('selecting a legacy theme stays local with no network call', () => {
     const spy = vi.spyOn(globalThis, 'fetch');

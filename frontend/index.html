@@ -11,7 +11,7 @@
         try {
           var m = localStorage.getItem('itms_theme') || 'paper';
           // Unknown strings fall through to the paper branch (same as missing).
-          var known = ['paper', 'console', 'bold', 'shell', 'terminal', 'ledgerly', 'ledgerly-light', 'light', 'dark', 'system'];
+          var known = ['paper', 'console', 'bold', 'shell', 'terminal', 'clarity', 'clarity-dark', 'ledgerly', 'ledgerly-light', 'light', 'dark', 'system'];
           if (known.indexOf(m) === -1) m = 'paper';
           var d = document.documentElement;
           var c = '#f6f5f1';
@@ -30,6 +30,12 @@
           } else if (m === 'terminal') {
             d.classList.add('dark', 'theme-terminal');
             c = '#0a0f0d';
+          } else if (m === 'clarity') {
+            d.classList.add('theme-clarity');
+            c = '#f6f7f9';
+          } else if (m === 'clarity-dark') {
+            d.classList.add('dark', 'theme-clarity-dark');
+            c = '#0b0d10';
           } else if (m === 'ledgerly') {
             d.classList.add('dark', 'ledgerly-dark');
             c = '#141311';

@@ -34,6 +34,8 @@ const MODE_ICONS: Record<ThemeMode, typeof Sun> = {
   bold: Zap,
   shell: Shell,
   terminal: SquareTerminal,
+  clarity: Sun,
+  'clarity-dark': Moon,
 };
 
 const GROUPS: Array<{ heading: 'New' | 'Classic'; modes: RegistryMeta[] }> = [
@@ -43,7 +45,7 @@ const GROUPS: Array<{ heading: 'New' | 'Classic'; modes: RegistryMeta[] }> = [
 
 /**
  * Header/footer theme control (#169, #179, #185).
- * Accessible 10-option dropdown listing every THEME_REGISTRY mode grouped
+ * Accessible 12-option dropdown listing every THEME_REGISTRY mode grouped
  * New/Classic. Selecting applies immediately (local fast path + server push
  * via setThemeMode — these are logged-in surfaces).
  * showLabel renders the current mode name (wide sidebar footer); icon-only
