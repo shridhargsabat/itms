@@ -34,7 +34,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22: matches frontend/Dockerfile (node:22-alpine) and local dev.
+          # Node 20 breaks vitest workers (undici decompress `.bind` crash).
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
