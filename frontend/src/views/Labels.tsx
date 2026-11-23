@@ -2,10 +2,15 @@ import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import QRCode from 'qrcode';
-import { CheckCircle2, Download, Printer, Search } from 'lucide-react';
+import { CheckCircle2, Download, Printer, QrCode, Search } from 'lucide-react';
 import { listAssets } from '@/api/client';
 import type { Asset } from '@/api/types';
+import { cn, inputCls } from '@/lib/utils';
 import { payloadFor } from '@/lib/qr';
+import EmptyState from '@/components/EmptyState';
+import FilterBar from '@/components/FilterBar';
+import PageHeader from '@/components/PageHeader';
+import { AssetStatusBadge } from '@/components/TicketBadge';
 import Select from '@/components/Select';
 import Modal from '@/components/Modal';
 import DataTable, { type Column } from '@/components/DataTable';
@@ -92,7 +97,7 @@ export default function Labels() {
     {
       key: 'status',
       header: 'Status',
-      render: (a) => <span className="text-xs text-secondary">{a.status}</span>,
+      render: (a) => <AssetStatusBadge status={a.status} />,
     },
     {
       key: 'serial_number',
@@ -178,29 +183,58 @@ export default function Labels() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
-      <div>
-        <h1 className="text-xl font-semibold">QR Labels</h1>
-        <p className="mt-0.5 text-xs text-muted">
-          Pick assets and print an A4 label sheet, start an audit run for the factory floor, or use the print icon on a row for an animated single-label print. Labels embed tag + serial — scan them with the{' '}
-          <span className="text-accent">Scan</span> page.
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        title="QR Labels"
+        description="Pick assets and print an A4 label sheet, or start an audit run for the factory floor."
+        actions={
+          <>
+            <Button
+              onClick={startRun}
+              disabled={selectedRows.length === 0}
+              variant="secondary"
+              size="sm"
+              leftIcon={<CheckCircle2 className="h-4 w-4" />}
+            >
+              Start audit run → Scan
+            </Button>
+            <Button
+              onClick={() => {
+                setPrintBatch(selectedRows);
+                setBatchRun((n) => n + 1);
+              }}
+              disabled={selectedRows.length === 0}
+              variant="primary"
+              size="sm"
+              leftIcon={<Printer className="h-4 w-4" />}
+            >
+              Print labels ({selectedRows.length})
+            </Button>
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl glass-card p-3">
+      <FilterBar>
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search tag / name / serial…"
-            className="h-9 w-full rounded-lg glass-dense pl-9 pr-3 text-sm outline-none focus:border-accent"
+            className={cn(inputCls, 'pl-9')}
           />
         </div>
-        <Select value={category} onChange={setCategory} options={[{ value: 'ALL', label: 'All categories' }, ...getCategories(rows).map((c) => ({ value: c, label: c }))]} />
-        <Select value={status} onChange={setStatus} options={STATUS_OPTIONS.map((s) => ({ value: s, label: s === 'ALL' ? 'All statuses' : s }))} />
-      </div>
+        <Select className="w-full sm:w-auto" value={category} onChange={setCategory} options={[{ value: 'ALL', label: 'All categories' }, ...getCategories(rows).map((c) => ({ value: c, label: c }))]} />
+        <Select className="w-full sm:w-auto" value={status} onChange={setStatus} options={STATUS_OPTIONS.map((s) => ({ value: s, label: s === 'ALL' ? 'All statuses' : s }))} />
+      </FilterBar>
 
+      {!assets.isLoading && rows.length === 0 ? (
+        <EmptyState
+          icon={QrCode}
+          title="No assets match"
+          description="Widen the search or category filters to find assets for labels or an audit run."
+        />
+      ) : (
       <DataTable
         columns={columns}
         rows={rows}
@@ -215,31 +249,9 @@ export default function Labels() {
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          onClick={() => {
-            setPrintBatch(selectedRows);
-            setBatchRun((n) => n + 1);
-          }}
-          disabled={selectedRows.length === 0}
-          variant="primary"
-          size="sm"
-          leftIcon={<Printer className="h-4 w-4" />}
-        >
-          Print labels ({selectedRows.length})
-        </Button>
-        <Button
-          onClick={startRun}
-          disabled={selectedRows.length === 0}
-          variant="secondary"
-          size="sm"
-          leftIcon={<CheckCircle2 className="h-4 w-4" />}
-        >
-          Start audit run → Scan
-        </Button>
-        <p className="text-[11px] text-muted">Labels: 38×21 mm (A4 3×8 grid) · audit guidance: 5% monthly, 100% annual, &lt;3% ghost target</p>
-      </div>
+      <p className="text-[11px] text-muted">Labels: 38×21 mm (A4 3×8 grid) · audit guidance: 5% monthly, 100% annual, &lt;3% ghost target</p>
 
       {printAsset && (
         <Modal title={`Print label — ${printAsset.asset_tag}`} onClose={closePrint}>

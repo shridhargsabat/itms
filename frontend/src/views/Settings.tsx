@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { getOAuthAdmin, updateOAuthAdmin } from '@/api/client';
 import type { OAuthConfig } from '@/api/types';
 import ThemeManager, { THEMES } from '@/components/ThemeManager';
+import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/Button';
+import { cn, inputCls, labelCls } from '@/lib/utils';
 import { getThemeMode, onThemeChanged, type ThemeMode } from '@/lib/theme';
 
 /** Icon component that never renders stale after server hydration. */
@@ -58,11 +60,11 @@ export default function Settings() {
   const redirectUri = `${window.location.origin}/api/v1/auth/oauth/callback`;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <div>
-        <h1 className="text-xl font-semibold text-primary">Settings</h1>
-        <p className="mt-0.5 text-sm text-secondary">Appearance + Google SSO — configured here, no server edits needed.</p>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader
+        title="Settings"
+        description="Appearance + Google SSO — configured here, no server edits needed."
+      />
 
       {/* Theme manager — user-level preference, synced across devices */}
       <div className="rounded-xl glass-card p-5">
@@ -71,7 +73,7 @@ export default function Settings() {
           <Button
             type="button"
             onClick={() => setThemeOpen(true)}
-            variant="primary"
+            variant="secondary"
             size="lg"
             className="shrink-0"
           >
@@ -118,33 +120,33 @@ export default function Settings() {
 
         <div className="mt-5 space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-secondary">OAuth Client ID</label>
+            <label className={labelCls}>OAuth Client ID</label>
             <input
               value={clientId ?? cfg.client_id}
               onChange={(e) => setClientId(e.target.value)}
               placeholder="1234567890-xxxx.apps.googleusercontent.com"
-              className="h-10 w-full rounded-lg glass-dense px-3 font-mono text-xs outline-none focus:border-accent"
+              className={cn(inputCls, 'font-mono text-xs')}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-secondary">OAuth Client Secret</label>
+            <label className={labelCls}>OAuth Client Secret</label>
             <input
               value={clientSecret}
               onChange={(e) => setClientSecret(e.target.value)}
               placeholder={cfg.has_secret ? '•••••••• (leave blank to keep)' : 'GOCSPX-…'}
               type="password"
-              className="h-10 w-full rounded-lg glass-dense px-3 font-mono text-xs outline-none focus:border-accent"
+              className={cn(inputCls, 'font-mono text-xs')}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-secondary">
+            <label className={labelCls}>
               Allowed domains <span className="normal-case text-muted">(comma-separated; empty = any existing account)</span>
             </label>
             <input
               value={domains ?? cfg.allowed_domains.join(', ')}
               onChange={(e) => setDomains(e.target.value)}
               placeholder="e.g. sonalapparels.in, itms.local"
-              className="h-10 w-full rounded-lg glass-dense px-3 font-mono text-xs outline-none focus:border-accent"
+              className={cn(inputCls, 'font-mono text-xs')}
             />
             <p className="mt-1 text-[11px] text-muted">
               Security default: SSO never auto-creates accounts — it only links to existing users by email. A domain
@@ -153,7 +155,7 @@ export default function Settings() {
           </div>
 
           <div className="rounded-lg glass-dense p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-secondary">Authorized redirect URI (Google Cloud → OAuth client → add this)</p>
+            <p className={labelCls}>Authorized redirect URI (Google Cloud → OAuth client → add this)</p>
             <p className="mt-1 select-all break-all font-mono text-[11px] text-accent">{redirectUri}</p>
           </div>
 

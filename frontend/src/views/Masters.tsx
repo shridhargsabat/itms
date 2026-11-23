@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, Database, LoaderCircle, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
+import { ClipboardList, Database, LoaderCircle, MapPin, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
+import { TABLE_SPEC } from '@/components/tableSpec';
+import DataTable, { type Column } from '@/components/DataTable';
+import EmptyState from '@/components/EmptyState';
+import FilterBar from '@/components/FilterBar';
 import Modal from '@/components/Modal';
+import PageHeader from '@/components/PageHeader';
+import { AssetStatusBadge } from '@/components/TicketBadge';
 import ScrollX from '@/components/ScrollX';
 import { Button } from '@/components/Button';
 import Select from '@/components/Select';
-import DataTable, { type Column } from '@/components/DataTable';
 import { getCachedUser } from '@/api/client';
 import {
   createMasterOption,
@@ -64,40 +69,43 @@ export default function Masters() {
 
   if (me?.role !== 'ADMIN') {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-edge p-12 text-center">
-        <ShieldAlert className="h-8 w-8 text-muted" />
-        <p className="text-sm text-secondary">Only administrators can manage users and master data.</p>
-      </div>
+      <EmptyState
+        icon={ShieldAlert}
+        title="Admins only"
+        description="Only administrators can manage users and master data."
+      />
     );
   }
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-primary">Masters</h1>
-        <p className="mt-0.5 text-sm text-secondary">Users and lookup data powering every dropdown.</p>
-      </div>
+      <PageHeader
+        title="Masters"
+        description="Users and lookup data powering every dropdown."
+      />
 
-      <ScrollX className="pb-1">
-        <div className="flex gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={cn(
-              'flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-3.5 text-sm font-medium transition-colors',
-              tab === t.id
-                ? 'border-indigo-500/50 bg-accent/10 text-accent'
-                : 'glass-dense text-secondary hover:text-primary',
-            )}
-          >
-            {t.id === 'users' ? <Users className="h-4 w-4" /> : <Database className="h-4 w-4" />}
-            {t.label}
-          </button>
-        ))}
-        </div>
-      </ScrollX>
+      <FilterBar>
+        <ScrollX className="w-full pb-1">
+          <div className="flex gap-2">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors',
+                tab === t.id
+                  ? 'bg-elevated text-primary'
+                  : 'text-secondary hover:text-primary',
+              )}
+            >
+              {t.id === 'users' ? <Users className="h-4 w-4" /> : <Database className="h-4 w-4" />}
+              {t.label}
+            </button>
+          ))}
+          </div>
+        </ScrollX>
+      </FilterBar>
 
       {tab === 'users' ? (
         <UsersTab />
@@ -263,7 +271,7 @@ function UsersTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterBar>
         <input
           className={cn(inputCls, 'w-full sm:w-56')}
           placeholder="Search name or email…"
@@ -271,13 +279,13 @@ function UsersTab() {
           onChange={(e) => setParams(e.target.value ? { search: e.target.value } : {}, { replace: true })}
         />
         <Select
-          className="w-auto min-w-[130px]"
+          className="w-full sm:w-auto sm:min-w-[130px]"
           value={role}
           onChange={(v) => setParams(v ? { role: v } : {}, { replace: true })}
           options={[{ value: '', label: 'All Roles' }, ...ROLES.map((r) => ({ value: r, label: r }))]}
         />
         <Select
-          className="w-auto min-w-[150px]"
+          className="w-full sm:w-auto sm:min-w-[150px]"
           value={department}
           onChange={(v) => setParams(v ? { department: v } : {}, { replace: true })}
           options={[
@@ -294,12 +302,28 @@ function UsersTab() {
         >
           New User
         </Button>
-      </div>
+      </FilterBar>
 
       {users.isLoading ? (
         <div className="flex items-center justify-center rounded-xl glass-card py-16">
           <LoaderCircle className="h-6 w-6 animate-spin text-muted" />
         </div>
+      ) : (users.data?.items?.length ?? 0) === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No users match the filters"
+          description="Try widening the search, or add a new user to get started."
+          action={
+            <Button
+              type="button"
+              onClick={openCreate}
+              variant="primary"
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              New User
+            </Button>
+          }
+        />
       ) : (
         <DataTable<UserRecord>
           rows={users.data?.items ?? []}
@@ -442,32 +466,39 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
 
   return (
     <div className="space-y-3">
-      <ScrollX className="rounded-xl glass-dense" innerClassName="max-h-[55vh] overflow-y-auto">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="border-b border-edge bg-surface text-[11px] uppercase tracking-wide text-muted">
+      {!loading && (options ?? []).length === 0 ? (
+        <EmptyState
+          icon={Database}
+          title="No options yet"
+          description="Add the first option below to populate this dropdown."
+        />
+      ) : (
+      <ScrollX className={TABLE_SPEC.shell} innerClassName={TABLE_SPEC.tableScroll}>
+        <table className={cn(TABLE_SPEC.table, TABLE_SPEC.minWidth)}>
+          <thead className={cn('border-b border-edge', TABLE_SPEC.head)}>
             <tr>
-              <th className="sticky top-0 z-10 bg-surface px-4 py-3 font-medium">Label</th>
-              <th className="sticky top-0 z-10 bg-surface px-4 py-3 font-medium">Code</th>
-              <th className="sticky top-0 z-10 w-24 bg-surface px-4 py-3 font-medium">Order</th>
-              <th className="sticky top-0 z-10 w-24 bg-surface px-4 py-3 font-medium">Active</th>
-              <th className="sticky top-0 z-10 w-32 bg-surface px-4 py-3 font-medium" />
+              <th className={TABLE_SPEC.th}>Label</th>
+              <th className={TABLE_SPEC.th}>Code</th>
+              <th className={cn(TABLE_SPEC.th, 'w-24')}>Order</th>
+              <th className={cn(TABLE_SPEC.th, 'w-24')}>Active</th>
+              <th className={cn(TABLE_SPEC.th, 'w-32')} />
             </tr>
           </thead>
-          <tbody className="divide-y divide-edge bg-base">
+          <tbody className={TABLE_SPEC.tbody}>
             {(options ?? []).map((o) => {
               const d = drafts[o.id] ?? { label: o.label, sort_order: o.sort_order };
               const dirty = d.label !== o.label || d.sort_order !== o.sort_order;
               return (
                 <tr key={o.id} className="animate-list-in">
-                  <td className="px-4 py-2.5">
+                  <td className={TABLE_SPEC.td}>
                     <input
                       className={cn(inputCls, 'h-9')}
                       value={d.label}
                       onChange={(e) => setDrafts((prev) => ({ ...prev, [o.id]: { ...d, label: e.target.value } }))}
                     />
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted">{o.code}</td>
-                  <td className="px-4 py-2.5">
+                  <td className={cn(TABLE_SPEC.td, 'font-mono text-xs text-muted')}>{o.code}</td>
+                  <td className={TABLE_SPEC.td}>
                     <input
                       className={cn(inputCls, 'h-9 w-16')}
                       type="number"
@@ -475,7 +506,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                       onChange={(e) => setDrafts((prev) => ({ ...prev, [o.id]: { ...d, sort_order: Number(e.target.value) } }))}
                     />
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className={TABLE_SPEC.td}>
                     <button
                       type="button"
                       onClick={() => saveMut.mutate({ id: o.id, body: { active: !o.active } })}
@@ -493,7 +524,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                       />
                     </button>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className={TABLE_SPEC.td}>
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
@@ -537,16 +568,10 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
                 </tr>
               );
             })}
-            {!loading && (options ?? []).length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
-                  No options yet — add the first one below.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </ScrollX>
+      )}
 
       <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-edge p-3">
         <div>
@@ -681,7 +706,11 @@ function TemplatesTab() {
           </div>
         ))}
         {templates.data?.length === 0 && (
-          <p className="rounded-xl border border-dashed border-edge p-6 text-center text-sm text-muted">No templates yet.</p>
+          <EmptyState
+            icon={ClipboardList}
+            title="No templates yet"
+            description="Create a template above to give requesters a guided starting point."
+          />
         )}
       </div>
     </div>
@@ -782,7 +811,11 @@ function VendorsTab() {
           </div>
         ))}
         {!vendors.isLoading && (vendors.data?.length ?? 0) === 0 && (
-          <div className="rounded-xl border border-dashed border-edge2 p-6 text-center text-xs text-muted">No vendors yet — add your first one.</div>
+          <EmptyState
+            icon={Database}
+            title="No vendors yet"
+            description="Add your first vendor to track AMC dates and claim history."
+          />
         )}
       </div>
 
@@ -790,30 +823,30 @@ function VendorsTab() {
         <Modal title={editing ? 'Edit vendor' : 'Add vendor'} onClose={() => setOpen(false)}>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(editing ? { id: editing.id, input: form } : { input: form }); }}>
             <div>
-              <label className="mb-1 block text-xs font-medium text-secondary">Name *</label>
-              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
+              <label className={labelCls}>Name *</label>
+              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-secondary">Contact name</label>
-                <input value={form.contact_name ?? ''} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
+                <label className={labelCls}>Contact name</label>
+                <input value={form.contact_name ?? ''} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className={inputCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-secondary">Contact email</label>
-                <input type="email" value={form.contact_email ?? ''} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
+                <label className={labelCls}>Contact email</label>
+                <input type="email" value={form.contact_email ?? ''} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} className={inputCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-secondary">Contact phone</label>
-                <input value={form.contact_phone ?? ''} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
+                <label className={labelCls}>Contact phone</label>
+                <input value={form.contact_phone ?? ''} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} className={inputCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-secondary">Support link</label>
-                <input value={form.support_link ?? ''} onChange={(e) => setForm({ ...form, support_link: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
+                <label className={labelCls}>Support link</label>
+                <input value={form.support_link ?? ''} onChange={(e) => setForm({ ...form, support_link: e.target.value })} className={inputCls} />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-secondary">AMC / renewal date</label>
-              <input type="date" value={form.amc_expiry ?? ''} onChange={(e) => setForm({ ...form, amc_expiry: e.target.value })} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
+              <label className={labelCls}>AMC / renewal date</label>
+              <input type="date" value={form.amc_expiry ?? ''} onChange={(e) => setForm({ ...form, amc_expiry: e.target.value })} className={inputCls} />
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="flex justify-end gap-2 pt-1">
@@ -859,8 +892,8 @@ function VendorClaims({ vendorId }: { vendorId: string }) {
       </div>
       {adding && (
         <form className="mb-3 space-y-2 rounded-lg glass-dense p-3" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
-          <textarea required placeholder="Issue / fault (e.g. 'Power port dead — sent for RMA')" value={issue} onChange={(e) => setIssue(e.target.value)} className="w-full rounded-lg glass-dense px-3 py-2 text-sm outline-none focus:border-accent" rows={2} />
-          <input placeholder="Outcome (optional — e.g. 'Motherboard replaced')" value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent" />
+          <textarea required placeholder="Issue / fault (e.g. 'Power port dead — sent for RMA')" value={issue} onChange={(e) => setIssue(e.target.value)} className={cn(inputCls, 'min-h-[56px] resize-y')} rows={2} />
+          <input placeholder="Outcome (optional — e.g. 'Motherboard replaced')" value={outcome} onChange={(e) => setOutcome(e.target.value)} className={inputCls} />
           <label className="flex items-center gap-2 text-xs text-secondary">
             <input type="checkbox" checked={replacement} onChange={(e) => setReplacement(e.target.checked)} className="accent-indigo-500" /> Replacement unit provided
           </label>
@@ -959,44 +992,52 @@ function LocationsTab() {
   const rows = locations.data ?? [];
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <FilterBar>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search site / building / floor / room…"
-          className="h-9 min-w-0 flex-1 rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent"
+          className={cn(inputCls, 'min-w-0 flex-1')}
         />
         <Button
           onClick={() => { setEditing(null); setForm(EMPTY_LOCATION); setError(''); setOpen(true); }}
           variant="primary"
           size="sm"
           className="shrink-0"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          + Add location
+          Add location
         </Button>
-      </div>
+      </FilterBar>
 
       {error && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">{error}</p>}
 
-      <div className="max-h-[55vh] overflow-x-auto overflow-y-auto rounded-xl glass-dense">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-surface text-[11px] uppercase tracking-wide text-muted">
+      {!locations.isLoading && rows.length === 0 ? (
+        <EmptyState
+          icon={MapPin}
+          title="No locations yet"
+          description="Add your first site, building, floor, or room to start tracking where assets live."
+        />
+      ) : (
+      <ScrollX className={TABLE_SPEC.shell} innerClassName={cn(TABLE_SPEC.tableScroll, 'overflow-x-auto')}>
+        <table className={cn(TABLE_SPEC.table, TABLE_SPEC.minWidth)}>
+          <thead className={cn('border-b border-edge', TABLE_SPEC.head)}>
             <tr>
-              <th className="sticky top-0 z-10 bg-surface px-3 py-2">Location path</th>
-              <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">Assets</th>
-              <th className="sticky top-0 z-10 bg-surface px-3 py-2 text-right">Actions</th>
+              <th className={TABLE_SPEC.th}>Location path</th>
+              <th className={cn(TABLE_SPEC.th, 'text-right')}>Assets</th>
+              <th className={cn(TABLE_SPEC.th, 'text-right')}>Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-edge/60">
+          <tbody className={TABLE_SPEC.tbody}>
             {rows.map((l) => (
               <tr key={l.id} className="hover:bg-elevated">
-                <td className="px-3 py-2">
+                <td className={TABLE_SPEC.td}>
                   <button className="text-left hover:text-accent" onClick={() => setDetail(l)}>
                     {fmtLocation(l) || '—'}
                   </button>
                 </td>
-                <td className="px-3 py-2 text-right text-xs text-secondary">{l.asset_count}</td>
-                <td className="px-3 py-2 text-right">
+                <td className={cn(TABLE_SPEC.td, 'text-right tabular-nums text-secondary')}>{l.asset_count}</td>
+                <td className={cn(TABLE_SPEC.td, 'text-right')}>
                   <Button
                     onClick={() => { setEditing(l); setForm({ site: l.site, building: l.building, floor: l.floor, room: l.room }); setError(''); setOpen(true); }}
                     variant="text"
@@ -1008,25 +1049,23 @@ function LocationsTab() {
                 </td>
               </tr>
             ))}
-            {!locations.isLoading && rows.length === 0 && (
-              <tr><td colSpan={3} className="px-3 py-8 text-center text-xs text-muted">No locations yet — add your first site/building/floor/room.</td></tr>
-            )}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
+      )}
 
       {open && (
         <Modal title={editing ? 'Edit location' : 'Add location'} onClose={() => setOpen(false)}>
           <div className="space-y-3 p-4">
             {(['site', 'building', 'floor', 'room'] as const).map((k) => (
               <label key={k} className="block">
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-secondary">{k}</span>
+                <span className={labelCls}>{k}</span>
                 <input
                   value={form[k]}
                   onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
                   placeholder={`e.g. ${k === 'site' ? 'Main Plant' : k === 'building' ? 'Factory A' : k === 'floor' ? 'Floor 2' : 'Server Room'}`}
                   autoFocus={k === 'site'}
-                  className="h-9 w-full rounded-lg glass-dense px-3 text-sm outline-none focus:border-accent"
+                  className={inputCls}
                 />
               </label>
             ))}
@@ -1055,7 +1094,7 @@ function LocationsTab() {
                 <div key={a.id} className="flex items-center justify-between rounded-lg glass-dense px-3 py-2 text-xs">
                   <span className="font-mono">{a.asset_tag}</span>
                   <span className="truncate px-2 text-secondary">{a.name}</span>
-                  <span className="text-secondary">{a.status}</span>
+                  <AssetStatusBadge status={a.status} />
                 </div>
               ))}
               {detailAssets.isLoading && <p className="text-xs text-muted">Loading…</p>}

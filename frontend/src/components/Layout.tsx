@@ -118,7 +118,7 @@ export default function Layout() {
       <UpdateToast />
       <BottomNav />
       {/* Mobile top bar (sidebar is hidden <lg): brand + user + logout */}
-      <header className="sticky top-0 z-40 flex items-center gap-2 glass-chrome px-4 pt-[env(safe-area-inset-top)] lg:hidden">
+      <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-edge glass-chrome px-4 pt-[env(safe-area-inset-top)] lg:hidden">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
           <Network className="h-5 w-5" />
         </span>

@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { changePassword } from '@/api/client';
 import { inputCls, labelCls } from '@/lib/utils';
 import { Button } from '@/components/Button';
+import PageHeader from '@/components/PageHeader';
 
 // P1-6: self-service change-own-password page.
 export default function Account() {
@@ -25,11 +26,13 @@ export default function Account() {
   });
 
   return (
-    <div className="mx-auto mt-8 w-full max-w-md px-4">
-      <h1 className="text-xl font-bold text-primary">Account</h1>
-      <p className="mt-1 text-sm text-muted">Update your sign-in password.</p>
+    <div className="mx-auto w-full max-w-md">
+      <PageHeader
+        title="Account"
+        description="Update your sign-in password."
+      />
       <form
-        className="mt-6 space-y-4 rounded-2xl glass-card p-6"
+        className="space-y-4 rounded-xl glass-card p-6"
         onSubmit={(e) => {
           e.preventDefault();
           if (pw.length < 8) { setErr('Password must be at least 8 characters.'); return; }
