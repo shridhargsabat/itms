@@ -27,7 +27,7 @@ export default function AddAssetButton({ className }: { className?: string }) {
         onClick={() => setOpen(true)}
         variant="primary"
         size="lg"
-        className={cn(className)}
+        className={cn('liquid-glass-btn-primary', className)}
         leftIcon={<Plus className="h-4 w-4" />}
       >
         Add Asset
