@@ -9,12 +9,12 @@
       // it during parse, so it must already exist.)
       (function () {
         try {
-          var m = localStorage.getItem('itms_theme') || 'paper';
-          // Unknown strings fall through to the paper branch (same as missing).
+          var m = localStorage.getItem('itms_theme') || 'light';
+          // Unknown strings fall through to the light branch (same as missing).
           var known = ['paper', 'console', 'bold', 'shell', 'terminal', 'clarity', 'clarity-dark', 'ledgerly', 'ledgerly-light', 'light', 'dark', 'system'];
-          if (known.indexOf(m) === -1) m = 'paper';
+          if (known.indexOf(m) === -1) m = 'light';
           var d = document.documentElement;
-          var c = '#f6f5f1';
+          var c = '#ffffff';
           if (m === 'paper') {
             d.classList.add('theme-paper');
             c = '#f6f5f1';
