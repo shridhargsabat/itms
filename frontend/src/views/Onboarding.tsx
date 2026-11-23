@@ -190,7 +190,7 @@ export default function Onboarding() {
             onClick={() => setTab(t)}
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-              tab === t ? 'bg-accent text-white' : 'text-secondary hover:text-primary',
+              tab === t ? 'bg-accent text-on-accent' : 'text-secondary hover:text-primary',
             )}
           >
             {t === 'ONBOARDING' ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}

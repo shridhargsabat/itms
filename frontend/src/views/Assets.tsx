@@ -417,7 +417,7 @@ export default function Assets() {
                 setFile(e.target.files?.[0] ?? null);
                 setImportResult(null);
               }}
-              className="block w-full cursor-pointer rounded-lg glass-dense border-dashed p-3 text-sm text-secondary file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:text-white hover:border-accent/50"
+              className="block w-full cursor-pointer rounded-lg glass-dense border-dashed p-3 text-sm text-secondary file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:text-on-accent hover:border-accent/50"
             />
             {file && (
               <p className="text-xs text-secondary">

@@ -147,6 +147,15 @@
   --t-font-mono: var(--font-mono);
 }
 
+/* Legacy on-accent ink — white in every legacy theme (light/dark/ledgerly),
+   exactly the pre-existing `text-white` on accent fills, so legacy primaries
+   render pixel-identically. New themes override per block below. Same
+   separate-rule idiom as the font rule (legacy blocks above never edited),
+   and likewise BEFORE the .theme-* blocks so they win ties. */
+:root, .ledgerly-dark, .ledgerly-light, .theme-light {
+  --t-on-accent: #ffffff;
+}
+
 /* Paper — warm paper light. Mockup 001: paper #f6f5f1, ink #1c1917,
    ink-soft #57534e, line #e2ddd2, moss #2f6b3c. Opaque: glass tokens read
    near-solid; not in the freeze list. */
@@ -164,6 +173,7 @@
   --t-muted: #6f6a61;
   --t-accent: #2f6b3c;
   --t-accent-strong: #1e4d2a;
+  --t-on-accent: #ffffff;
   --t-glass-hi: rgb(255 255 255 / 0.85);
   --t-glass-edge: #d8d4c9;
   --t-glass-shadow: rgb(15 23 42 / 0.14);
@@ -189,6 +199,7 @@
   --t-muted: #8b8b93;
   --t-accent: #10b981;
   --t-accent-strong: #0c8a62;
+  --t-on-accent: #04120c;
   --t-glass-hi: rgb(255 255 255 / 0.12);
   --t-glass-edge: #26262d;
   --t-glass-shadow: rgb(0 0 0 / 0.5);
@@ -214,6 +225,7 @@
   --t-muted: #a79fc0;
   --t-accent: #d4ff3f;
   --t-accent-strong: #9cbd2e;
+  --t-on-accent: #131a05;
   --t-glass-hi: rgb(255 255 255 / 0.14);
   --t-glass-edge: rgb(255 255 255 / 0.12);
   --t-glass-shadow: rgb(0 0 0 / 0.5);
@@ -240,6 +252,7 @@
   --t-muted: #5b6a82;
   --t-accent: #4f46e5;
   --t-accent-strong: #4338ca;
+  --t-on-accent: #ffffff;
   --t-glass-hi: rgb(255 255 255 / 0.75);
   --t-glass-edge: rgb(255 255 255 / 0.65);
   --t-glass-shadow: rgb(15 23 42 / 0.14);
@@ -265,6 +278,7 @@
   --t-muted: #8ba89a;
   --t-accent: #4ade80;
   --t-accent-strong: #22c55e;
+  --t-on-accent: #04120a;
   --t-glass-hi: rgb(215 227 220 / 0.08);
   --t-glass-edge: var(--t-edge2);
   --t-glass-shadow: rgb(0 0 0 / 0.55);
@@ -275,11 +289,14 @@
 
 /* Font utilities: Tailwind v4 generates font-display / font-body /
    font-mono2 from these keys. (mono2: leaves the default font-mono
-   utility untouched.) Separate @theme block: the legacy one is unedited. */
+   utility untouched.) --color-on-accent likewise generates text-on-accent
+   (task-15 sweep: per-theme ink for white-on-accent fills). Separate @theme
+   block: the legacy one is unedited. */
 @theme {
   --font-display: var(--t-font-display);
   --font-body: var(--t-font-body);
   --font-mono2: var(--t-font-mono);
+  --color-on-accent: var(--t-on-accent);
 }
 
 @layer base {

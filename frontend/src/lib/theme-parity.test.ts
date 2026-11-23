@@ -73,6 +73,32 @@ describe('css token contract', () => {
       expect(ratio(hex(cls,'muted'),base)).toBeGreaterThanOrEqual(4.5);
     });
   });
+  it('every theme block defines --t-on-accent (task-15 sweep)', () => {
+    // White-on-accent text is unreadable on bold lime / terminal green /
+    // console emerald — each theme needs its own on-accent ink.
+    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal'].forEach((cls) => {
+      const block = css.match(new RegExp(`\\.${cls}\\s*{([^}]*)}`, 's'))?.[1] ?? '';
+      expect(block).toContain('--t-on-accent:');
+    });
+    // Legacy default keeps pre-existing white-on-accent (pixel-identical).
+    // (All :root/ledgerly legacy-selector blocks are scanned: the default
+    // lives in its own rule after the font rule, same selector idiom.)
+    const legacy = [...css.matchAll(/:root,\s*\.ledgerly-dark,\s*\.ledgerly-light[^{]*{([^}]*)}/gs)]
+      .map((m) => m[1]).join('\n');
+    expect(legacy).toContain('--t-on-accent: #ffffff;');
+    // Wired as a semantic color so components use text-on-accent.
+    expect(css).toContain('--color-on-accent: var(--t-on-accent);');
+  });
+  it('on-accent hits AA on accent (all new themes)', () => {
+    const hex = (cls: string, t: string) =>
+      css.match(new RegExp(`\\.${cls}\\s*{[^}]*--t-${t}:\\s*(#[0-9a-fA-F]{6})`, 's'))?.[1] ?? '';
+    const lum = (h: string) => { const c = [0,2,4].map((i) => { const v = parseInt(h.slice(1+i,3+i),16)/255;
+      return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
+    const ratio = (a: string, b: string) => { const [x,y] = [lum(a),lum(b)].sort((p,q)=>q-p); return (x+0.05)/(y+0.05); };
+    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal'].forEach((cls) => {
+      expect(ratio(hex(cls,'on-accent'),hex(cls,'accent'))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
 });
 
 describe('hardcoded-color sweep (task 14)', () => {

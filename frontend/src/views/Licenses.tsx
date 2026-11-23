@@ -172,7 +172,7 @@ export default function Licenses() {
             onClick={() => setTab(t.id)}
             className={cn(
               'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition',
-              tab === t.id ? 'bg-accent text-white' : 'text-secondary hover:text-primary',
+              tab === t.id ? 'bg-accent text-on-accent' : 'text-secondary hover:text-primary',
             )}
           >
             {t.label}

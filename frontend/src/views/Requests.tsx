@@ -136,7 +136,7 @@ export default function Requests() {
             onClick={() => setTab(t.id)}
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-              tab === t.id ? 'bg-accent text-white' : 'text-secondary hover:text-primary',
+              tab === t.id ? 'bg-accent text-on-accent' : 'text-secondary hover:text-primary',
             )}
           >
             {t.label}
@@ -284,7 +284,7 @@ function RequestCard({
           {isAgent && r.status === 'IN_PROGRESS' && (
             <button
               onClick={() => onAction('complete')}
-              className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-white hover:opacity-90"
+              className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-on-accent hover:opacity-90"
             >
               <CheckCircle2 className="h-3.5 w-3.5" /> Complete
             </button>
