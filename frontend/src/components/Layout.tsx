@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import { LiquidGlassFilterBank } from '@/components/LiquidGlass';
 import ThemeToggle from '@/components/ThemeToggle';
 import { Button } from '@/components/Button';
 import { applyTheme, watchSystemTheme } from '@/lib/theme';
@@ -112,6 +113,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen">
       <AnimatedBackground />
+      <LiquidGlassFilterBank />
       <OfflineBanner />
       <UpdateToast />
       <BottomNav />

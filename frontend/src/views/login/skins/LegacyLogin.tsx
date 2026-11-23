@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, KeyRound, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import { LiquidGlassFilterBank, LiquidGlassSurface } from '@/components/LiquidGlass';
 import { useLogin } from '../useLogin';
 
 /**
@@ -30,11 +31,12 @@ export default function LegacyLogin() {
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-base px-4">
       <AnimatedBackground />
+      <LiquidGlassFilterBank />
 
       {/* glass card */}
       <div className="animate-fade-up relative w-full max-w-md">
         <div className="animate-pulse-ring rounded-2xl p-px">
-          <div className="rounded-2xl glass-card p-8">
+          <LiquidGlassSurface variant="card" elastic interactive className="rounded-2xl p-8">
             <div className="mb-7 flex flex-col items-center gap-3">
               <div className="relative">
                 <span className="animate-ping-slow absolute inset-0 rounded-2xl bg-accent/30" />
@@ -150,7 +152,7 @@ export default function LegacyLogin() {
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400/80" />
               Real auth — argon2 hashes + revocable sessions · build {__BUILD_SHA__}
             </p>
-          </div>
+          </LiquidGlassSurface>
         </div>
       </div>
     </div>
