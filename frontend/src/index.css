@@ -448,6 +448,167 @@
   backdrop-filter: url(#itms-liquid-glass-refract) blur(20px) saturate(175%);
 }
 
+/* ---------- Apple Liquid Glass tokens (additive-only) ----------
+   Glass-scoped panel/subcard/pill/btn-primary for the Liquid Glass
+   themes (light/dark/system). Day rules ride the light guard, night
+   rules the dark guard (chains copied verbatim from the refraction
+   selectors above); the 9 non-glass themes fall back to token
+   surfaces below. Later tasks consume these four classes. No existing
+   block above or below is edited — this section only adds. */
+
+/* Day panel: radius 26px. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .liquid-glass-panel {
+  background: rgba(255,255,255,0.50);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  backdrop-filter: blur(40px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.78);
+  border-radius: 26px;
+  box-shadow: inset 0 1.5px 1px rgba(255,255,255,0.95), 0 12px 36px rgba(15,23,42,0.08);
+}
+
+/* Day subcard: radius 20px, no backdrop-filter (spec §3B / reference). */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .liquid-glass-subcard {
+  background: rgba(255,255,255,0.62);
+  border: 1px solid rgba(255,255,255,0.85);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 4px 14px rgba(15,23,42,0.04);
+}
+
+/* Day pill: radius full. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .liquid-glass-pill {
+  background: rgba(255,255,255,0.62);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.85);
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 6px 20px rgba(15,23,42,0.06);
+}
+
+/* Night panel (spec §3B): blur/radius carry over from day. */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .liquid-glass-panel {
+  background: rgba(255,255,255,0.09);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  backdrop-filter: blur(40px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 26px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.35), 0 16px 40px rgba(0,0,0,0.45);
+}
+
+/* Night subcard (spec §3B): no backdrop-filter, inset-only shadow. */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .liquid-glass-subcard {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.20);
+}
+
+/* Night pill (spec §3B): inset-only shadow. */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .liquid-glass-pill {
+  background: rgba(255,255,255,0.10);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.30);
+}
+
+/* Primary glass button: unscoped (solid gradient, no transparency to
+   guard); non-glass themes override to --t-accent below. Gradient runs
+   top #0A84FF → bottom #0066D6 (direction unspecified in the brief). */
+.liquid-glass-btn-primary {
+  background: linear-gradient(180deg, #0A84FF, #0066D6);
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.5);
+  color: #fff;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.liquid-glass-btn-primary:hover {
+  filter: brightness(1.06);
+}
+.liquid-glass-btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Non-glass fallbacks: token surfaces, same radii, no backdrop-filter.
+   box-shadow: none is a defensive no-op (no glass shadow reaches these
+   scopes — the glass rules are guard-excluded). */
+.theme-paper .liquid-glass-panel,
+.theme-console .liquid-glass-panel,
+.theme-bold .liquid-glass-panel,
+.theme-shell .liquid-glass-panel,
+.theme-terminal .liquid-glass-panel,
+.theme-clarity .liquid-glass-panel,
+.theme-clarity-dark .liquid-glass-panel,
+.ledgerly-dark .liquid-glass-panel,
+.ledgerly-light .liquid-glass-panel {
+  background: var(--t-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--t-edge);
+  border-radius: 26px;
+  box-shadow: none;
+}
+.theme-paper .liquid-glass-subcard,
+.theme-console .liquid-glass-subcard,
+.theme-bold .liquid-glass-subcard,
+.theme-shell .liquid-glass-subcard,
+.theme-terminal .liquid-glass-subcard,
+.theme-clarity .liquid-glass-subcard,
+.theme-clarity-dark .liquid-glass-subcard,
+.ledgerly-dark .liquid-glass-subcard,
+.ledgerly-light .liquid-glass-subcard {
+  background: var(--t-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--t-edge);
+  border-radius: 20px;
+  box-shadow: none;
+}
+.theme-paper .liquid-glass-pill,
+.theme-console .liquid-glass-pill,
+.theme-bold .liquid-glass-pill,
+.theme-shell .liquid-glass-pill,
+.theme-terminal .liquid-glass-pill,
+.theme-clarity .liquid-glass-pill,
+.theme-clarity-dark .liquid-glass-pill,
+.ledgerly-dark .liquid-glass-pill,
+.ledgerly-light .liquid-glass-pill {
+  background: var(--t-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--t-edge);
+  border-radius: 9999px;
+  box-shadow: none;
+}
+.theme-paper .liquid-glass-btn-primary,
+.theme-console .liquid-glass-btn-primary,
+.theme-bold .liquid-glass-btn-primary,
+.theme-shell .liquid-glass-btn-primary,
+.theme-terminal .liquid-glass-btn-primary,
+.theme-clarity .liquid-glass-btn-primary,
+.theme-clarity-dark .liquid-glass-btn-primary,
+.ledgerly-dark .liquid-glass-btn-primary,
+.ledgerly-light .liquid-glass-btn-primary {
+  background: var(--t-accent);
+  color: #fff;
+}
+
+/* Transparency + print guards for the four classes. New appended
+   blocks (same declarations as .glass-card in the existing guards) —
+   the existing guard blocks are left unedited per append-only. */
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass-panel, .liquid-glass-subcard, .liquid-glass-pill, .liquid-glass-btn-primary {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    background: var(--t-surface); box-shadow: none;
+  }
+}
+@media print {
+  .liquid-glass-panel, .liquid-glass-subcard, .liquid-glass-pill, .liquid-glass-btn-primary {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    background: #fff !important; box-shadow: none !important;
+  }
+}
+
 /* Liquid Glass Light login title contrast fix:
    LegacyLogin's h1 uses from-indigo-300 via-white to-indigo-300 (designed for
    dark mode). When .dark is absent, remap the gradient stops to deep indigo/
