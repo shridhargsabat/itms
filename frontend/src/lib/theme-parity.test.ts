@@ -51,9 +51,10 @@ describe('css token contract', () => {
   });
   it('legacy font vars delegate to the tailwind stacks (pixel-identity)', () => {
     // Task-15 pixel-proof: legacy --t-font-* must resolve EXACTLY to the
-    // preflight stacks. A literal copy drifted once (ui-sans-serif/system-ui
-    // vs tailwind --font-sans) and rasterized 1 LSB off on Linux — delegation
-    // to the theme vars cannot drift.
+    // preflight stacks. A literal copy diverged once (ui-sans-serif/system-ui
+    // vs tailwind --font-sans) — latent cross-platform restyle risk, zero
+    // pixels here but wrong on principle — delegation to the theme vars
+    // cannot drift.
     const legacy = css.match(/:root,\s*\.ledgerly-dark,\s*\.ledgerly-light,\s*\.theme-light\s*{([^}]*)}/s)?.[1] ?? '';
     expect(legacy).toContain('--t-font-display: var(--font-sans)');
     expect(legacy).toContain('--t-font-body: var(--font-sans)');

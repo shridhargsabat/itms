@@ -132,8 +132,9 @@
    pair with .dark (see index.html FOUC script + theme registry). */
 
 /* Legacy font vars — DELEGATE to tailwind's own theme stacks (never a literal
-   copy: a literal ui-sans-serif/system-ui copy drifted from preflight's
-   -apple-system stack and rasterized 1 LSB off on Linux — task-15 pixel-proof),
+   copy: a literal ui-sans-serif/system-ui copy diverged as a string from
+   preflight's -apple-system stack — latent cross-platform restyle risk —
+   so delegation removes the drift class entirely; task-15 pixel-proof),
    so `body { font-family: var(--t-font-body) }` renders legacy themes
    pixel-identically. Separate rule: legacy blocks above are never edited.
    (.dark inherits these from :root.)
