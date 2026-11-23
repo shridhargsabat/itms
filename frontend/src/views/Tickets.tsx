@@ -421,7 +421,7 @@ export default function Tickets() {
                 {TICKET_STATUSES.map((st) => {
                   const items = rows.filter((t) => t.status === st);
                   return (
-                    <div key={st} className="min-w-[240px] snap-start rounded-xl glass-dense p-3 md:min-w-0">
+                    <div key={st} className="min-w-[240px] snap-start rounded-xl glass-dense liquid-glass-panel p-3 md:min-w-0">
                       <div className="mb-3 flex items-center justify-between px-1">
                         <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
                           {st.replace('_', ' ')}
@@ -437,7 +437,7 @@ export default function Tickets() {
                             type="button"
                             onClick={() => setSelectedId(t.id)}
                             className={cn(
-                              'animate-list-in w-full rounded-lg glass-card p-3 text-left transition-colors',
+                              'animate-list-in w-full rounded-lg glass-card liquid-glass-subcard p-3 text-left transition-colors',
                               selectedId === t.id && 'border-indigo-500/60',
                             )}
                             style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
@@ -502,7 +502,7 @@ export default function Tickets() {
                 </button>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-5">
-            <div className="mt-3 rounded-lg glass-card p-2.5">
+            <div className="mt-3 rounded-lg glass-card liquid-glass-subcard p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
                   SLA · {SLA_HOURS[selected.priority] ?? 24}h policy
@@ -534,7 +534,7 @@ export default function Tickets() {
                 </span>
               </div>
               {selected.asset_id && (
-                <div className="flex items-center gap-2 rounded-lg glass-card px-3 py-2">
+                <div className="flex items-center gap-2 rounded-lg glass-card liquid-glass-subcard px-3 py-2">
                   <Link2 className="h-4 w-4 shrink-0 text-accent" />
                   <div className="min-w-0">
                     <p className="truncate text-xs text-primary">

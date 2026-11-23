@@ -47,7 +47,7 @@ function BucketSection({
         <meta.icon className="h-4 w-4" /> {meta.label}
         <span className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary">{total}</span>
       </h2>
-      <div className="overflow-hidden rounded-xl glass-card">
+      <div className="overflow-hidden rounded-xl glass-card liquid-glass-panel">
         {pageRows.map((a, i) => (
           <button
             key={a.id}

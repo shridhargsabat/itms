@@ -1145,3 +1145,44 @@
   background-color: rgb(48 209 88 / 0.14);
   --tw-ring-color: rgb(48 209 88 / 0.40);
 }
+
+/* ---------- Task 10: CMDB glass scope — root tag + depth pill (appended) --
+   Glass scope only: day rules ride the light guard chain, night rules the
+   dark guard chain (copied verbatim from the Task 4/5/6 selectors above). The
+   guard chains exclude all 9 non-glass theme classes, so every other theme
+   keeps the CMDB.tsx token classes with zero per-theme rules (R9: no
+   affirmative .theme-X selectors here at all). Unlayered, so these beat the
+   layered Tailwind utilities.
+   Root tag: Apple blue #007AFF day and night (reference hardcodes it).
+   Depth pill: #AF52DE `DEPTH n` pill (reference verbatim: rounded-full
+   bg-[#AF52DE]/20 text-[#AF52DE] font-mono text-[11px] font-bold). The TSX
+   keeps its "depth n" text and token classes — text-transform uppercases it
+   in glass scope only, so the diff stays class-only. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .cmdb-root-tag {
+  color: #007AFF;
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .cmdb-depth {
+  color: #AF52DE;
+  background-color: rgb(175 82 222 / 0.20);
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .cmdb-root-tag {
+  color: #007AFF;
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .cmdb-depth {
+  color: #AF52DE;
+  background-color: rgb(175 82 222 / 0.20);
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

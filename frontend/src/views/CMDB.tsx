@@ -86,7 +86,7 @@ export default function CMDB() {
       />
 
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-        <div className="min-w-0 rounded-xl glass-card p-3">
+        <div className="min-w-0 rounded-xl glass-card liquid-glass-panel rounded-[26px] p-3">
           <div className="mb-2 flex items-center gap-2 px-2 py-1">
             <Network className="h-4 w-4 text-secondary" />
             <h2 className="text-xs font-semibold uppercase tracking-wide text-secondary">
@@ -140,15 +140,15 @@ export default function CMDB() {
 
         <div className="min-w-0 space-y-4">
           {impact.isLoading && (
-            <div className="flex h-40 items-center justify-center rounded-xl glass-card text-muted">
+            <div className="flex h-40 items-center justify-center rounded-xl glass-card liquid-glass-panel rounded-[26px] text-muted">
               <LoaderCircle className="h-5 w-5 animate-spin" />
             </div>
           )}
           {impact.data && (
-            <div className="rounded-xl glass-card">
+            <div className="rounded-xl glass-card liquid-glass-panel rounded-[26px]">
               <div className="border-b border-edge px-5 py-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs text-accent">
+                  <span className="font-mono text-xs text-accent cmdb-root-tag">
                     {root?.asset_tag ?? impact.data.root_asset_id}
                   </span>
                   {root && <AssetStatusBadge status={root.status} />}
@@ -185,7 +185,7 @@ export default function CMDB() {
                         <span className="hidden text-xs text-muted sm:inline">
                           {a.category.replace('_', ' ')}
                         </span>
-                        <span className="ml-auto shrink-0 rounded bg-elevated px-1.5 py-0.5 text-[10px] text-secondary">
+                        <span className="ml-auto shrink-0 rounded bg-elevated px-1.5 py-0.5 text-[10px] text-secondary cmdb-depth">
                           depth {a.depth}
                         </span>
                       </div>
@@ -196,7 +196,7 @@ export default function CMDB() {
             </div>
           )}
 
-          <div className="rounded-xl glass-card">
+          <div className="rounded-xl glass-card liquid-glass-panel rounded-[26px]">
             <div className="flex items-center gap-2 border-b border-edge px-5 py-4">
               <GitBranch className="h-4 w-4 text-secondary" />
               <h2 className="text-sm font-semibold text-primary">Relationships</h2>
