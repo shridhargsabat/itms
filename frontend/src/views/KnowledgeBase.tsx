@@ -10,6 +10,9 @@ import {
 import { getCachedUser } from '@/api/client';
 import { cn, formatDate, inputCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
+import EmptyState from '@/components/EmptyState';
+import FilterBar from '@/components/FilterBar';
+import PageHeader from '@/components/PageHeader';
 import PaginationFooter from '@/components/PaginationFooter';
 import { Button } from '@/components/Button';
 import type { KbArticle } from '@/api/types';
@@ -58,26 +61,24 @@ export default function KnowledgeBase() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="flex items-center gap-3">
-        <BookOpen className="h-6 w-6 text-secondary" />
-        <div>
-          <h1 className="text-xl font-bold text-primary">Knowledge Base</h1>
-          <p className="text-xs text-muted">Solutions by ticket type · canned responses for agents</p>
-        </div>
-        {isStaff && (
-          <Button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="ml-auto"
-            variant="primary"
-            leftIcon={<Plus className="h-4 w-4" />}
-          >
-            New article
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Knowledge Base"
+        description="Solutions by ticket type · canned responses for agents"
+        actions={
+          isStaff ? (
+            <Button
+              type="button"
+              onClick={() => setCreating(true)}
+              variant="primary"
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              New article
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <FilterBar>
         {['ALL', ...TYPES].map((t) => (
           <button
             key={t}
@@ -86,8 +87,8 @@ export default function KnowledgeBase() {
             className={cn(
               'rounded-full border px-3 py-1 text-xs transition-colors',
               typeFilter === t
-                ? 'border-indigo-500/60 bg-indigo-500/15 text-accent'
-                : 'border-edge text-muted hover:border-edge2 hover:text-primary',
+                ? 'border-edge2 bg-elevated font-medium text-primary'
+                : 'border-edge text-secondary hover:text-primary',
             )}
           >
             {t === 'ALL' ? 'All types' : t}
@@ -102,7 +103,7 @@ export default function KnowledgeBase() {
             className={cn(inputCls, 'w-56 pl-8')}
           />
         </div>
-      </div>
+      </FilterBar>
 
       {tab === 'canned' && (
         <div className="mt-3 flex items-center gap-2">
@@ -137,20 +138,38 @@ export default function KnowledgeBase() {
           <div className="space-y-2">
             {articles.isLoading && <p className="text-sm text-muted">Loading…</p>}
             {!articles.isLoading && (articles.data?.items.length ?? 0) === 0 && (
-              <p className="rounded-xl glass-card border-dashed p-8 text-center text-sm text-muted">
-                No articles yet{isStaff ? ' — capture your first resolved ticket via “Convert to article”' : ''}.
-              </p>
+              <EmptyState
+                icon={BookOpen}
+                title="No articles yet"
+                description={
+                  isStaff
+                    ? 'Capture your first resolved ticket via “Convert to article”.'
+                    : 'No solutions match this search. Try different keywords.'
+                }
+                action={
+                  isStaff ? (
+                    <Button
+                      type="button"
+                      onClick={() => setCreating(true)}
+                      variant="primary"
+                      leftIcon={<Plus className="h-4 w-4" />}
+                    >
+                      New article
+                    </Button>
+                  ) : undefined
+                }
+              />
             )}
             {articles.data?.items.map((a) => (
               <div key={a.id} className={cn(
-                'rounded-xl glass-card p-4',
-                a.id === openId && 'border-indigo-500/60 ring-1 ring-indigo-500/40',
+                'rounded-xl border border-edge bg-surface p-4',
+                a.id === openId && 'border-accent ring-1 ring-accent/30',
               )}>
                 <div className="flex items-start gap-3">
                   <FileText className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                      <span className="rounded-full bg-elevated px-2 py-0.5 text-[10px] font-medium text-secondary">
                         {a.ticket_type}
                       </span>
                       {a.source_ticket_id && (
@@ -190,7 +209,7 @@ export default function KnowledgeBase() {
         ) : (
           <div className="space-y-2">
             {canned.data?.map((c) => (
-              <div key={c.id} className="rounded-xl glass-card p-4">
+              <div key={c.id} className="rounded-xl border border-edge bg-surface p-4">
                 <div className="flex items-start gap-3">
                   <Zap className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
                   <div className="min-w-0 flex-1">
@@ -207,9 +226,23 @@ export default function KnowledgeBase() {
               </div>
             ))}
             {canned.data?.length === 0 && (
-              <p className="rounded-xl glass-card border-dashed p-8 text-center text-sm text-muted">
-                No canned responses yet.
-              </p>
+              <EmptyState
+                icon={Zap}
+                title="No canned responses yet"
+                description="Create reusable replies agents can insert into ticket comments."
+                action={
+                  isStaff ? (
+                    <Button
+                      type="button"
+                      onClick={() => setShowCannedForm(true)}
+                      variant="primary"
+                      leftIcon={<Plus className="h-4 w-4" />}
+                    >
+                      New canned response
+                    </Button>
+                  ) : undefined
+                }
+              />
             )}
           </div>
         )}
@@ -247,7 +280,7 @@ function ArticleForm({ article, onClose }: { article: KbArticle | null; onClose:
   });
 
   return (
-    <div className="mt-4 rounded-xl glass-card p-4">
+    <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
       <h2 className="text-sm font-bold text-primary">{article ? 'Edit article' : 'New article'}</h2>
       <div className="mt-3 space-y-3">
         <select value={type} onChange={(e) => setType(e.target.value)} className={cn(inputCls, 'w-48')}>
@@ -293,7 +326,7 @@ function CannedForm({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <div className="mt-4 rounded-xl glass-card p-4">
+    <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
       <h2 className="text-sm font-bold text-primary">New canned response</h2>
       <div className="mt-3 space-y-3">
         <input className={inputCls} placeholder="Title (e.g. Password reset steps)" value={title}

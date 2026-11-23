@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Clock,
+  Inbox,
   LoaderCircle,
   Plus,
   ShieldCheck,
@@ -13,7 +14,10 @@ import {
 } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
+import EmptyState from '@/components/EmptyState';
+import FilterBar from '@/components/FilterBar';
 import Modal from '@/components/Modal';
+import PageHeader from '@/components/PageHeader';
 import PaginationFooter from '@/components/PaginationFooter';
 import Select from '@/components/Select';
 import { Button } from '@/components/Button';
@@ -112,31 +116,29 @@ export default function Requests() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">Service Requests</h1>
-          <p className="text-xs text-secondary">
-            Raise a structured IT request instead of a corridor / WhatsApp ask.
-          </p>
-        </div>
-        <Button
-          onClick={() => setCreating(true)}
-          variant="primary"
-          leftIcon={<Plus className="h-4 w-4" />}
-        >
-          New Request
-        </Button>
-      </div>
+      <PageHeader
+        title="Service Requests"
+        description="Raise a structured IT request instead of a corridor / WhatsApp ask."
+        actions={
+          <Button
+            onClick={() => setCreating(true)}
+            variant="primary"
+            leftIcon={<Plus className="h-4 w-4" />}
+          >
+            New Request
+          </Button>
+        }
+      />
 
       {/* tabs */}
-      <div className="flex gap-1 rounded-xl glass-dense p-1">
+      <FilterBar>
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={cn(
               'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-              tab === t.id ? 'bg-accent text-on-accent' : 'text-secondary hover:text-primary',
+              tab === t.id ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
             )}
           >
             {t.label}
@@ -147,7 +149,7 @@ export default function Requests() {
             )}
           </button>
         ))}
-      </div>
+      </FilterBar>
 
       {/* list */}
       <div className="flex flex-col gap-3">
@@ -157,9 +159,24 @@ export default function Requests() {
           </div>
         )}
         {!requests.isLoading && list.length === 0 && (
-          <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-secondary">
-            {tab === 'pending' ? 'No requests waiting for approval. 🎉' : 'No requests here yet.'}
-          </div>
+          <EmptyState
+            icon={Inbox}
+            title={tab === 'pending' ? 'No pending approvals' : 'No requests here yet'}
+            description={
+              tab === 'pending'
+                ? 'No requests are waiting for approval. New submissions will appear here.'
+                : 'Raise your first structured request to get started.'
+            }
+            action={
+              <Button
+                onClick={() => setCreating(true)}
+                variant="primary"
+                leftIcon={<Plus className="h-4 w-4" />}
+              >
+                New Request
+              </Button>
+            }
+          />
         )}
         {list.map((r) => (
           <RequestCard
