@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Download, FileUp, Search, Tags, Trash2, TriangleAlert, UserCog, X } from 'lucide-react';
+import { CheckCircle2, Download, FileUp, PackageSearch, Search, Tags, Trash2, TriangleAlert, UserCog, X } from 'lucide-react';
 import {
   bulkAssignAssets,
   bulkDeleteAssets,
@@ -22,6 +22,9 @@ import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import { Button } from '@/components/Button';
 import AddAssetButton from '@/components/AddAssetButton';
+import PageHeader from '@/components/PageHeader';
+import FilterBar from '@/components/FilterBar';
+import EmptyState from '@/components/EmptyState';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import { inputCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
@@ -189,6 +192,13 @@ export default function Assets() {
     setParams(next, { replace: true });
   };
 
+  const hasActiveFilters = Boolean(search || category || status || location);
+  const clearFilters = () => {
+    const next = new URLSearchParams(params);
+    ['search', 'category', 'status', 'location'].forEach((k) => next.delete(k));
+    setParams(next, { replace: true });
+  };
+
   const columns: Column<Asset>[] = [
     {
       key: 'asset_tag',
@@ -231,80 +241,82 @@ export default function Assets() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-primary">Assets</h1>
-          <p className="mt-0.5 text-sm text-secondary">
-            {data?.total ?? 0} asset{data?.total === 1 ? '' : 's'} in the registry
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <AddAssetButton />
-          {isAdmin && (
+      <PageHeader
+        title="Assets"
+        description={`${data?.total ?? 0} asset${data?.total === 1 ? '' : 's'} in the registry`}
+        className="mb-0"
+        actions={
+          <>
+            <AddAssetButton />
+            {isAdmin && (
+              <Button
+                type="button"
+                onClick={() => {
+                  setImportOpen(true);
+                  setFile(null);
+                  setImportResult(null);
+                }}
+                variant="secondary"
+                size="lg"
+                leftIcon={<FileUp className="h-4 w-4" />}
+              >
+                Import
+              </Button>
+            )}
             <Button
               type="button"
-              onClick={() => {
-                setImportOpen(true);
-                setFile(null);
-                setImportResult(null);
-              }}
+              onClick={onExport}
               variant="secondary"
               size="lg"
-              leftIcon={<FileUp className="h-4 w-4" />}
+              leftIcon={<Download className="h-4 w-4" />}
             >
-              Import
+              Export
             </Button>
-          )}
-          <Button
-            type="button"
-            onClick={onExport}
-            variant="secondary"
-            size="lg"
-            leftIcon={<Download className="h-4 w-4" />}
-          >
-            Export
-          </Button>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <input
-              className={`${inputCls} w-56 pl-9`}
-              placeholder="Search assets…"
-              value={search}
-              onChange={(e) => update('search', e.target.value)}
-            />
-          </div>
-          <Select
-            className="w-auto min-w-[130px]"
-            value={category}
-            onChange={(v) => update('category', v)}
-            options={[
-              { value: '', label: 'All Categories' },
-              ...ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') })),
-            ]}
-          />
-          <Select
-            className="w-auto min-w-[130px]"
-            value={status}
-            onChange={(v) => update('status', v)}
-            options={[
-              { value: '', label: 'All Statuses' },
-              ...ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
-            ]}
-          />
-          <Select
-            className="w-auto min-w-[150px]"
-            value={location}
-            onChange={(v) => update('location', v)}
-            options={[
-              { value: '', label: 'All Locations' },
-              ...(locationsQ.data ?? []).map((l) => ({
-                value: l.id,
-                label: [l.site, l.building, l.floor, l.room].filter(Boolean).join(' / ') || '—',
-              })),
-            ]}
+          </>
+        }
+      />
+
+      <FilterBar className="mb-0">
+        <div className="relative min-w-0 flex-1 sm:max-w-xs sm:flex-none sm:basis-56">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            className={`${inputCls} pl-9`}
+            placeholder="Search assets…"
+            value={search}
+            onChange={(e) => update('search', e.target.value)}
           />
         </div>
-      </div>
+        <Select
+          className="w-auto min-w-[130px]"
+          value={category}
+          onChange={(v) => update('category', v)}
+          options={[
+            { value: '', label: 'All Categories' },
+            ...ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') })),
+          ]}
+        />
+        <Select
+          className="w-auto min-w-[130px]"
+          value={status}
+          onChange={(v) => update('status', v)}
+          options={[
+            { value: '', label: 'All Statuses' },
+            ...ASSET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
+          ]}
+        />
+        <Select
+          className="w-auto min-w-[150px]"
+          value={location}
+          onChange={(v) => update('location', v)}
+          options={[
+            { value: '', label: 'All Locations' },
+            ...(locationsQ.data ?? []).map((l) => ({
+              value: l.id,
+              label: [l.site, l.building, l.floor, l.room].filter(Boolean).join(' / ') || '—',
+            })),
+          ]}
+        />
+      </FilterBar>
 
       {selectedIds.size > 0 && (
         <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-5 flex flex-wrap items-center gap-2 glass-chrome border-x-0 border-t-0 px-6 py-2.5 lg:mx-0 lg:mt-0 lg:rounded-t-xl lg:border lg:px-4">
@@ -368,22 +380,43 @@ export default function Assets() {
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        rows={data?.items ?? []}
-        total={data?.total}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
-        onSortChange={onSortChange}
-        loading={isLoading}
-        emptyMessage="No assets match the current filters."
-        onRowClick={(a) => setSelected(a)}
-        selectedIds={isAdmin ? selectedIds : undefined}
-        onSelectionChange={isAdmin ? setSelectedIds : undefined}
-      />
+      {!isLoading && (data?.items ?? []).length === 0 ? (
+        <EmptyState
+          icon={PackageSearch}
+          title="No assets found"
+          description={
+            hasActiveFilters
+              ? 'No assets match the current filters.'
+              : 'No assets in the registry yet. Add your first asset to get started.'
+          }
+          action={
+            hasActiveFilters ? (
+              <Button type="button" onClick={clearFilters} variant="secondary" size="lg">
+                Clear filters
+              </Button>
+            ) : isAdmin ? (
+              <AddAssetButton />
+            ) : undefined
+          }
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={data?.items ?? []}
+          total={data?.total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
+          onSortChange={onSortChange}
+          loading={isLoading}
+          emptyMessage="No assets match the current filters."
+          onRowClick={(a) => setSelected(a)}
+          selectedIds={isAdmin ? selectedIds : undefined}
+          onSelectionChange={isAdmin ? setSelectedIds : undefined}
+        />
+      )}
 
       <AssetSpecModal asset={selected} onClose={() => setSelected(null)} />
 
