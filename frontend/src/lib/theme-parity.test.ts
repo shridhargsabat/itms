@@ -199,3 +199,39 @@ describe('liquid glass SVG refraction & non-glass opacity isolation', () => {
     expect(css).toContain('.theme-paper .glass-card');
   });
 });
+
+describe('clarity shared surfaces', () => {
+  const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../index.css'), 'utf8');
+  it('remaps shared glass utilities to opaque surfaces in both clarity themes', () => {
+    ['theme-clarity', 'theme-clarity-dark'].forEach((cls) => {
+      expect(css).toContain(`.${cls} .glass-card`);
+      expect(css).toContain(`.${cls} .glass-chrome`);
+      expect(css).toContain(`.${cls} .glass-dense`);
+    });
+  });
+  it('sets backdrop-filter none on clarity glass cards', () => {
+    expect(css).toMatch(/\.theme-clarity \.glass-card[\s\S]*?\{[^}]*backdrop-filter:\s*none/s);
+  });
+  it('hides ambient background layers in both clarity themes', () => {
+    ['theme-clarity', 'theme-clarity-dark'].forEach((cls) => {
+      expect(css).toContain(`.${cls} .ab-mesh`);
+    });
+    expect(css).toMatch(/\.theme-clarity \.ab-mesh[\s\S]*?\{[^}]*display:\s*none/s);
+  });
+  it('binds display type, tabular numerals, and focus ring in both clarity themes', () => {
+    ['theme-clarity', 'theme-clarity-dark'].forEach((cls) => {
+      expect(css).toContain(`.${cls} h1`);
+      expect(css).toContain(`.${cls} .text-3xl`);
+      expect(css).toContain(`.${cls} .font-mono`);
+      expect(css).toContain(`.${cls} :focus-visible`);
+    });
+  });
+  it('does not leak clarity selectors into the other new themes', () => {
+    ['theme-paper', 'theme-console', 'theme-bold', 'theme-shell', 'theme-terminal'].forEach((cls) => {
+      expect(css).not.toContain(`.${cls} :focus-visible`);
+      expect(css).not.toContain(`.${cls} .text-3xl`);
+      expect(css).not.toContain(`.${cls} [role="listbox"]`);
+      expect(css).not.toContain(`.${cls} tbody tr:hover`);
+    });
+  });
+});

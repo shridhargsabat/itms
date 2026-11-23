@@ -779,3 +779,57 @@
   --t-font-body: var(--font-sans);
   --t-font-mono: 'JetBrains Mono', var(--font-mono);
 }
+/* Clarity shared-surface remap. Scoped: legacy themes remain untouched. */
+.theme-clarity .ab-mesh, .theme-clarity .ab-blobs, .theme-clarity .ab-particles,
+.theme-clarity-dark .ab-mesh, .theme-clarity-dark .ab-blobs, .theme-clarity-dark .ab-particles {
+  display: none;
+}
+.theme-clarity .glass-card, .theme-clarity .glass-chrome, .theme-clarity .glass-dense,
+.theme-clarity-dark .glass-card, .theme-clarity-dark .glass-chrome, .theme-clarity-dark .glass-dense {
+  background: var(--t-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--t-edge);
+  box-shadow: 0 1px 2px var(--t-glass-shadow);
+}
+.theme-clarity .glass-dense, .theme-clarity-dark .glass-dense {
+  background: var(--t-input);
+  box-shadow: none;
+}
+.theme-clarity .rounded-2xl, .theme-clarity-dark .rounded-2xl { border-radius: 10px; }
+.theme-clarity .rounded-xl, .theme-clarity-dark .rounded-xl { border-radius: 10px; }
+.theme-clarity .rounded-lg, .theme-clarity-dark .rounded-lg { border-radius: 8px; }
+.theme-clarity h1, .theme-clarity-dark h1 {
+  font-family: var(--t-font-display);
+  font-size: 1.5rem;
+  line-height: 1.875rem;
+  letter-spacing: -0.02em;
+}
+.theme-clarity [data-testid$="count"], .theme-clarity-dark [data-testid$="count"],
+.theme-clarity .text-3xl, .theme-clarity-dark .text-3xl {
+  font-family: var(--t-font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.theme-clarity .font-mono, .theme-clarity-dark .font-mono {
+  font-family: var(--t-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.theme-clarity aside.glass-chrome, .theme-clarity-dark aside.glass-chrome {
+  background: var(--t-surface);
+  border-right: 1px solid var(--t-edge);
+  box-shadow: none;
+}
+.theme-clarity aside [role="menu"], .theme-clarity-dark aside [role="menu"],
+.theme-clarity [role="listbox"], .theme-clarity-dark [role="listbox"] {
+  background: var(--t-surface);
+  border: 1px solid var(--t-edge);
+  box-shadow: 0 12px 32px -12px var(--t-glass-shadow);
+}
+.theme-clarity tbody tr:hover, .theme-clarity-dark tbody tr:hover {
+  background: var(--t-elevated);
+}
+.theme-clarity :focus-visible, .theme-clarity-dark :focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
