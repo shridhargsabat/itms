@@ -57,6 +57,19 @@ fn require_staff(role: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Canonical ticket-type: trim + uppercase, default INCIDENT,
+/// legacy "REQUEST" → "SERVICE_REQUEST".
+fn normalize_type(raw: Option<&str>) -> String {
+    let upper = raw.unwrap_or("INCIDENT").trim().to_uppercase();
+    if upper.is_empty() {
+        return "INCIDENT".to_string();
+    }
+    if upper == "REQUEST" {
+        return "SERVICE_REQUEST".to_string();
+    }
+    upper
+}
+
 // ---------------------------------------------------------------------------
 // GET /kb/articles?ticket_type=&search=&limit=&offset=
 #[derive(Deserialize)]
@@ -73,7 +86,13 @@ pub async fn list_articles(
 ) -> Result<impl axum::response::IntoResponse, AppError> {
     let mut conds: Vec<String> = vec![];
     if let Some(tt) = q.ticket_type.as_deref().filter(|s| !s.is_empty() && *s != "ALL") {
-        conds.push(format!("a.ticket_type = '{}'", tt.replace('\'', "''")));
+        let normalized = normalize_type(Some(tt));
+        if normalized == "SERVICE_REQUEST" {
+            // Match historical 'REQUEST' rows too.
+            conds.push("a.ticket_type IN ('SERVICE_REQUEST', 'REQUEST')".to_string());
+        } else {
+            conds.push(format!("a.ticket_type = '{}'", normalized.replace('\'', "''")));
+        }
     }
     if let Some(term) = q.search.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let esc = term.replace('\'', "''");
@@ -139,11 +158,7 @@ pub async fn create_article(
             "title and body are required",
         ));
     }
-    let ticket_type = body
-        .ticket_type
-        .clone()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "INCIDENT".to_string());
+    let ticket_type = normalize_type(body.ticket_type.as_deref());
     let id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO kb_articles (ticket_type, title, body, created_by, updated_by) \
          VALUES ($1, $2, $3, $4, $4) RETURNING id",
@@ -199,7 +214,7 @@ pub async fn update_article(
     let Some((tt, title, b)) = current else {
         return Err(AppError::new(StatusCode::NOT_FOUND, "article not found"));
     };
-    let new_tt = body.ticket_type.unwrap_or(tt);
+    let new_tt = normalize_type(Some(&body.ticket_type.unwrap_or(tt)));
     let new_title = body.title.map(|s| s.trim().to_string()).unwrap_or(title);
     let new_body = body.body.map(|s| s.trim().to_string()).unwrap_or(b);
     sqlx::query(
@@ -363,6 +378,48 @@ pub async fn convert_to_article(
             "only resolved or closed tickets can become articles",
         ));
     }
+    // Idempotent on source_ticket_id: re-converting returns the existing
+    // article instead of inserting a duplicate row.
+    let existing: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM kb_articles WHERE source_ticket_id = $1 ORDER BY updated_at DESC LIMIT 1",
+    )
+    .bind(ticket_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    if let Some(existing_id) = existing {
+        let custom_title = body.title.clone().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        let custom_body = body.body.clone().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        if custom_title.is_some() || custom_body.is_some() {
+            let current: Option<(String, String)> = sqlx::query_as(
+                "SELECT title, body FROM kb_articles WHERE id = $1",
+            )
+            .bind(existing_id)
+            .fetch_optional(&state.pool)
+            .await?;
+            if let Some((cur_title, cur_body)) = current {
+                sqlx::query(
+                    "UPDATE kb_articles SET title = $2, body = $3, \
+                     updated_by = $4, updated_at = NOW() WHERE id = $1",
+                )
+                .bind(existing_id)
+                .bind(custom_title.unwrap_or(cur_title))
+                .bind(custom_body.unwrap_or(cur_body))
+                .bind(uid)
+                .execute(&state.pool)
+                .await?;
+            }
+        }
+        return Ok((
+            StatusCode::OK,
+            Json(
+                sqlx::query_as::<_, KbArticle>(&format!("{ARTICLE_SELECT} WHERE a.id = $1"))
+                    .bind(existing_id)
+                    .fetch_one(&state.pool)
+                    .await?,
+            ),
+        ));
+    }
+    let tt = normalize_type(Some(&tt));
     let title = body.title.clone().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
         .unwrap_or_else(|| format!("{ttitle} (how it was fixed)"));
     let body_text = body.body.clone().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())

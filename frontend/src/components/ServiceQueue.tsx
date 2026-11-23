@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Search, Ticket, X } from 'lucide-react';
 import { listTickets, patchTicketStatus } from '@/api/client';
-import { TICKET_STATUSES } from '@/api/types';
+import { ALLOWED_TICKET_TRANSITIONS } from '@/api/types';
 import type { TicketStatus } from '@/api/types';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
 import SlaChip from '@/components/SlaChip';
@@ -191,7 +191,7 @@ export default function ServiceQueue() {
                       setConfirmed(null);
                       updateStatus.mutate({ id: selected.id, status: v as TicketStatus });
                     }}
-                    options={TICKET_STATUSES.map((s) => ({ value: s, label: s }))}
+                    options={[selected.status, ...(ALLOWED_TICKET_TRANSITIONS[selected.status] ?? [])].map((s) => ({ value: s, label: s }))}
                   />
                   {confirmed && (
                     <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-400">

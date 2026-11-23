@@ -126,7 +126,7 @@ async fn velocity(
                 ) i ON i.d = (CURRENT_DATE - 6 + g.n)
                 LEFT JOIN (
                     SELECT created_at::date AS d, COUNT(*) AS cnt FROM tickets
-                    WHERE ticket_type = 'SERVICE_REQUEST' AND created_at::date >= CURRENT_DATE - 6
+                    WHERE ticket_type IN ('SERVICE_REQUEST', 'REQUEST') AND created_at::date >= CURRENT_DATE - 6
                     GROUP BY 1
                 ) r ON r.d = (CURRENT_DATE - 6 + g.n)
                 LEFT JOIN (
@@ -159,7 +159,7 @@ async fn velocity(
                 LEFT JOIN (
                     SELECT ((created_at::date - (CURRENT_DATE - 27)) / 7) AS w, COUNT(*) AS cnt
                     FROM tickets
-                    WHERE ticket_type = 'SERVICE_REQUEST' AND created_at::date >= CURRENT_DATE - 27
+                    WHERE ticket_type IN ('SERVICE_REQUEST', 'REQUEST') AND created_at::date >= CURRENT_DATE - 27
                     GROUP BY 1
                 ) r ON r.w = g.w
                 LEFT JOIN (

@@ -7,7 +7,7 @@ export type AssetCategory =
   | 'MONITOR'
   | 'LICENSE';
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
-export type TicketType = 'INCIDENT' | 'SERVICE_REQUEST' | 'CHANGE';
+export type TicketType = 'INCIDENT' | 'SERVICE_REQUEST' | 'CHANGE' | 'PROBLEM' | 'ACCESS' | 'OTHER';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 export interface AuthUser {
@@ -84,8 +84,22 @@ export const ASSET_CATEGORIES: AssetCategory[] = [
   'LICENSE',
 ];
 export const TICKET_STATUSES: TicketStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
-export const TICKET_TYPES: TicketType[] = ['INCIDENT', 'SERVICE_REQUEST', 'CHANGE'];
+export const TICKET_TYPES: TicketType[] = [
+  'INCIDENT',
+  'SERVICE_REQUEST',
+  'CHANGE',
+  'PROBLEM',
+  'ACCESS',
+  'OTHER',
+];
 export const PRIORITIES: Priority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+
+export const ALLOWED_TICKET_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
+  OPEN: ['IN_PROGRESS', 'CLOSED'],
+  IN_PROGRESS: ['RESOLVED', 'OPEN'],
+  RESOLVED: ['CLOSED', 'OPEN'],
+  CLOSED: ['OPEN'],
+};
 
 /** One GROUP BY bucket of a dashboard breakdown (key = priority/status code). */
 export interface MetricBucket {
@@ -294,7 +308,14 @@ export interface CreateTicketInput {
   ticket_type: TicketType;
   priority: Priority;
   requester_id?: string;
+  assignee_id?: string;
   asset_id?: string;
+}
+
+export interface UpdateTicketInput {
+  priority?: Priority;
+  assignee_id?: string | null;
+  asset_id?: string | null;
 }
 
 // ── Onboarding / offboarding (P0-1, issue #50) ──────────────────────────────
@@ -498,6 +519,7 @@ export interface TicketAttachment {
 }
 
 export interface TicketTimelineEntry {
+  id?: string;
   kind: 'change';
   actor: string;
   action: string;

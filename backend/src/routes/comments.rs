@@ -406,18 +406,20 @@ async fn ticket_timeline(
     .fetch_all(pool)
     .await?;
     // who-changed-what: audit entries for this ticket (TICKET_* actions)
-    let changes: Vec<serde_json::Value> = sqlx::query_as::<_, (Option<String>, String, chrono::DateTime<chrono::Utc>, serde_json::Value)>(
-        "SELECT u.name, al.action, al.created_at, COALESCE(al.diff, '{}'::jsonb) \
+    let changes: Vec<serde_json::Value> = sqlx::query_as::<_, (Uuid, Option<String>, String, chrono::DateTime<chrono::Utc>, serde_json::Value)>(
+        "SELECT al.id, u.name, al.action, al.created_at, COALESCE(al.diff, '{}'::jsonb) \
          FROM audit_logs al LEFT JOIN users u ON u.id = al.actor_id \
-         WHERE al.target_type = 'ticket' AND al.target_id = $1 AND al.action LIKE 'TICKET_%' \
+         WHERE al.target_type = 'ticket' AND al.target_id = $1 \
+           AND (al.action LIKE 'TICKET_%' OR al.action = 'SLA_ESCALATE') \
          ORDER BY al.created_at ASC",
     )
     .bind(ticket_id)
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|(name, action, at, details)| {
+    .map(|(id, name, action, at, details)| {
         json!({
+            "id": id,
             "kind": "change",
             "actor": name.unwrap_or_else(|| "System".to_string()),
             "action": action,

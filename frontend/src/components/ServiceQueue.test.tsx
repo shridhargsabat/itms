@@ -163,11 +163,13 @@ describe('ServiceQueue (task 9)', () => {
     const drawer = await screen.findByTestId('service-queue-drawer');
 
     // App-native Select: open the trigger, then pick the portaled option.
+    // T1 is OPEN → only IN_PROGRESS and CLOSED are legal transitions.
     fireEvent.click(within(drawer).getByRole('button', { name: 'OPEN' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'RESOLVED' }));
+    expect(screen.queryByRole('option', { name: 'RESOLVED' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
 
-    expect(await within(drawer).findByText('Status updated to RESOLVED')).toBeInTheDocument();
-    expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'RESOLVED');
+    expect(await within(drawer).findByText('Status updated to IN_PROGRESS')).toBeInTheDocument();
+    expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS');
   });
 
   it('is visible to non-admin users (no admin gate)', async () => {

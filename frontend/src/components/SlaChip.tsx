@@ -38,7 +38,7 @@ export default function SlaChip({ dueAt, policyHours }: { dueAt: string | null; 
             ? 'bg-amber-500/15 text-amber-400'
             : 'bg-emerald-500/15 text-emerald-400',
       )}
-      title={`SLA due ${due.toLocaleString()}`}
+      title={`SLA due ${new Date(dueAt).toLocaleString()}`}
     >
       {overdue ? `OVERDUE ${formatSla(left)}` : `SLA ${formatSla(left)}`}
     </span>
