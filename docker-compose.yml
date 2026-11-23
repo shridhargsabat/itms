@@ -35,11 +35,11 @@ services:
         limits: { cpus: "0.75", memory: 768M }
 
   backend:
-    # CI/CD: image pulled from the Gitea registry (itms-deploy-bot namespace).
+    # CI/CD: image pulled from GHCR (shridhargsabat namespace).
     # Builds happen in the deploy job (scripts/build-deploy.sh) and are pushed
     # as itms-<sha> + itms-latest. pull_policy: always guarantees a changed
     # backend is ALWAYS recreated on deploy (not left stale on a local tag).
-    image: gitea.ai-automation-hub.tech/itms-deploy-bot/itms-backend:${BACKEND_TAG:-itms-latest}
+    image: ghcr.io/shridhargsabat/itms-backend:${BACKEND_TAG:-itms-latest}
     pull_policy: always
     container_name: itms-backend
     restart: unless-stopped
@@ -76,8 +76,8 @@ services:
         limits: { cpus: "0.75", memory: 512M }
 
   frontend:
-    # CI/CD: image pulled from the Gitea registry (itms-deploy-bot namespace).
-    image: gitea.ai-automation-hub.tech/itms-deploy-bot/itms-frontend:${FRONTEND_TAG:-itms-latest}
+    # CI/CD: image pulled from GHCR (shridhargsabat namespace).
+    image: ghcr.io/shridhargsabat/itms-frontend:${FRONTEND_TAG:-itms-latest}
     pull_policy: always
     container_name: itms-frontend
     restart: unless-stopped

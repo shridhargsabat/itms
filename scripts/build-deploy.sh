@@ -2,38 +2,44 @@
 # build-deploy.sh — ITMS CI/CD deploy script.
 #
 # Builds BOTH the backend (Rust) and frontend (React/Vite) images, pushes them
-# to the Gitea container registry (itms-deploy-bot namespace), then brings the
-# live stack up with --pull always so every service actually recreates with the
-# freshly pushed image (fixes the stale-backend trap where a locally-built
-# `itms-backend` image tag never changes and compose silently skips rebuilding).
+# to GHCR (shridhargsabat namespace), then brings the live stack up with
+# --pull always so every service actually recreates with the freshly pushed
+# image (fixes the stale-backend trap where a locally-built `itms-backend`
+# image tag never changes and compose silently skips rebuilding).
 #
-# Runs inside the deploy job's docker:28-cli helper container (Alpine). Expected mounts:
-#   /code                      → host deploy checkout (e.g. /root/itms)
-#   /var/run/docker.sock       → host docker daemon
-#   /run/secrets/registry-token → itms-deploy-bot package token (read-only)
+# Runs EITHER directly on the VPS (/root/itms checkout, invoked over SSH by
+# .github/workflows/ci-cd.yml) OR inside the legacy Gitea helper container
+# (Alpine, /code mount). Expected inputs:
+#   CODE_DIR (/code)           → deploy checkout (e.g. /root/itms)
+#   /var/run/docker.sock       → host docker daemon (helper-container mode)
+#   /run/secrets/registry-token → registry token file, if present (otherwise
+#                                  REGISTRY_TOKEN env is used)
 #
 # Env overrides:
+#   CODE_DIR (default /code)   deploy checkout directory
 #   BRANCH (default main)      branch to deploy from
 #   PROJECT (default itms)     compose project name
 #   COMPOSE_FILE (default docker-compose.yml)
 #   ENV_FILE (default .env)    compose env file
-#   REGISTRY (default gitea.ai-automation-hub.tech)
-#   PUSH_USER (default itms-deploy-bot)  registry push identity
+#   REGISTRY (default ghcr.io)
+#   PUSH_USER (default shridhargsabat)  registry push identity
+#   REGISTRY_TOKEN (or token file)      registry password (GHCR: GITHUB_TOKEN)
 #   LATEST_TAG (default itms-latest)
 #   IMAGE_PREFIX (default itms)  image name stem → itms-backend / itms-frontend
 set -eu
 
 # ── Config ──────────────────────────────────────────────────────────────
+CODE_DIR="${CODE_DIR:-/code}"
 BRANCH="${BRANCH:-main}"
 PROJECT="${PROJECT:-itms}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 ENV_FILE="${ENV_FILE:-.env}"
-REGISTRY="${REGISTRY:-gitea.ai-automation-hub.tech}"
-PUSH_USER="${PUSH_USER:-itms-deploy-bot}"
+REGISTRY="${REGISTRY:-ghcr.io}"
+PUSH_USER="${PUSH_USER:-shridhargsabat}"
 LATEST_TAG="${LATEST_TAG:-itms-latest}"
 IMAGE_PREFIX="${IMAGE_PREFIX:-itms}"
 
-cd /code
+cd "$CODE_DIR"
 
 # ── 1. Reset checkout to the branch tip ─────────────────────────────────
 git fetch --force origin "$BRANCH:refs/remotes/origin/$BRANCH" 2>/dev/null
