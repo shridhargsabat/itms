@@ -994,3 +994,28 @@
   outline: 2px solid var(--t-accent);
   outline-offset: 2px;
 }
+
+/* ---------- Task 4: ambient glass orbs + canvas gradient (appended) -------
+   Glass scope only: the orb container is `display: none` by default and
+   shows ONLY under the light/dark guard chains (copied verbatim from the
+   refraction selectors above). No per-theme hide rules: the guard chains
+   exclude all 9 non-glass theme classes, so base-none already hides the
+   orbs in every non-glass theme — and theme-parity.test.ts forbids
+   `.theme-{console,bold,shell,terminal} .ab-*` selectors. Existing
+   mesh/blobs/grid/particles are untouched (other themes rely on them).
+   Canvas gradients ride the same guard chains. */
+.ab-glass-orbs {
+  display: none;
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ab-glass-orbs {
+  display: block;
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ab-glass-orbs {
+  display: block;
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) body {
+  background: linear-gradient(135deg,#DCEBFF 0%,#EEF2FF 50%,#FCE7F3 100%);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) body {
+  background: linear-gradient(135deg,#0B1226 0%,#131836 50%,#0A192F 100%);
+}
