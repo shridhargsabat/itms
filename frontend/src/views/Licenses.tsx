@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CalendarClock,
   Infinity as InfinityIcon,
+  KeyRound,
   LoaderCircle,
   Pencil,
   Plus,
@@ -13,6 +14,9 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
+import EmptyState from '@/components/EmptyState';
+import FilterBar from '@/components/FilterBar';
+import PageHeader from '@/components/PageHeader';
 import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import { getCachedUser, listUsers } from '@/api/client';
@@ -115,27 +119,27 @@ export default function Licenses() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">Software Licenses</h1>
-          <p className="text-xs text-secondary">Seat register — track what you pay for vs what you use.</p>
-        </div>
-        {isAdmin && (
-          <Button
-            onClick={() => setCreating(true)}
-            variant="primary"
-            leftIcon={<Plus className="h-4 w-4" />}
-          >
-            Register License
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Software Licenses"
+        description="Seat register — track what you pay for vs what you use."
+        actions={
+          isAdmin ? (
+            <Button
+              onClick={() => setCreating(true)}
+              variant="primary"
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              Register License
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* utilization summary */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl glass-card p-3">
           <p className="text-[10px] uppercase tracking-wide text-muted">Utilization</p>
-          <p className={cn('mt-1 text-lg font-bold', utilPct < 70 ? 'text-red-400' : utilPct < 90 ? 'text-amber-400' : 'text-emerald-400')}>
+          <p className={cn('mt-1 text-lg font-bold tabular-nums', utilPct < 70 ? 'text-red-400' : utilPct < 90 ? 'text-amber-400' : 'text-emerald-400')}>
             {utilPct}%
           </p>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-elevated">
@@ -148,18 +152,18 @@ export default function Licenses() {
         </div>
         <div className="rounded-xl glass-card p-3">
           <p className="text-[10px] uppercase tracking-wide text-muted">Wasted spend / yr</p>
-          <p className="mt-1 text-lg font-bold text-amber-400">{fmtMoney(wasted, 'INR')}</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-amber-400">{fmtMoney(wasted, 'INR')}</p>
           <p className="mt-1 text-[10px] text-muted">unused seats × cost</p>
         </div>
         <button onClick={() => setTab('expiring')} className="rounded-xl glass-card p-3 text-left transition hover:border-accent/40">
           <p className="text-[10px] uppercase tracking-wide text-muted">Expiry alerts</p>
-          <p className={cn('mt-1 text-lg font-bold', alertCount > 0 ? 'text-red-400' : 'text-emerald-400')}>{alertCount}</p>
+          <p className={cn('mt-1 text-lg font-bold tabular-nums', alertCount > 0 ? 'text-red-400' : 'text-emerald-400')}>{alertCount}</p>
           <p className="mt-1 text-[10px] text-muted">expired + ≤90 days</p>
         </button>
       </div>
 
       {/* tabs */}
-      <div className="flex gap-1 rounded-xl glass-dense p-1">
+      <FilterBar>
         {(
           [
             { id: 'all', label: 'All Licenses' },
@@ -171,14 +175,14 @@ export default function Licenses() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition',
-              tab === t.id ? 'bg-accent text-white' : 'text-secondary hover:text-primary',
+              'flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+              tab === t.id ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
             )}
           >
             {t.label}
           </button>
         ))}
-      </div>
+      </FilterBar>
 
       {/* list */}
       <div className="flex flex-col gap-3">
@@ -188,9 +192,28 @@ export default function Licenses() {
           </div>
         )}
         {!pageQ.isLoading && list.length === 0 && (
-          <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-secondary">
-            {tab === 'expired' ? 'No expired licenses. 🎉' : tab === 'expiring' ? 'Nothing expiring in the next 90 days. 🎉' : 'No licenses registered yet.'}
-          </div>
+          <EmptyState
+            icon={KeyRound}
+            title={tab === 'expired' ? 'No expired licenses' : tab === 'expiring' ? 'Nothing expiring soon' : 'No licenses registered yet'}
+            description={
+              tab === 'expired'
+                ? 'Every license is current — nothing has lapsed.'
+                : tab === 'expiring'
+                  ? 'Nothing expires in the next 90 days. Renewals will surface here automatically.'
+                  : 'Register your first license to start tracking seats, cost, and renewals.'
+            }
+            action={
+              tab === 'all' && isAdmin ? (
+                <Button
+                  onClick={() => setCreating(true)}
+                  variant="primary"
+                  leftIcon={<Plus className="h-4 w-4" />}
+                >
+                  Register License
+                </Button>
+              ) : undefined
+            }
+          />
         )}
         {list.map((l) => (
           <LicenseCard
@@ -258,7 +281,7 @@ function LicenseCard({
     <div className="flex flex-col gap-2 rounded-xl glass-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button onClick={onOpen} className="flex flex-wrap items-center gap-2 text-left">
-          <span className="text-sm font-medium">{l.name}</span>
+          <span className="text-sm font-medium text-primary">{l.name}</span>
           {l.vendor && <span className="text-[11px] text-muted">{l.vendor}</span>}
           <span className={cn('rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide', TYPE_STYLE[l.license_type])}>
             {l.license_type === 'OPEN_SOURCE' ? 'Open source' : l.license_type === 'PERPETUAL' ? 'Perpetual' : 'Subscription'}
@@ -303,7 +326,7 @@ function LicenseCard({
             style={{ width: `${util}%` }}
           />
         </div>
-        <span className="w-20 text-right text-[10px] text-muted">
+        <span className="w-20 text-right text-[10px] tabular-nums text-muted">
           {l.seats_used}/{l.seats_total} seats · {util}%
         </span>
       </div>

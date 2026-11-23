@@ -4,7 +4,10 @@ import jsQR from 'jsqr';
 import { CheckCircle2, CircleAlert, Flag, ScanLine, XCircle } from 'lucide-react';
 import { listAssets, scanAudit } from '@/api/client';
 import type { Asset, QrScanResult } from '@/api/types';
+import { cn, inputCls, labelCls } from '@/lib/utils';
 import { parsePayload } from '@/lib/qr';
+import EmptyState from '@/components/EmptyState';
+import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 
 /**
@@ -125,11 +128,11 @@ export default function Scan() {
   const pct = expected > 0 ? Math.round((found / expected) * 100) : 0;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 p-4 sm:p-6">
-      <div>
-        <h1 className="text-xl font-semibold">Scan Audit</h1>
-        <p className="mt-0.5 text-xs text-muted">Point the camera at an ITMS label. Each scan records an audit entry on the asset; the run tally reconciles found vs expected.</p>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <PageHeader
+        title="Scan Audit"
+        description="Point the camera at an ITMS label. Each scan records an audit entry on the asset; the run tally reconciles found vs expected."
+      />
 
       {/* Camera card */}
       <div className="relative overflow-hidden rounded-xl border border-edge bg-black">
@@ -158,13 +161,13 @@ export default function Scan() {
 
       {camError && (
         <form onSubmit={manualSubmit} className="space-y-2 rounded-xl glass-card p-3">
-          <label className="block text-xs font-medium text-secondary">Manual tag lookup</label>
+          <label className={labelCls}>Manual tag lookup</label>
           <div className="flex gap-2">
             <input
               value={manual}
               onChange={(e) => setManual(e.target.value)}
               placeholder="e.g. AST-0012 or serial"
-              className="h-9 min-w-0 flex-1 rounded-lg glass-dense px-3 font-mono text-sm outline-none focus:border-accent"
+              className={cn(inputCls, 'min-w-0 flex-1 font-mono')}
             />
             <Button type="submit" variant="primary" size="sm" className="shrink-0">Enter</Button>
           </div>
@@ -187,21 +190,25 @@ export default function Scan() {
         </div>
 
         {expected === 0 ? (
-          <p className="mt-3 text-xs text-muted">
-            No targets picked. Select assets on the <span className="text-accent">QR Labels</span> page and hit <em>Start audit run</em>.
-          </p>
+          <div className="mt-3">
+            <EmptyState
+              icon={ScanLine}
+              title="No targets picked"
+              description="Select assets on the QR Labels page and hit Start audit run to reconcile a run here."
+            />
+          </div>
         ) : ended ? (
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg glass-dense p-3">
-              <div className="text-xl font-semibold text-emerald-400">{pct}%</div>
+              <div className="text-xl font-semibold tabular-nums text-emerald-400">{pct}%</div>
               <div className="text-[10px] text-muted">found</div>
             </div>
             <div className="rounded-lg glass-dense p-3">
-              <div className="text-xl font-semibold">{found}</div>
+              <div className="text-xl font-semibold tabular-nums">{found}</div>
               <div className="text-[10px] text-muted">of {expected} expected</div>
             </div>
             <div className={`rounded-lg glass-dense p-3 ${missing > 0 ? 'border-amber-500/40 text-amber-400' : 'border-emerald-500/40 text-emerald-400'}`}>
-              <div className="text-xl font-semibold">{missing}</div>
+              <div className="text-xl font-semibold tabular-nums">{missing}</div>
               <div className="text-[10px] text-muted">missing ({missing > 0 ? 'investigate ghosts' : 'all present'})</div>
             </div>
             {run && (

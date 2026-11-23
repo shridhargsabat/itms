@@ -16,7 +16,7 @@ export interface AuthUser {
   name: string;
   role: string;
   department: string;
-  /** Per-user theme pref (theme manager): light | dark | ledgerly | ledgerly-light | system. */
+  /** Per-user theme pref (theme manager): light | dark | ledgerly | ledgerly-light | system | paper | console | bold | shell | terminal. */
   theme?: string;
 }
 

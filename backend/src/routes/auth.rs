@@ -127,7 +127,14 @@ pub struct ThemeRequest {
     pub theme: String,
 }
 
-const VALID_THEMES: [&str; 5] = ["light", "dark", "ledgerly", "ledgerly-light", "system"];
+const VALID_THEMES: [&str; 12] = [
+    "light", "dark", "ledgerly", "ledgerly-light", "system", "paper",
+    "console", "bold", "shell", "terminal", "clarity", "clarity-dark",
+];
+
+fn is_valid_theme(t: &str) -> bool {
+    VALID_THEMES.contains(&t)
+}
 
 pub async fn set_theme(
     State(state): State<AppState>,
@@ -135,10 +142,10 @@ pub async fn set_theme(
     Json(body): Json<ThemeRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let theme = body.theme.trim().to_lowercase();
-    if !VALID_THEMES.contains(&theme.as_str()) {
+    if !is_valid_theme(&theme) {
         return Err(AppError::new(
             StatusCode::UNPROCESSABLE_ENTITY,
-            "theme must be one of: light, dark, ledgerly, ledgerly-light, system",
+            "theme must be one of: light, dark, ledgerly, ledgerly-light, system, paper, console, bold, shell, terminal, clarity, clarity-dark",
         ));
     }
     sqlx::query("UPDATE users SET theme = $1 WHERE id = $2")
@@ -296,4 +303,18 @@ pub async fn demo_login(
         "expires_at": expires_at,
         "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme }
     })))
+}
+
+#[cfg(test)]
+mod theme_tests {
+    use super::is_valid_theme;
+    #[test]
+    fn allowlist_covers_all_twelve_modes() {
+        for t in ["light","dark","ledgerly","ledgerly-light","system","paper","console","bold","shell","terminal","clarity","clarity-dark"] {
+            assert!(is_valid_theme(t), "missing {t}");
+        }
+        assert!(!is_valid_theme("paper "));
+        assert!(!is_valid_theme("DARK"));
+        assert!(!is_valid_theme(""));
+    }
 }

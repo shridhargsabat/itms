@@ -2,23 +2,23 @@ import type { AssetStatus, Priority, TicketStatus } from '@/api/types';
 import { cn } from '@/lib/utils';
 
 const PRIORITY_STYLES: Record<Priority, string> = {
-  URGENT: 'bg-red-500/15 text-red-400 ring-red-500/30',
-  HIGH: 'bg-orange-500/15 text-orange-400 ring-orange-500/30',
-  MEDIUM: 'bg-yellow-500/15 text-yellow-400 ring-yellow-500/30',
+  URGENT: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/30',
+  HIGH: 'bg-orange-500/15 text-orange-700 dark:text-orange-400 ring-orange-500/30',
+  MEDIUM: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 ring-yellow-500/30',
   LOW: 'bg-slate-500/15 text-secondary ring-slate-500/30',
 };
 
 const STATUS_STYLES: Record<TicketStatus, string> = {
-  OPEN: 'bg-blue-500/15 text-blue-400 ring-blue-500/30',
-  IN_PROGRESS: 'bg-amber-500/15 text-amber-400 ring-amber-500/30',
-  RESOLVED: 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30',
+  OPEN: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 ring-blue-500/30',
+  IN_PROGRESS: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-amber-500/30',
+  RESOLVED: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30',
   CLOSED: 'bg-slate-500/15 text-secondary ring-slate-500/30',
 };
 
 const ASSET_STATUS_STYLES: Record<AssetStatus, string> = {
-  IN_STOCK: 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30',
-  ASSIGNED: 'bg-blue-500/15 text-blue-400 ring-blue-500/30',
-  MAINTENANCE: 'bg-amber-500/15 text-amber-400 ring-amber-500/30',
+  IN_STOCK: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30',
+  ASSIGNED: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 ring-blue-500/30',
+  MAINTENANCE: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-amber-500/30',
   RETIRED: 'bg-slate-500/15 text-secondary ring-slate-500/30',
 };
 

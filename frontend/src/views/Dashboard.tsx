@@ -30,6 +30,8 @@ import type { CreateTicketInput, DashboardMetrics, MetricBucket } from '@/api/ty
 import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import AddAssetButton from '@/components/AddAssetButton';
+import PageHeader from '@/components/PageHeader';
+import EmptyState from '@/components/EmptyState';
 import {
   cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 
@@ -50,12 +52,12 @@ type Chip = {
 const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
 const CHIPS: Chip[] = [
-  { label: 'Open Requests', key: 'open_requests', icon: ClipboardList, accent: 'bg-blue-500/10 text-blue-400', to: '/requests' },
-  { label: 'SLA Overdue', key: 'overdue_tickets', icon: Timer, accent: 'bg-red-500/10 text-red-400', to: '/tickets?overdue=true', admin: true },
-  { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
-  { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-400', to: '/warranty' },
-  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-400', to: '/onboarding', wide: true },
-  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-400', to: '/licenses', admin: true, wide: true },
+  { label: 'Open Requests', key: 'open_requests', icon: ClipboardList, accent: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', to: '/requests' },
+  { label: 'SLA Overdue', key: 'overdue_tickets', icon: Timer, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/tickets?overdue=true', admin: true },
+  { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/tickets?priority=HIGH' },
+  { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', to: '/warranty' },
+  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/onboarding', wide: true },
+  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/licenses', admin: true, wide: true },
 ];
 
 function OverdueTickets() {
@@ -251,26 +253,25 @@ export default function Dashboard() {
       {/* Sticky actions row: the + New Ticket / + Add Asset buttons must stay
           visible while scrolling (phones resumed mid-page reported them as
           'missing' when they were scrolled above the fold). */}
-      <div className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-6 flex flex-wrap items-center justify-between gap-3 glass-card border-x-0 border-t-0 px-6 py-2 lg:top-0 lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6 lg:py-4">
-        <div>
-          <h1 className="text-xl font-semibold text-primary">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-secondary">
-            Inventory, tickets and recent activity at a glance.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            onClick={() => setNewOpen(true)}
-            variant="primary"
-            size="lg"
-            leftIcon={<Plus className="h-4 w-4" />}
-          >
-            New Ticket
-          </Button>
-          <AddAssetButton />
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Inventory, tickets and recent activity at a glance."
+        className="sticky top-[calc(2.8125rem+env(safe-area-inset-top))] z-30 -mx-6 -mt-6 bg-base/95 px-6 py-3 backdrop-blur lg:top-0 lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:border-edge lg:px-6"
+        actions={
+          <>
+            <Button
+              type="button"
+              onClick={() => setNewOpen(true)}
+              variant="primary"
+              size="lg"
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              New Ticket
+            </Button>
+            <AddAssetButton />
+          </>
+        }
+      />
 
       {metrics.isError && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
@@ -291,7 +292,7 @@ export default function Dashboard() {
             <p className="truncate text-[11px] font-medium uppercase tracking-wide text-secondary lg:text-xs">
               Open Tickets
             </p>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 sm:h-9 sm:w-9">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 sm:h-9 sm:w-9">
               <Ticket className="h-4 w-4 sm:h-5 sm:w-5" />
             </span>
           </div>
@@ -459,12 +460,12 @@ export default function Dashboard() {
               </div>
             ))}
             {!audit.isLoading && (audit.data?.items ?? []).length === 0 && (
-              <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
-                <Activity className="h-8 w-8 text-muted" />
-                <p className="text-sm text-muted">No audit entries yet.</p>
-                <p className="max-w-xs text-xs text-muted">
-                  Asset updates and ticket changes will show up here automatically.
-                </p>
+              <div className="px-5 py-4">
+                <EmptyState
+                  icon={Activity}
+                  title="No recent activity"
+                  description="No audit entries yet. Asset updates and ticket changes will show up here automatically."
+                />
               </div>
             )}
           </div>

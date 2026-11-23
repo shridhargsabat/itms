@@ -6,12 +6,16 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   CheckCircle2,
+  ClipboardList,
   LoaderCircle,
   Pencil,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { cn, formatDateOnly, inputCls, labelCls } from '@/lib/utils';
+import EmptyState from '@/components/EmptyState';
+import FilterBar from '@/components/FilterBar';
+import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
@@ -80,7 +84,7 @@ function Progress({ ev }: { ev: OnboardingEvent }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs text-secondary">
+      <span className="text-xs tabular-nums text-secondary">
         {ev.done_tasks}/{ev.total_tasks}
       </span>
     </div>
@@ -164,45 +168,45 @@ export default function Onboarding() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">Onboarding / Offboarding</h1>
-          <p className="text-xs text-secondary">
-            {tab === 'ONBOARDING' ? 'Joiner checklist — assign assets, create access.' : 'Leaver checklist — recover assets, revoke access, flag data wipe.'}
-          </p>
-        </div>
-        {isAdmin && (
-          <Button
-            onClick={() => setCreating(true)}
-            variant="primary"
-            leftIcon={<Plus className="h-4 w-4" />}
-          >
-            New {tab === 'ONBOARDING' ? 'Joiner' : 'Leaver'} Event
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Onboarding / Offboarding"
+        description={
+          tab === 'ONBOARDING' ? 'Joiner checklist — assign assets, create access.' : 'Leaver checklist — recover assets, revoke access, flag data wipe.'
+        }
+        actions={
+          isAdmin ? (
+            <Button
+              onClick={() => setCreating(true)}
+              variant="primary"
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              New {tab === 'ONBOARDING' ? 'Joiner' : 'Leaver'} Event
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Type tabs */}
-      <div className="flex gap-1 rounded-xl glass-dense p-1">
+      <FilterBar>
         {(['ONBOARDING', 'OFFBOARDING'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
-              'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-              tab === t ? 'bg-accent text-white' : 'text-secondary hover:text-primary',
+              'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+              tab === t ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
             )}
           >
             {t === 'ONBOARDING' ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
             {t === 'ONBOARDING' ? 'Onboarding' : 'Offboarding'}
             {overdueTotal > 0 && tab === t && (
-              <span className="rounded-full bg-red-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-red-500/90 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
                 {overdueTotal}
               </span>
             )}
           </button>
         ))}
-      </div>
+      </FilterBar>
 
       {/* Event cards */}
       <div className="flex flex-col gap-3">
@@ -212,9 +216,26 @@ export default function Onboarding() {
           </div>
         )}
         {!events.isLoading && list.length === 0 && (
-          <div className="rounded-xl glass-card border-dashed p-10 text-center text-sm text-secondary">
-            No {tab.toLowerCase()} events yet.
-          </div>
+          <EmptyState
+            icon={ClipboardList}
+            title={tab === 'ONBOARDING' ? 'No joiner events yet' : 'No leaver events yet'}
+            description={
+              tab === 'ONBOARDING'
+                ? 'Create a joiner event to start tracking assets and access for a new hire.'
+                : 'Create a leaver event to track asset recovery, access revocation, and data wipe.'
+            }
+            action={
+              isAdmin ? (
+                <Button
+                  onClick={() => setCreating(true)}
+                  variant="primary"
+                  leftIcon={<Plus className="h-4 w-4" />}
+                >
+                  New {tab === 'ONBOARDING' ? 'Joiner' : 'Leaver'} Event
+                </Button>
+              ) : undefined
+            }
+          />
         )}
         {list.map((ev) => (
           <button
@@ -227,7 +248,7 @@ export default function Onboarding() {
                 <span className={cn('rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide', TYPE_STYLE[ev.event_type])}>
                   {ev.event_type}
                 </span>
-                <span className="font-medium">{ev.person_name}</span>
+                <span className="font-medium text-primary">{ev.person_name}</span>
                 <span className="hidden text-xs text-secondary sm:inline">{ev.person_email}</span>
               </div>
               <div className="flex items-center gap-2">

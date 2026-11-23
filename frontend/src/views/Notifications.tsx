@@ -4,6 +4,8 @@ import { BellRing, CheckCheck } from 'lucide-react';
 import { getNotifications, getUnreadCount, markAllNotificationsRead, markNotificationRead } from '@/api/client';
 import { cn, formatDate } from '@/lib/utils';
 import { Button } from '@/components/Button';
+import EmptyState from '@/components/EmptyState';
+import PageHeader from '@/components/PageHeader';
 import { useServerPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
 
@@ -47,37 +49,35 @@ export default function Notifications() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-primary">Notifications</h1>
-          <p className="text-xs text-muted">
-            {unread.data?.unread ?? 0} unread · in-app + email mirror
-          </p>
-        </div>
-        {!!unread.data?.unread && (
-          <Button
-            type="button"
-            onClick={() => markAll.mutate()}
-            disabled={markAll.isPending}
-            loading={markAll.isPending}
-            variant="secondary"
-            size="sm"
-            className="border-edge px-3 py-1.5 text-xs text-accent"
-            leftIcon={!markAll.isPending ? <CheckCheck className="h-3.5 w-3.5" /> : undefined}
-          >
-            Mark all read
-          </Button>
-        )}
-      </div>
+    <div className="mx-auto max-w-2xl">
+      <PageHeader
+        title="Notifications"
+        description={`${unread.data?.unread ?? 0} unread · in-app + email mirror`}
+        actions={
+          !!unread.data?.unread ? (
+            <Button
+              type="button"
+              onClick={() => markAll.mutate()}
+              disabled={markAll.isPending}
+              loading={markAll.isPending}
+              variant="secondary"
+              size="sm"
+              className="border-edge px-3 py-1.5 text-xs text-accent"
+              leftIcon={!markAll.isPending ? <CheckCheck className="h-3.5 w-3.5" /> : undefined}
+            >
+              Mark all read
+            </Button>
+          ) : undefined
+        }
+      />
 
       {isLoading && <p className="py-10 text-center text-sm text-muted">Loading…</p>}
       {!isLoading && items.length === 0 && (
-        <div className="flex flex-col items-center gap-2 py-14 text-muted">
-          <BellRing className="h-8 w-8" />
-          <p className="text-sm">No notifications yet.</p>
-          <p className="text-xs">Ticket assignments, status changes and comments will appear here.</p>
-        </div>
+        <EmptyState
+          icon={BellRing}
+          title="No notifications yet"
+          description="Ticket assignments, status changes, and comments will appear here."
+        />
       )}
 
       <div className="flex flex-col gap-2">

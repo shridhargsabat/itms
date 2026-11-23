@@ -75,7 +75,7 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
           className={cn(
             'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
             mode === 'manual'
-              ? 'bg-accent text-white'
+              ? 'bg-accent text-on-accent'
               : 'text-secondary hover:text-primary',
           )}
         >
@@ -87,7 +87,7 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
           className={cn(
             'flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
             mode === 'invoice'
-              ? 'bg-accent text-white'
+              ? 'bg-accent text-on-accent'
               : 'text-secondary hover:text-primary',
           )}
         >

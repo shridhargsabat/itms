@@ -5,6 +5,8 @@ import { getWarrantyAlerts } from '@/api/client';
 import type { WarrantyAlert } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import { Button } from '@/components/Button';
+import PageHeader from '@/components/PageHeader';
+import EmptyState from '@/components/EmptyState';
 import { formatDateOnly } from '@/lib/utils';
 import { useClientPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
@@ -120,14 +122,11 @@ export default function WarrantyView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-primary">Warranty Alerts</h1>
-          <p className="mt-0.5 text-sm text-secondary">
-            {expiredData.length + expiringData.length} asset{alertsCount(expiredData, expiringData) === 1 ? '' : 's'} with a warranty expiring in the next 90 days (or already expired).
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader
+        title="Warranty Alerts"
+        description={`${expiredData.length + expiringData.length} asset${alertsCount(expiredData, expiringData) === 1 ? '' : 's'} with a warranty expiring in the next 90 days (or already expired).`}
+        className="mb-0"
+        actions={
           <Button
             type="button"
             onClick={() => nav('/assets')}
@@ -138,17 +137,17 @@ export default function WarrantyView() {
           >
             Open Assets
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {loading ? (
         <p className="py-10 text-center text-sm text-muted">Loading warranty alerts…</p>
       ) : groups.length === 0 ? (
-        <div className="rounded-xl glass-card border-dashed py-14 text-center">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
-          <p className="mt-3 text-sm font-medium text-primary">No warranty alerts right now</p>
-          <p className="mt-1 text-xs text-muted">Everything has ≥ 90 days of warranty (or none recorded).</p>
-        </div>
+        <EmptyState
+          icon={CheckCircle2}
+          title="No warranty alerts right now"
+          description="Everything has ≥ 90 days of warranty (or none recorded)."
+        />
       ) : (
         <div className="space-y-6">
           {groups.map(({ key, meta, items }) => (

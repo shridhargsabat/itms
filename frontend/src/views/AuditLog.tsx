@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ScrollText } from 'lucide-react';
 import { getAuditLog } from '@/api/client';
 import DataTable, { type Column, type SortState } from '@/components/DataTable';
-import { formatDate } from '@/lib/utils';
+import EmptyState from '@/components/EmptyState';
+import PageHeader from '@/components/PageHeader';
+import { cn, formatDate } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 import type { AuditLogEntry } from '@/api/types';
+
+// Backend audit actions are SCREAMING_SNAKE_CASE (e.g. VENDOR_DELETED);
+// destructive ones get the red chip treatment.
+const DESTRUCTIVE_ACTION = /delete|destroy|revoke|remove/i;
 
 export default function AuditLog() {
   const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
@@ -48,7 +54,12 @@ export default function AuditLog() {
       render: (e) => (
         <span
           title={e.action}
-          className="max-w-[180px] truncate rounded bg-elevated px-2 py-0.5 font-mono text-xs text-secondary"
+          className={cn(
+            'inline-block max-w-[180px] truncate rounded px-2 py-0.5 font-mono text-xs',
+            DESTRUCTIVE_ACTION.test(e.action)
+              ? 'bg-red-500/10 text-red-700 dark:text-red-400'
+              : 'bg-elevated text-secondary',
+          )}
         >
           {e.action}
         </span>
@@ -80,34 +91,40 @@ export default function AuditLog() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-primary">Audit Log</h1>
-        <p className="mt-0.5 text-sm text-secondary">
-          {total} event{total === 1 ? '' : 's'} — click a row to inspect the diff.
-        </p>
-      </div>
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        total={data?.total}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        sort={sort}
-        onSortChange={(s) => {
-          setSort(s);
-          reset();
-        }}
-        loading={isLoading}
-        emptyMessage="No audit entries yet."
-        renderExpanded={(e) => (
-          <pre className="max-h-72 overflow-auto rounded-lg glass-dense p-3 font-mono text-xs leading-relaxed text-secondary">
-            {JSON.stringify(e.diff, null, 2)}
-          </pre>
-        )}
+      <PageHeader
+        title="Audit Log"
+        description={`${total} event${total === 1 ? '' : 's'} — click a row to inspect the diff.`}
       />
+
+      {!isLoading && rows.length === 0 ? (
+        <EmptyState
+          icon={ScrollText}
+          title="No audit entries yet"
+          description="Events will appear here as users make changes across the workspace."
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          total={data?.total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          sort={sort}
+          onSortChange={(s) => {
+            setSort(s);
+            reset();
+          }}
+          loading={isLoading}
+          emptyMessage="No audit entries yet."
+          renderExpanded={(e) => (
+            <pre className="max-h-72 overflow-auto rounded-lg glass-dense p-3 font-mono text-xs leading-relaxed text-secondary">
+              {JSON.stringify(e.diff, null, 2)}
+            </pre>
+          )}
+        />
+      )}
     </div>
   );
 }

@@ -45,7 +45,8 @@ export default function BottomNav() {
             className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMore(false)}
           />
-          <div className="animate-sheet-up absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-2xl glass-chrome pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_44px_rgba(0,0,0,0.35)]">
+          {/* intentional literal shadow (no shadow-color token exists; task-14 sweep) */}
+          <div className="animate-sheet-up absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl glass-chrome pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_44px_rgba(0,0,0,0.35)]">
             <div className="flex justify-center pb-1 pt-3">
               <span className="h-1 w-10 rounded-full bg-edge" />
             </div>
@@ -86,7 +87,7 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t glass-chrome lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-edge glass-chrome lg:hidden">
         <div className="flex h-14 items-stretch">
           {primary.map(({ to, label, icon: Icon, end }) => (
             <NavLink

@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { MetricBucket } from '@/api/types';
+import { LiquidGlassSurface } from '@/components/LiquidGlass';
 
 /**
  * Bento-box card shell: token-based surface with rounded-2xl edges, hover
@@ -13,15 +14,17 @@ export default function BentoCard({
   ...rest
 }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
   return (
-    <div
+    <LiquidGlassSurface
+      variant="card"
+      interactive
       {...rest}
       className={cn(
-        'min-w-0 rounded-2xl glass-card p-4 transition-all duration-150 sm:p-5',
+        'min-w-0 rounded-2xl p-4 transition-all duration-150 sm:p-5',
         className,
       )}
     >
       {children}
-    </div>
+    </LiquidGlassSurface>
   );
 }
 

@@ -1,10 +1,6 @@
 /**
- * Theme manager: light (default) / dark / ledgerly / ledgerly-light / system.
- *
- * In Liquid Glass mode, 'system' renders the Apple-style frosted glass look
- * that auto-follows the device color scheme (light/dark). Forced 'light' and
- * 'dark' also render frosted glass. 'ledgerly' and 'ledgerly-light' remain
- * opaque warm-paper alternatives.
+ * Theme manager: delegates to the registry (theme-registry.ts), the single
+ * source of truth for all 10 theme modes. Default is paper.
  *
  * Two sources, one goal:
  * - localStorage ('itms_theme') is the fast-path cache — FOUC script +
@@ -14,17 +10,24 @@
  *   from the server value (server wins), and every local change pushes up
  *   best-effort (fire-and-forget; next login re-syncs anyway).
  *
- * `@custom-variant dark` in index.css keys off `.dark`; `.ledgerly-dark`
- * (later in the file) overrides the tokens with the Ledgerly palette.
+ * `@custom-variant dark` in index.css keys off `.dark`; the dark-family
+ * themes (dark, ledgerly, console, bold, terminal) carry it, the light
+ * family (light, ledgerly-light, paper, shell) never does.
  */
 import { setThemePref } from '@/api/client';
+import { DEFAULT_THEME, THEME_REGISTRY, type ThemeMode } from '@/lib/theme-registry';
 
-export type ThemeMode = 'light' | 'dark' | 'ledgerly' | 'ledgerly-light' | 'system';
+export type { ThemeMode } from '@/lib/theme-registry';
 
 const KEY = 'itms_theme';
 const mq = () => window.matchMedia('(prefers-color-scheme: dark)');
 
-const THEMES: ThemeMode[] = ['light', 'dark', 'ledgerly-light', 'ledgerly', 'system'];
+const THEMES: ThemeMode[] = Object.keys(THEME_REGISTRY) as ThemeMode[];
+
+/** Every class any theme can put on <html> — cleared before each apply. */
+const ALL_THEME_CLASSES: string[] = [
+  ...new Set(Object.values(THEME_REGISTRY).flatMap((m) => m.classes)),
+];
 
 export function isThemeMode(v: unknown): v is ThemeMode {
   return typeof v === 'string' && (THEMES as string[]).includes(v);
@@ -32,49 +35,46 @@ export function isThemeMode(v: unknown): v is ThemeMode {
 
 export function getThemeMode(): ThemeMode {
   const v = localStorage.getItem(KEY);
-  return isThemeMode(v) ? v : 'light';
+  return isThemeMode(v) ? v : DEFAULT_THEME;
 }
 
-export function getResolvedTheme(): 'light' | 'dark' | 'ledgerly' | 'ledgerly-light' {
+/**
+ * Resolved theme: 'system' follows the device (light/dark); every other
+ * mode is identity. Never returns 'system', so the registry's static
+ * system placeholder is always resolved dynamically at apply time.
+ */
+export function getResolvedTheme(): Exclude<ThemeMode, 'system'> {
   const mode = getThemeMode();
-  if (mode === 'ledgerly' || mode === 'ledgerly-light') return mode;
-  return mode === 'system' ? (mq().matches ? 'dark' : 'light') : mode;
+  if (mode === 'system') return mq().matches ? 'dark' : 'light';
+  return mode;
 }
 
-export function applyTheme(mode?: ThemeMode) {
+export function applyTheme() {
   const resolved = getResolvedTheme();
   const root = document.documentElement;
-  // `.dark` drives the @custom-variant dark: utilities — it must be present
-  // ONLY for the dark-family themes (dark, ledgerly). The light themes
-  // (light, ledgerly-light) never carry it, so dark: variants stay inert.
-  root.classList.toggle('dark', resolved === 'dark' || resolved === 'ledgerly');
-  // `.ledgerly-dark` / `.ledgerly-light` (later in index.css) override every
-  // --t-* token with the Ledgerly palette.
-  root.classList.toggle('ledgerly-dark', resolved === 'ledgerly');
-  root.classList.toggle('ledgerly-light', resolved === 'ledgerly-light');
+  // Clear every known theme class, then apply the resolved theme's classes
+  // from the registry. `.dark` drives the @custom-variant dark: utilities —
+  // it is present ONLY for the dark-family themes.
+  root.classList.remove(...ALL_THEME_CLASSES);
+  const classes = THEME_REGISTRY[resolved].classes;
+  if (classes.length > 0) root.classList.add(...classes);
   // meta theme-color follows the resolved theme (PWA chrome)
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    // ledgerly-light → warm paper #f6f5f1 · light → #ffffff · ledgerly(dark) → #141311 · slate dark → #020617
-    meta.setAttribute(
-      'content',
-      resolved === 'ledgerly-light'
-        ? '#f6f5f1'
-        : resolved === 'ledgerly'
-          ? '#141311'
-          : resolved === 'light'
-            ? '#ffffff'
-            : '#020617',
-    );
+    meta.setAttribute('content', THEME_REGISTRY[resolved].themeColor);
   }
-  void mode;
+}
+
+/** Apply immediately + persist locally only (no server push — pre-auth safe). */
+export function setThemeModeLocal(mode: ThemeMode) {
+  localStorage.setItem('itms_theme', mode);
+  applyTheme();
+  window.dispatchEvent(new Event('itms-theme-changed'));
 }
 
 /** Apply immediately + persist locally + push to the server (best-effort). */
 export function setThemeMode(mode: ThemeMode) {
-  localStorage.setItem(KEY, mode);
-  applyTheme(mode);
-  window.dispatchEvent(new Event(THEME_CHANGED));
+  setThemeModeLocal(mode);
   // Fire-and-forget: failing here is fine — the next login re-syncs.
   // (apiFetch's 401 path redirects to /login, which is correct when the
   // session really is dead; network failures just no-op.)
@@ -84,14 +84,14 @@ export function setThemeMode(mode: ThemeMode) {
 /**
  * Server → local hydration. Called after login / /auth/me / SSO: the per-user
  * pref is authoritative on every device, so it overrides the local cache.
- * Unknown/absent values fall back to 'light' (never trusts client input).
+ * Unknown/absent values fall back to the default (never trusts client input).
  */
 export function hydrateThemeFromUser(user?: { theme?: string } | null) {
   const v = user?.theme;
-  const mode = isThemeMode(v) ? v : 'light';
+  const mode = isThemeMode(v) ? v : DEFAULT_THEME;
   if (localStorage.getItem(KEY) !== mode) {
     localStorage.setItem(KEY, mode);
-    applyTheme(mode);
+    applyTheme();
     window.dispatchEvent(new Event(THEME_CHANGED));
   }
 }
@@ -110,7 +110,7 @@ let systemListener: ((e: MediaQueryListEvent) => void) | null = null;
 export function watchSystemTheme() {
   if (systemListener) return;
   systemListener = () => {
-    if (getThemeMode() === 'system') applyTheme('system');
+    if (getThemeMode() === 'system') applyTheme();
   };
   mq().addEventListener('change', systemListener);
 }

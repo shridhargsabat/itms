@@ -11,6 +11,7 @@ import {
   Paperclip,
   Plus,
   Table,
+  Ticket as TicketIcon,
   Trash2,
   User,
   X,
@@ -36,7 +37,10 @@ import {
 import { PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
 import type { CreateTicketInput, Ticket, TicketStatus, TicketTemplate } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
+import EmptyState from '@/components/EmptyState';
+import FilterBar from '@/components/FilterBar';
 import Modal from '@/components/Modal';
+import PageHeader from '@/components/PageHeader';
 import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
@@ -292,18 +296,15 @@ export default function Tickets() {
 
   const next = selected ? NEXT_STATUS[selected.status] : undefined;
 
+  const matchCount = view === 'table' ? (data?.total ?? rows.length) : rows.length;
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-primary">Tickets</h1>
-          <p className="mt-0.5 text-sm text-secondary">
-            {view === 'table' ? data?.total ?? rows.length : rows.length} ticket
-            {view === 'table' ? (data?.total ?? rows.length) === 1 ? '' : 's' : rows.length === 1 ? '' : 's'} matching filters
-          </p>
-        </div>
-        <div className="w-full min-w-0 sm:w-auto">
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+      <PageHeader
+        title="Tickets"
+        description={`${matchCount} ticket${matchCount === 1 ? '' : 's'} matching filters`}
+        actions={
+          <>
             <Button
               type="button"
               onClick={() =>
@@ -317,72 +318,89 @@ export default function Tickets() {
               }
               variant="secondary"
               size="lg"
-              className="sm:flex-none"
               leftIcon={<Download className="h-4 w-4" />}
             >
               Export
             </Button>
-            <div className="col-span-2 flex overflow-hidden rounded-lg glass-dense sm:col-auto">
-              <button
-                type="button"
-                onClick={() => setView('table')}
-                className={cn(
-                  'inline-flex h-10 flex-1 items-center justify-center gap-1.5 px-3 text-sm transition-colors sm:flex-none',
-                  view === 'table' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
-                )}
-              >
-                <Table className="h-4 w-4" /> Table
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('kanban')}
-                className={cn(
-                  'inline-flex h-10 flex-1 items-center justify-center gap-1.5 px-3 text-sm transition-colors sm:flex-none',
-                  view === 'kanban' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
-                )}
-              >
-                <Columns3 className="h-4 w-4" /> Kanban
-              </button>
-            </div>
-            <Select
-              className="w-full sm:w-auto sm:min-w-[130px]"
-              value={status}
-              onChange={(v) => update('status', v)}
-              options={[
-                { value: '', label: 'All Statuses' },
-                ...TICKET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
-              ]}
-          />
-          <Select
-            className="w-full sm:w-auto sm:min-w-[130px]"
-            value={priority}
-            onChange={(v) => update('priority', v)}
-            options={[{ value: '', label: 'All Priorities' }, ...PRIORITIES.map((p) => ({ value: p, label: p }))]}
-          />
-          <Select
-            className="w-full sm:w-auto sm:min-w-[130px]"
-            value={type}
-            onChange={(v) => update('type', v)}
-            options={[
-              { value: '', label: 'All Types' },
-              ...TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') })),
-            ]}
-          />
-          <Button
+            <Button
+              type="button"
+              onClick={() => setNewOpen(true)}
+              variant="primary"
+              leftIcon={<Plus className="h-4 w-4" />}
+            >
+              New Ticket
+            </Button>
+          </>
+        }
+      />
+
+      <FilterBar>
+        <div className="flex overflow-hidden rounded-lg glass-dense">
+          <button
             type="button"
-            onClick={() => setNewOpen(true)}
-            variant="primary"
-            className="col-span-2 sm:col-auto"
-            leftIcon={<Plus className="h-4 w-4" />}
+            onClick={() => setView('table')}
+            className={cn(
+              'inline-flex h-9 items-center gap-1.5 px-3 text-sm transition-colors',
+              view === 'table' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
+            )}
           >
-            New Ticket
-          </Button>
-          </div>
+            <Table className="h-4 w-4" /> Table
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('kanban')}
+            className={cn(
+              'inline-flex h-9 items-center gap-1.5 px-3 text-sm transition-colors',
+              view === 'kanban' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
+            )}
+          >
+            <Columns3 className="h-4 w-4" /> Kanban
+          </button>
         </div>
-      </div>
+        <Select
+          className="w-full sm:w-auto sm:min-w-[130px]"
+          value={status}
+          onChange={(v) => update('status', v)}
+          options={[
+            { value: '', label: 'All Statuses' },
+            ...TICKET_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') })),
+          ]}
+        />
+        <Select
+          className="w-full sm:w-auto sm:min-w-[130px]"
+          value={priority}
+          onChange={(v) => update('priority', v)}
+          options={[{ value: '', label: 'All Priorities' }, ...PRIORITIES.map((p) => ({ value: p, label: p }))]}
+        />
+        <Select
+          className="w-full sm:w-auto sm:min-w-[130px]"
+          value={type}
+          onChange={(v) => update('type', v)}
+          options={[
+            { value: '', label: 'All Types' },
+            ...TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') })),
+          ]}
+        />
+      </FilterBar>
 
       <div className="min-w-0">
-          {view === 'table' ? (
+        {!isLoading && rows.length === 0 ? (
+          <EmptyState
+            icon={TicketIcon}
+            title="No tickets found"
+            description="No tickets match the current filters. Adjust the filters or create a new ticket."
+            action={
+              <Button
+                type="button"
+                onClick={() => setNewOpen(true)}
+                variant="primary"
+                leftIcon={<Plus className="h-4 w-4" />}
+              >
+                New Ticket
+              </Button>
+            }
+          />
+        ) : view === 'table' ? (
             <DataTable
               columns={columns}
               rows={rows}
