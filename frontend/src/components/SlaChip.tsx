@@ -31,7 +31,7 @@ export default function SlaChip({ dueAt, policyHours }: { dueAt: string | null; 
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold',
+        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold',
         overdue
           ? 'bg-red-500/15 text-red-400'
           : frac <= 0.5

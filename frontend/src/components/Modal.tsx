@@ -29,7 +29,7 @@ export default function Modal({ title, onClose, children }: ModalProps) {
       <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <LiquidGlassSurface
         variant="chrome"
-        className="animate-sheet-up relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl sm:max-w-lg sm:rounded-xl"
+        className="animate-sheet-up relative flex max-h-[92dvh] w-full flex-col rounded-t-[26px] liquid-glass-panel sm:max-w-lg sm:rounded-[26px]"
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-elevated2 sm:hidden" />
         <div className="flex items-center justify-between border-b border-edge px-5 py-4">
