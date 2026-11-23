@@ -42,8 +42,22 @@ IMAGE_PREFIX="${IMAGE_PREFIX:-itms}"
 cd "$CODE_DIR"
 
 # ── 1. Reset checkout to the branch tip ─────────────────────────────────
-git fetch --force origin "$BRANCH:refs/remotes/origin/$BRANCH" 2>/dev/null
-git checkout -f --detach "refs/remotes/origin/$BRANCH" 2>/dev/null
+# Retry: the VPS uplink is occasionally filtered/flaky — a single failed
+# fetch must not fail the deploy, and failures must be VISIBLE (an early
+# version silenced git stderr and died as a bare exit 128).
+FETCH_OK=""
+for i in 1 2 3; do
+  if OUT=$(git fetch --force origin "$BRANCH:refs/remotes/origin/$BRANCH" 2>&1); then
+    echo "$OUT" | tail -2
+    FETCH_OK=1
+    break
+  fi
+  echo "$OUT" | tail -3 >&2
+  echo "!! fetch attempt $i failed — retrying in 10s" >&2
+  sleep 10
+done
+[ -n "$FETCH_OK" ] || { echo "FATAL: git fetch origin $BRANCH failed 3 times" >&2; exit 1; }
+git checkout -f --detach "refs/remotes/origin/$BRANCH"
 git reset --hard "refs/remotes/origin/$BRANCH"
 SHA="$(git rev-parse --short=8 HEAD)"
 TAG="itms-${SHA}"
