@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import VelocityChart from './VelocityChart';
 import ExpiringSoon from './ExpiringSoon';
 import Dashboard from '@/views/Dashboard';
-import { getAuditLog, getDashboardMetrics, getLicenses, getVelocity, getWarrantyAlerts, listOverdueTickets } from '@/api/client';
+import { getAuditLog, getDashboardMetrics, getLicenses, getVelocity, getWarrantyAlerts, listOverdueTickets, listTickets } from '@/api/client';
 import { licenseDaysLeft } from '@/lib/chartData';
 import type { License, VelocityPoint, WarrantyAlert } from '@/api/types';
 
@@ -63,6 +63,7 @@ vi.mock('@/api/client', async (importOriginal) => {
     getDashboardMetrics: vi.fn(),
     getAuditLog: vi.fn(),
     listOverdueTickets: vi.fn(),
+    listTickets: vi.fn(),
   };
 });
 
@@ -144,6 +145,7 @@ beforeEach(() => {
   vi.mocked(getDashboardMetrics).mockResolvedValue(METRICS);
   vi.mocked(getAuditLog).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(listOverdueTickets).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(listTickets).mockResolvedValue({ items: [], total: 0 });
 });
 
 function queryClient() {

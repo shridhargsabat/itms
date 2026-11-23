@@ -28,6 +28,7 @@ import AddAssetButton from '@/components/AddAssetButton';
 import EmptyState from '@/components/EmptyState';
 import VelocityChart from '@/components/VelocityChart';
 import ExpiringSoon from '@/components/ExpiringSoon';
+import ServiceQueue from '@/components/ServiceQueue';
 import { getResolvedTheme, onThemeChanged, setThemeMode } from '@/lib/theme';
 import { THEME_REGISTRY } from '@/lib/theme-registry';
 import {
@@ -369,6 +370,9 @@ export default function Dashboard() {
         <VelocityChart className="xl:col-span-8" />
         <ExpiringSoon className="xl:col-span-4" />
       </section>
+
+      {/* Live service queue (Task 9): below analytics, above activity. */}
+      <ServiceQueue />
 
       {/* Recent Activity: EXACT existing header + feed, unchanged
           behavior (30s refetch, pause). p-0 keeps the inner px-5 rows at

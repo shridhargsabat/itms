@@ -53,6 +53,8 @@ vi.mock('@/api/client', async (importOriginal) => {
     getVelocity: () => Promise.resolve({ range: '7d', points: [] }),
     getWarrantyAlerts: () => Promise.resolve([]),
     getLicenses: () => Promise.resolve({ items: [], total: 0 }),
+    // Task 9 service queue: empty keeps this suite hermetic (no real fetch).
+    listTickets: () => Promise.resolve({ items: [], total: 0 }),
   };
 });
 
