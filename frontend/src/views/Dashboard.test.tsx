@@ -48,6 +48,11 @@ vi.mock('@/api/client', async (importOriginal) => {
     getDashboardMetrics: () => Promise.resolve(METRICS),
     getAuditLog: () => Promise.resolve({ items: [] }),
     listOverdueTickets: () => Promise.resolve({ items: [] }),
+    // Task 8 analytics row: empty data keeps this suite hermetic (no real
+    // fetch, no recharts mount — both components take the EmptyState path).
+    getVelocity: () => Promise.resolve({ range: '7d', points: [] }),
+    getWarrantyAlerts: () => Promise.resolve([]),
+    getLicenses: () => Promise.resolve({ items: [], total: 0 }),
   };
 });
 

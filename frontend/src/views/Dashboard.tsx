@@ -26,6 +26,8 @@ import Modal from '@/components/Modal';
 import Select from '@/components/Select';
 import AddAssetButton from '@/components/AddAssetButton';
 import EmptyState from '@/components/EmptyState';
+import VelocityChart from '@/components/VelocityChart';
+import ExpiringSoon from '@/components/ExpiringSoon';
 import { getResolvedTheme, onThemeChanged, setThemeMode } from '@/lib/theme';
 import { THEME_REGISTRY } from '@/lib/theme-registry';
 import {
@@ -358,6 +360,14 @@ export default function Dashboard() {
             </span>
           </Link>
         ))}
+      </section>
+
+      {/* Analytics row: velocity chart (8) + Expiring Soon stack (4),
+          both live. Panels are direct grid children so they stretch to
+          equal height. */}
+      <section data-testid="analytics-row" className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <VelocityChart className="xl:col-span-8" />
+        <ExpiringSoon className="xl:col-span-4" />
       </section>
 
       {/* Recent Activity: EXACT existing header + feed, unchanged
