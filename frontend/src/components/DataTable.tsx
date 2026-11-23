@@ -119,6 +119,20 @@ export default function DataTable<T extends { id: string }>({
       } else {
         targetBottom = window.innerHeight;
       }
+      // If the shell lives inside a bounded max-height ancestor (e.g. CMDB's
+      // 70vh left-column container), clamp to that ancestor's bottom so the
+      // inner table never overflows its own panel.
+      let anc: HTMLElement | null = shell.parentElement;
+      while (anc && anc !== scrollParent && anc !== document.body) {
+        const mh = getComputedStyle(anc).maxHeight;
+        if (mh && mh !== 'none') {
+          const ar = anc.getBoundingClientRect();
+          const apb = parseFloat(getComputedStyle(anc).paddingBottom) || 0;
+          targetBottom = Math.min(targetBottom, ar.bottom - apb);
+          break;
+        }
+        anc = anc.parentElement;
+      }
       const next = Math.max(targetBottom - shell.getBoundingClientRect().top - 24, 280);
       // only re-render when the measured height actually moved (avoid churn on scroll/resize)
       if (shellMaxH.current === undefined || Math.abs(shellMaxH.current - next) > 2) {
