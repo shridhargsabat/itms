@@ -15,6 +15,7 @@ import FilterBar from '@/components/FilterBar';
 import PageHeader from '@/components/PageHeader';
 import PaginationFooter from '@/components/PaginationFooter';
 import { Button } from '@/components/Button';
+import Select from '@/components/Select';
 import type { KbArticle } from '@/api/types';
 
 // P1-7 (issue #48): lite knowledge base — articles by ticket type + canned
@@ -283,9 +284,12 @@ function ArticleForm({ article, onClose }: { article: KbArticle | null; onClose:
     <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
       <h2 className="text-sm font-bold text-primary">{article ? 'Edit article' : 'New article'}</h2>
       <div className="mt-3 space-y-3">
-        <select value={type} onChange={(e) => setType(e.target.value)} className={cn(inputCls, 'w-48')}>
-          {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
+        <Select
+          className="w-48"
+          value={type}
+          onChange={setType}
+          options={TYPES.map((t) => ({ value: t, label: t }))}
+        />
         <input className={inputCls} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <textarea
           className={cn(inputCls, 'min-h-32 resize-y')}

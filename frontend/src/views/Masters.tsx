@@ -803,7 +803,7 @@ function VendorsTab() {
               <div className="flex shrink-0 items-center gap-1">
                 <Button onClick={() => startEdit(v)} variant="ghost" size="icon" className="p-2 text-muted hover:text-accent" title="Edit"><Pencil className="h-4 w-4" /></Button>
                 {isAdmin && (
-                  <Button onClick={() => { if (confirm(`Delete vendor ${v.name}?`)) remove.mutate(v.id); }} variant="ghost" size="icon" className="p-2 text-muted hover:bg-red-500/10 hover:text-red-400" title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                  <DeleteButton onConfirm={() => remove.mutate(v.id)} label={v.name} />
                 )}
               </div>
             </div>
