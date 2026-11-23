@@ -66,9 +66,11 @@ export default function ExpiringSoon({ className }: { className?: string }) {
         ) : (
           <>
             {warrantyRows.map((w) => (
-              <div
+              <button
                 key={w.id}
-                className="glass-card flex items-center justify-between gap-2 rounded-[20px] p-3.5"
+                type="button"
+                onClick={() => navigate(`/assets?search=${encodeURIComponent(w.asset_tag)}`)}
+                className="glass-card flex w-full cursor-pointer items-center justify-between gap-2 rounded-[20px] p-3.5 text-left transition-colors hover:bg-elevated/60"
               >
                 <div className="min-w-0">
                   <div className="truncate text-xs font-semibold text-primary">{w.name}</div>
@@ -77,12 +79,14 @@ export default function ExpiringSoon({ className }: { className?: string }) {
                   </div>
                 </div>
                 <CountdownPill days={w.days_left} />
-              </div>
+              </button>
             ))}
             {licenseRows.map((l) => (
-              <div
+              <button
                 key={l.id}
-                className="glass-card flex items-center justify-between gap-2 rounded-[20px] p-3.5"
+                type="button"
+                onClick={() => navigate('/licenses?tab=expiring')}
+                className="glass-card flex w-full cursor-pointer items-center justify-between gap-2 rounded-[20px] p-3.5 text-left transition-colors hover:bg-elevated/60"
               >
                 <div className="min-w-0">
                   <div className="truncate text-xs font-semibold text-primary">{l.name}</div>
@@ -91,7 +95,7 @@ export default function ExpiringSoon({ className }: { className?: string }) {
                   </div>
                 </div>
                 <CountdownPill days={licenseDaysLeft(l.expiry_date)} />
-              </div>
+              </button>
             ))}
           </>
         )}

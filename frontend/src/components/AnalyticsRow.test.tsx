@@ -174,7 +174,7 @@ function renderStack() {
 
 function LocationProbe() {
   const loc = useLocation();
-  return <div data-testid="loc">{loc.pathname}</div>;
+  return <div data-testid="loc">{loc.pathname}{loc.search}</div>;
 }
 
 describe('VelocityChart (task 8)', () => {
@@ -255,6 +255,40 @@ describe('ExpiringSoon (task 8)', () => {
     expect(await screen.findByTestId('expiring-soon')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /open cmdb impact lens/i }));
     expect(await screen.findByTestId('loc')).toHaveTextContent('/cmdb');
+  });
+
+  it('navigates a warranty row to the filtered asset', async () => {
+    render(
+      <QueryClientProvider client={queryClient()}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<><ExpiringSoon /><LocationProbe /></>} />
+            <Route path="/assets" element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId('expiring-soon')).toBeInTheDocument();
+    await screen.findByText('Core PostgreSQL 18 Primary');
+    fireEvent.click(screen.getByRole('button', { name: /core postgresql 18 primary/i }));
+    expect(await screen.findByTestId('loc')).toHaveTextContent('/assets?search=SRV-MUM-001');
+  });
+
+  it('navigates a license row to the expiring tab', async () => {
+    render(
+      <QueryClientProvider client={queryClient()}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<><ExpiringSoon /><LocationProbe /></>} />
+            <Route path="/licenses" element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId('expiring-soon')).toBeInTheDocument();
+    await screen.findByText(/microsoft 365 e5/i);
+    fireEvent.click(screen.getByRole('button', { name: /microsoft 365 e5/i }));
+    expect(await screen.findByTestId('loc')).toHaveTextContent('/licenses?tab=expiring');
   });
 
   it('shows an empty state when nothing is expiring', async () => {
