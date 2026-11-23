@@ -12,7 +12,7 @@ import {
 import {
   type Vec2,
   computeDirectionalScale,
-  computeSpecularAngle,
+  computeSpecularGradient,
   generateLiquidDisplacementMap,
 } from '@/lib/liquid-glass-shader';
 import { getResolvedTheme, onThemeChanged } from '@/lib/theme';
@@ -21,27 +21,43 @@ import { cn } from '@/lib/utils';
 
 export const LIQUID_GLASS_FILTER_ID = 'itms-liquid-glass-refract';
 
-/** Reactive hook: true only when the active resolved theme has `glass: true` (light, dark, system). */
-export function useIsLiquidGlassTheme(): boolean {
-  const [isGlass, setIsGlass] = useState<boolean>(() => THEME_REGISTRY[getResolvedTheme()].glass);
+/** Reactive hook returning `{ isGlass, isDark }` for the active resolved theme. */
+export function useLiquidGlassThemeState(): { isGlass: boolean; isDark: boolean } {
+  const [state, setState] = useState(() => {
+    const meta = THEME_REGISTRY[getResolvedTheme()];
+    return { isGlass: meta.glass, isDark: meta.dark };
+  });
 
   useEffect(() => {
-    const sync = () => setIsGlass(THEME_REGISTRY[getResolvedTheme()].glass);
+    const sync = () => {
+      const meta = THEME_REGISTRY[getResolvedTheme()];
+      setState({ isGlass: meta.glass, isDark: meta.dark });
+    };
     sync();
     return onThemeChanged(sync);
   }, []);
 
-  return isGlass;
+  return state;
+}
+
+/** Reactive hook: true only when the active resolved theme has `glass: true` (light, dark, system). */
+export function useIsLiquidGlassTheme(): boolean {
+  return useLiquidGlassThemeState().isGlass;
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 /**
  * Shared SVG displacement filter bank ported from rdev/liquid-glass-react.
- * Mounted once at the root of Layout / LegacyLogin so every `.glass-card` and
- * `<LiquidGlassSurface>` can reference `url(#itms-liquid-glass-refract)` without
- * duplicating 40KB SVG filter trees per card.
+ * Mounted once at the root of Layout / LegacyLogin so every `.glass-card`,
+ * `.glass-chrome`, and `<LiquidGlassSurface>` can reference
+ * `url(#itms-liquid-glass-refract)` without duplicating SVG filter trees.
  */
 export function LiquidGlassFilterBank({
-  displacementScale = 28,
+  displacementScale = 18,
   aberrationIntensity = 2,
 }: {
   displacementScale?: number;
@@ -89,13 +105,13 @@ export function LiquidGlassFilterBank({
 
           <feOffset in="SourceGraphic" dx="0" dy="0" result="CENTER_ORIGINAL" />
 
-          {/* Red channel displacement */}
+          {/* Red channel displacement (R=X, G=Y) */}
           <feDisplacementMap
             in="SourceGraphic"
             in2="DISPLACEMENT_MAP"
             scale={displacementScale}
             xChannelSelector="R"
-            yChannelSelector="B"
+            yChannelSelector="G"
             result="RED_DISPLACED"
           />
           <feColorMatrix
@@ -105,13 +121,13 @@ export function LiquidGlassFilterBank({
             result="RED_CHANNEL"
           />
 
-          {/* Green channel displacement */}
+          {/* Green channel displacement (R=X, G=Y) */}
           <feDisplacementMap
             in="SourceGraphic"
             in2="DISPLACEMENT_MAP"
             scale={displacementScale * (1 - aberrationIntensity * 0.05)}
             xChannelSelector="R"
-            yChannelSelector="B"
+            yChannelSelector="G"
             result="GREEN_DISPLACED"
           />
           <feColorMatrix
@@ -121,13 +137,13 @@ export function LiquidGlassFilterBank({
             result="GREEN_CHANNEL"
           />
 
-          {/* Blue channel displacement */}
+          {/* Blue channel displacement (R=X, G=Y) */}
           <feDisplacementMap
             in="SourceGraphic"
             in2="DISPLACEMENT_MAP"
             scale={displacementScale * (1 - aberrationIntensity * 0.1)}
             xChannelSelector="R"
-            yChannelSelector="B"
+            yChannelSelector="G"
             result="BLUE_DISPLACED"
           />
           <feColorMatrix
@@ -194,7 +210,7 @@ export function LiquidGlassSurface({
   onPointerUp,
   ...rest
 }: LiquidGlassSurfaceProps) {
-  const isGlass = useIsLiquidGlassTheme();
+  const { isGlass, isDark } = useLiquidGlassThemeState();
   const ref = useRef<HTMLElement | null>(null);
   const [mouseOffset, setMouseOffset] = useState<Vec2>({ x: 0, y: 0 });
   const [elasticScale, setElasticScale] = useState<string>('scale(1)');
@@ -204,7 +220,7 @@ export function LiquidGlassSurface({
   const handlePointerMove = useCallback(
     (e: ReactPointerEvent<HTMLElement>) => {
       onPointerMove?.(e);
-      if (!isGlass) return;
+      if (!isGlass || prefersReducedMotion()) return;
       const el = ref.current;
       const rect = el?.getBoundingClientRect();
       const width = rect && rect.width > 0 ? rect.width : 280;
@@ -244,8 +260,7 @@ export function LiquidGlassSurface({
     );
   }
 
-  const spec = computeSpecularAngle(mouseOffset);
-  const specularGradient = `linear-gradient(${spec.angleDeg}deg, rgba(255,255,255,0) 0%, rgba(255,255,255,${spec.stop1Opacity.toFixed(3)}) ${spec.stop1Pct}%, rgba(255,255,255,${spec.stop2Opacity.toFixed(3)}) ${spec.stop2Pct}%, rgba(255,255,255,0) 100%)`;
+  const specularGradient = computeSpecularGradient(mouseOffset, isDark);
 
   const mergedStyle: CSSProperties = {
     ...style,
@@ -261,6 +276,10 @@ export function LiquidGlassSurface({
     background: specularGradient,
   };
 
+  const sheenBackground = isDark
+    ? 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0) 65%)'
+    : 'radial-gradient(circle at 50% 0%, rgba(99,102,241,0.22) 0%, rgba(56,189,248,0.08) 45%, rgba(255,255,255,0) 70%)';
+
   return (
     <Tag
       ref={ref as never}
@@ -270,12 +289,12 @@ export function LiquidGlassSurface({
       onPointerMove={handlePointerMove}
       onPointerEnter={(e) => {
         onPointerEnter?.(e);
-        setHovered(true);
+        if (!prefersReducedMotion()) setHovered(true);
       }}
       onPointerLeave={handlePointerLeave}
       onPointerDown={(e) => {
         onPointerDown?.(e);
-        setActive(true);
+        if (!prefersReducedMotion()) setActive(true);
       }}
       onPointerUp={(e) => {
         onPointerUp?.(e);
@@ -287,23 +306,31 @@ export function LiquidGlassSurface({
       <span
         aria-hidden="true"
         data-testid="liquid-glass-specular"
-        className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] mix-blend-screen opacity-40"
+        className={cn(
+          'pointer-events-none absolute inset-0 z-10 rounded-[inherit]',
+          isDark ? 'mix-blend-screen opacity-40' : 'mix-blend-normal opacity-80',
+        )}
         style={xorMaskStyle}
       />
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] mix-blend-overlay opacity-75"
+        className={cn(
+          'pointer-events-none absolute inset-0 z-10 rounded-[inherit]',
+          isDark ? 'mix-blend-overlay opacity-75' : 'mix-blend-overlay opacity-55',
+        )}
         style={xorMaskStyle}
       />
       {interactive && (
         <span
           aria-hidden="true"
           data-testid="liquid-glass-sheen"
-          className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] mix-blend-overlay transition-opacity duration-200"
+          className={cn(
+            'pointer-events-none absolute inset-0 z-10 rounded-[inherit] transition-opacity duration-200',
+            isDark ? 'mix-blend-overlay' : 'mix-blend-normal',
+          )}
           style={{
             opacity: active ? 0.55 : hovered ? 0.35 : 0,
-            backgroundImage:
-              'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0) 65%)',
+            backgroundImage: sheenBackground,
           }}
         />
       )}
