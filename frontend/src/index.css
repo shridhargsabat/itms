@@ -131,18 +131,20 @@
    against --t-base. Paper/shell are light (no .dark); console/bold/terminal
    pair with .dark (see index.html FOUC script + theme registry). */
 
-/* Legacy font vars — explicit per legacy theme, equal to the current
-   Tailwind preflight stack, so `body { font-family: var(--t-font-body) }`
-   renders legacy themes pixel-identically. Separate rule: legacy blocks
-   above are never edited. (.dark inherits these from :root.)
+/* Legacy font vars — DELEGATE to tailwind's own theme stacks (never a literal
+   copy: a literal ui-sans-serif/system-ui copy drifted from preflight's
+   -apple-system stack and rasterized 1 LSB off on Linux — task-15 pixel-proof),
+   so `body { font-family: var(--t-font-body) }` renders legacy themes
+   pixel-identically. Separate rule: legacy blocks above are never edited.
+   (.dark inherits these from :root.)
    ORDER MATTERS: this rule sits BEFORE the .theme-* blocks. Theme classes
    live on <html> (= :root), so at equal (0,1,0) specificity the later rule
    wins — the theme blocks must come last or every theme computes the
    system stack instead of Fraunces / Space Grotesk / JetBrains Mono. */
 :root, .ledgerly-dark, .ledgerly-light, .theme-light {
-  --t-font-display: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --t-font-body: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --t-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --t-font-display: var(--font-sans);
+  --t-font-body: var(--font-sans);
+  --t-font-mono: var(--font-mono);
 }
 
 /* Paper — warm paper light. Mockup 001: paper #f6f5f1, ink #1c1917,
