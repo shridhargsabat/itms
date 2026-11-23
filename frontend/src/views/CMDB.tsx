@@ -4,6 +4,8 @@ import { GitBranch, LoaderCircle, MoveRight, Network } from 'lucide-react';
 import { getImpact, getTopology } from '@/api/client';
 import type { TopologyNode } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
+import EmptyState from '@/components/EmptyState';
+import PageHeader from '@/components/PageHeader';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 
 // CMDB carve-out: the CI table is embedded in a narrow 300px sidebar column —
@@ -78,12 +80,10 @@ export default function CMDB() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-primary">CMDB</h1>
-        <p className="mt-0.5 text-sm text-secondary">
-          Configuration items and dependency impact analysis.
-        </p>
-      </div>
+      <PageHeader
+        title="CMDB"
+        description="Configuration items and dependency impact analysis."
+      />
 
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
         <div className="min-w-0 rounded-xl glass-card p-3">
@@ -100,32 +100,42 @@ export default function CMDB() {
               ))}
             </div>
           )}
-          <div className="max-h-[70vh] overflow-y-auto p-1">
-            {/* CMDB carve-out: the CI table lives in a narrow 300px sidebar and
-                slices the in-memory topology graph (unpaginated by design —
-                the graph is loaded whole). */}
-            <DataTable<TopologyNode>
-              columns={ciColumns}
-              rows={allNodes.slice((ciPage - 1) * ciPageSize, ciPage * ciPageSize)}
-              total={allNodes.length}
-              page={ciPage}
-              pageSize={ciPageSize}
-              onPageChange={(p) => setCiPage(Math.max(1, p))}
-              onPageSizeChange={(s) => {
-                setCiPageSize(s);
-                setCiPage(1);
-              }}
-              sort={ciSort}
-              onSortChange={(s) => {
-                setCiSort(s);
-                setCiPage(1);
-              }}
-              loading={topology.isLoading}
-              emptyMessage="No configuration items found."
-              minWidth={CI_TABLE_MIN_WIDTH}
-              onRowClick={(n) => setSelectedId(n.id)}
-            />
-          </div>
+          {!topology.isLoading && allNodes.length === 0 ? (
+            <div className="p-1">
+              <EmptyState
+                icon={Network}
+                title="No configuration items"
+                description="No configuration items found in the topology yet."
+              />
+            </div>
+          ) : (
+            <div className="max-h-[70vh] overflow-y-auto p-1">
+              {/* CMDB carve-out: the CI table lives in a narrow 300px sidebar and
+                  slices the in-memory topology graph (unpaginated by design —
+                  the graph is loaded whole). */}
+              <DataTable<TopologyNode>
+                columns={ciColumns}
+                rows={allNodes.slice((ciPage - 1) * ciPageSize, ciPage * ciPageSize)}
+                total={allNodes.length}
+                page={ciPage}
+                pageSize={ciPageSize}
+                onPageChange={(p) => setCiPage(Math.max(1, p))}
+                onPageSizeChange={(s) => {
+                  setCiPageSize(s);
+                  setCiPage(1);
+                }}
+                sort={ciSort}
+                onSortChange={(s) => {
+                  setCiSort(s);
+                  setCiPage(1);
+                }}
+                loading={topology.isLoading}
+                emptyMessage="No configuration items found."
+                minWidth={CI_TABLE_MIN_WIDTH}
+                onRowClick={(n) => setSelectedId(n.id)}
+              />
+            </div>
+          )}
         </div>
 
         <div className="min-w-0 space-y-4">
@@ -142,7 +152,7 @@ export default function CMDB() {
                     {root?.asset_tag ?? impact.data.root_asset_id}
                   </span>
                   {root && <AssetStatusBadge status={root.status} />}
-                  <span className="ml-auto rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-indigo-500/30">
+                  <span className="ml-auto rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-accent/30">
                     {impact.data.impact_count} impacted
                   </span>
                 </div>
@@ -157,9 +167,11 @@ export default function CMDB() {
               </div>
               <div className="p-3">
                 {impact.data.impacted.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-edge p-6 text-center text-sm text-muted">
-                    No downstream impact found for this asset.
-                  </p>
+                  <EmptyState
+                    icon={GitBranch}
+                    title="No downstream impact"
+                    description="No downstream impact found for this asset."
+                  />
                 ) : (
                   <div className="divide-y divide-edge/60">
                     {impact.data.impacted.map((a) => (
@@ -194,7 +206,11 @@ export default function CMDB() {
             </div>
             <div className="max-h-64 space-y-2 overflow-y-auto p-4">
               {(topology.data?.edges ?? []).length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted">No relationships defined.</p>
+                <EmptyState
+                  icon={GitBranch}
+                  title="No relationships"
+                  description="No relationships defined between configuration items yet."
+                />
               ) : (
                 (topology.data?.edges ?? []).map((e) => {
                   const parent = nodeById.get(e.parent_asset_id);
