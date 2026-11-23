@@ -50,12 +50,12 @@ type Chip = {
 const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
 const CHIPS: Chip[] = [
-  { label: 'Open Requests', key: 'open_requests', icon: ClipboardList, accent: 'bg-blue-500/10 text-blue-400', to: '/requests' },
-  { label: 'SLA Overdue', key: 'overdue_tickets', icon: Timer, accent: 'bg-red-500/10 text-red-400', to: '/tickets?overdue=true', admin: true },
-  { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-400', to: '/tickets?priority=HIGH' },
-  { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-400', to: '/warranty' },
-  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-400', to: '/onboarding', wide: true },
-  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-400', to: '/licenses', admin: true, wide: true },
+  { label: 'Open Requests', key: 'open_requests', icon: ClipboardList, accent: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', to: '/requests' },
+  { label: 'SLA Overdue', key: 'overdue_tickets', icon: Timer, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/tickets?overdue=true', admin: true },
+  { label: 'High Priority', key: 'high_priority_count', icon: TriangleAlert, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/tickets?priority=HIGH' },
+  { label: 'Warranty Alerts', key: 'warranty_alerts_count', icon: ShieldCheck, accent: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', to: '/warranty' },
+  { label: 'Onboarding Overdue', key: 'onboarding_overdue', icon: UserRoundCheck, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/onboarding', wide: true },
+  { label: 'License Alerts', key: 'license_alerts', icon: BadgeCheck, accent: 'bg-red-500/10 text-red-700 dark:text-red-400', to: '/licenses', admin: true, wide: true },
 ];
 
 function OverdueTickets() {
@@ -291,7 +291,7 @@ export default function Dashboard() {
             <p className="truncate text-[11px] font-medium uppercase tracking-wide text-secondary lg:text-xs">
               Open Tickets
             </p>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 sm:h-9 sm:w-9">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 sm:h-9 sm:w-9">
               <Ticket className="h-4 w-4 sm:h-5 sm:w-5" />
             </span>
           </div>
