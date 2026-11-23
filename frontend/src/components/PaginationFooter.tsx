@@ -68,6 +68,7 @@ export default function PaginationFooter({
         />
         <Button
           type="button"
+          variant="ghost"
           aria-label="Previous page"
           className={`${navBtn} px-2`}
           disabled={!canPrev}
@@ -81,6 +82,7 @@ export default function PaginationFooter({
         </span>
         <Button
           type="button"
+          variant={canNext ? 'primary' : 'ghost'}
           aria-label="Next page"
           className={nextBtn}
           disabled={!canNext}
