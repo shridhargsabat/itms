@@ -138,7 +138,7 @@ export default function NotificationsBell({ className }: { className?: string })
           <div
             ref={panelRef}
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-            className="animate-menu-in z-[70] overflow-hidden rounded-xl glass-chrome"
+            className="animate-menu-in z-[70] overflow-hidden rounded-xl border border-edge bg-surface shadow-xl"
           >
             <div className="flex items-center justify-between border-b border-edge px-3 py-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">Notifications</p>

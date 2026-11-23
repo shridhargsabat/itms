@@ -161,7 +161,7 @@ export default function Select({
               maxWidth: menu?.maxWidth ?? 0,
             }}
             role="listbox"
-            className="animate-menu-in z-[70] max-h-64 overflow-auto rounded-lg glass-chrome p-1"
+            className="animate-menu-in z-[70] max-h-64 overflow-auto rounded-lg border border-edge bg-surface p-1 shadow-xl"
           >
             {options.map((o) => (
               <button
