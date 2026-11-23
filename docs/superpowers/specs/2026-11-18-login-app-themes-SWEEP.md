@@ -127,3 +127,5 @@ first observable paint is already themed — no light flash possible.
 - `npx tsc -b`: clean
 - `npm run build`: dist/ written
 - `cargo test theme_tests` (backend/): 1 passed
+
+Owner waiver (final review): the legacy-visible pager ghost-variant bugfix (`a47212d`) is intentional — the old render contradicted PaginationFooter's own no-fixed-accent-fill documented intent; controller-accepted, no code change.

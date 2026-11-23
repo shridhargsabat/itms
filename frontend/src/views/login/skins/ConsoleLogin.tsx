@@ -152,7 +152,7 @@ export default function ConsoleLogin() {
                   verifying…
                 </>
               ) : (
-                'Authenticate ↵'
+                <>Authenticate ↵</>
               )}
             </button>
           </form>

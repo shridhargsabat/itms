@@ -49,7 +49,7 @@ export function getResolvedTheme(): Exclude<ThemeMode, 'system'> {
   return mode;
 }
 
-export function applyTheme(mode?: ThemeMode) {
+export function applyTheme() {
   const resolved = getResolvedTheme();
   const root = document.documentElement;
   // Clear every known theme class, then apply the resolved theme's classes
@@ -63,13 +63,12 @@ export function applyTheme(mode?: ThemeMode) {
   if (meta) {
     meta.setAttribute('content', THEME_REGISTRY[resolved].themeColor);
   }
-  void mode;
 }
 
 /** Apply immediately + persist locally only (no server push — pre-auth safe). */
 export function setThemeModeLocal(mode: ThemeMode) {
   localStorage.setItem('itms_theme', mode);
-  applyTheme(mode);
+  applyTheme();
   window.dispatchEvent(new Event('itms-theme-changed'));
 }
 
@@ -92,7 +91,7 @@ export function hydrateThemeFromUser(user?: { theme?: string } | null) {
   const mode = isThemeMode(v) ? v : DEFAULT_THEME;
   if (localStorage.getItem(KEY) !== mode) {
     localStorage.setItem(KEY, mode);
-    applyTheme(mode);
+    applyTheme();
     window.dispatchEvent(new Event(THEME_CHANGED));
   }
 }
@@ -111,7 +110,7 @@ let systemListener: ((e: MediaQueryListEvent) => void) | null = null;
 export function watchSystemTheme() {
   if (systemListener) return;
   systemListener = () => {
-    if (getThemeMode() === 'system') applyTheme('system');
+    if (getThemeMode() === 'system') applyTheme();
   };
   mq().addEventListener('change', systemListener);
 }

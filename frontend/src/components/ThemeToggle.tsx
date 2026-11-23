@@ -54,12 +54,17 @@ export default function ThemeToggle({ className, showLabel }: { className?: stri
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
+  // Mount-once: device follower + cross-surface sync subscription.
   useEffect(() => {
-    applyTheme(mode);
     watchSystemTheme();
     // Server hydration (login / me) can change the theme from elsewhere —
     // keep the icon/state in sync instead of showing a stale mode.
     return onThemeChanged(() => setMode(getThemeMode()));
+  }, []);
+
+  // Re-apply only when the picked mode changes.
+  useEffect(() => {
+    applyTheme();
   }, [mode]);
 
   // Click-outside closes the menu.

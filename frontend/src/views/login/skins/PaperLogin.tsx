@@ -167,7 +167,7 @@ export default function PaperLogin() {
                   Signing in…
                 </>
               ) : (
-                'Sign in'
+                <>Sign in</>
               )}
             </button>
           </form>
@@ -208,7 +208,7 @@ export default function PaperLogin() {
                 Signing in…
               </>
             ) : (
-              'Use demo account'
+              <>Use demo account</>
             )}
           </button>
           <p className="mt-2.5 text-center text-xs text-muted">

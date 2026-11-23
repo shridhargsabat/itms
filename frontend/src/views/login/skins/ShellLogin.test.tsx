@@ -34,4 +34,10 @@ describe('shell skin R1 contract', () => {
     fireEvent.pointerUp(peek);
     expect(backdrop).toHaveAttribute('data-peeking', 'false');
   });
+  it('hides the hold-to-peek pill on narrow viewports (login-menu overlap)', () => {
+    wrap();
+    // Centered peek pill would collide with the fixed login-menu pill under
+    // ~640px, so it stays hidden there.
+    expect(screen.getByRole('button', { name: /peek/i }).className).toContain('max-[639px]:hidden');
+  });
 });

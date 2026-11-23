@@ -179,7 +179,7 @@
   --t-glass-edge: #d8d4c9;
   --t-glass-shadow: rgb(15 23 42 / 0.14);
   --t-font-display: Fraunces, Georgia, serif;
-  --t-font-body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --t-font-mono: JetBrains Mono, ui-monospace, monospace;
 }
 
@@ -205,7 +205,7 @@
   --t-glass-edge: #26262d;
   --t-glass-shadow: rgb(0 0 0 / 0.5);
   --t-font-display: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --t-font-body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --t-font-mono: JetBrains Mono, ui-monospace, monospace;
 }
 
@@ -231,7 +231,7 @@
   --t-glass-edge: rgb(255 255 255 / 0.12);
   --t-glass-shadow: rgb(0 0 0 / 0.5);
   --t-font-display: Space Grotesk, Inter, sans-serif;
-  --t-font-body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --t-font-mono: JetBrains Mono, ui-monospace, monospace;
 }
 
@@ -257,9 +257,9 @@
   --t-glass-hi: rgb(255 255 255 / 0.75);
   --t-glass-edge: rgb(255 255 255 / 0.65);
   --t-glass-shadow: rgb(15 23 42 / 0.14);
-  --t-font-display: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --t-font-body: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --t-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --t-font-display: var(--font-sans);
+  --t-font-body: var(--font-sans);
+  --t-font-mono: var(--font-mono);
 }
 
 /* Terminal — phosphor terminal dark. Mockup 006: bg #0a0f0d, term #0d1512,

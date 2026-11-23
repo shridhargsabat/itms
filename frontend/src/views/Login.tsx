@@ -12,6 +12,8 @@ export default function Login() {
   const [mode, setMode] = useState(getThemeMode());
   useEffect(() => onThemeChanged(() => setMode(getThemeMode())), []);
   const skin = skinForTheme(mode);
+  // No skins.ts registry by design: skinForTheme() + the switch below is the
+  // routing (covered by theme-registry + skin R1 tests).
   return (
     <>
       <LoginThemeMenu />

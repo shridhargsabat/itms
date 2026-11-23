@@ -315,7 +315,7 @@ export default function ShellLogin() {
         onFocus={() => setPeeking(true)}
         onBlur={() => setPeeking(false)}
         aria-pressed={peeking}
-        className="absolute bottom-3.5 left-1/2 z-[5] -translate-x-1/2 text-nowrap rounded-full border px-4 py-[7px] font-body text-xs transition"
+        className="absolute bottom-3.5 left-1/2 z-[5] -translate-x-1/2 text-nowrap rounded-full border px-4 py-[7px] font-body text-xs transition max-[639px]:hidden"
         style={{
           background: 'color-mix(in srgb, var(--t-primary) 80%, transparent)',
           color: 'var(--t-edge)',

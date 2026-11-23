@@ -133,7 +133,7 @@ function ThemePreview({ theme }: { theme: ThemeMeta }) {
           <div className="h-1.5 w-12 rounded-full" style={{ backgroundColor: 'var(--t-elevated2)' }} />
           <div
             className="grid h-4 w-4 place-items-center rounded"
-            style={{ backgroundColor: 'var(--t-accent)', color: '#ffffff' }}
+            style={{ backgroundColor: 'var(--t-accent)', color: 'var(--t-on-accent)' }}
           >
             <Check className="h-2.5 w-2.5" strokeWidth={3} />
           </div>

@@ -28,6 +28,21 @@ describe('fouc parity', () => {
     expect(html).toContain(`d.classList.add('dark', 'theme-bold')`);
     expect(html).toContain(`d.classList.add('dark', 'theme-terminal')`);
   });
+  it('falls unknown stored values through to the paper branch', () => {
+    // Missing values default via `|| 'paper'`, but an invalid string (e.g.
+    // 'banana') must not land in the unthemed else branch either.
+    expect(html).toContain(`=== -1) m = 'paper'`);
+  });
+  it('sets meta theme-color per theme before first paint', () => {
+    // PWA chrome must match the theme from the first paint, not stay
+    // static #ffffff until React mounts.
+    expect(html).toContain(`meta[name="theme-color"]`);
+    expect(html).toContain(`setAttribute('content'`);
+    ['#f6f5f1', '#09090b', '#0d0716', '#0a0f0d', '#141311', '#020617'].forEach((c) =>
+      expect(html).toContain(c));
+    // The meta tag must precede the script — the script queries it during parse.
+    expect(html.indexOf('<meta name="theme-color"')).toBeLessThan(html.indexOf('itms_theme'));
+  });
 });
 
 describe('css token contract', () => {
@@ -59,6 +74,19 @@ describe('css token contract', () => {
     expect(legacy).toContain('--t-font-display: var(--font-sans)');
     expect(legacy).toContain('--t-font-body: var(--font-sans)');
     expect(legacy).toContain('--t-font-mono: var(--font-mono)');
+  });
+  it('shell font vars delegate to the tailwind stacks (no literal copies)', () => {
+    // Same drift class as legacy: a literal ui-sans-serif/system-ui copy can
+    // diverge from preflight's stack — delegation cannot drift.
+    const block = css.match(/\.theme-shell\s*{([^}]*)}/s)?.[1] ?? '';
+    expect(block).toContain('--t-font-display: var(--font-sans)');
+    expect(block).toContain('--t-font-body: var(--font-sans)');
+    expect(block).toContain('--t-font-mono: var(--font-mono)');
+  });
+  it('body stacks never lead with unbundled Inter', () => {
+    // Inter is not bundled: a leading Inter in a body stack is a dead hop
+    // before the system fallback on every render.
+    expect(css).not.toMatch(/--t-font-body:\s*Inter/);
   });
   it('muted/secondary hit AA and primary hits AAA on base (all new themes)', () => {
     // parse hexes per theme block, relative-luminance contrast vs --t-base
