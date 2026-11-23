@@ -149,3 +149,22 @@ describe('hardcoded-color sweep (task 14)', () => {
     expect(boldSrc).toContain('var(--t-accent)');
   });
 });
+
+describe('paper ambient background', () => {
+  const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../index.css'), 'utf8');
+  const bg = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../components/AnimatedBackground.tsx'), 'utf8');
+  it('paper hides the cool aurora and shows warm glow instead', () => {
+    expect(css).toContain('.theme-paper .ab-mesh');
+    expect(css).toContain('.theme-paper .ab-blobs');
+    expect(css).toContain('.theme-paper .ab-paper-glow');
+    expect(css).toContain('.theme-paper .ab-particles span');
+    expect(bg).toContain('ab-paper-glow');
+    expect(bg).toContain('ab-mesh');
+  });
+  it('no other theme gets ambient overrides', () => {
+    ['theme-console', 'theme-bold', 'theme-shell', 'theme-terminal'].forEach((cls) => {
+      expect(css).not.toContain(`.${cls} .ab-`);
+    });
+  });
+});

@@ -288,6 +288,21 @@
   --t-font-mono: JetBrains Mono, ui-monospace, monospace;
 }
 
+/* Paper ambient: the cool pastel aurora clashes with warm-paper surfaces,
+   so paper hides the mesh + blobs, shows a warm glow instead, and turns
+   particles into warm dust. Scoped to .theme-paper — every other theme
+   (legacy included) renders exactly as before. */
+.theme-paper .ab-mesh,
+.theme-paper .ab-blobs {
+  display: none;
+}
+.theme-paper .ab-paper-glow {
+  display: block;
+}
+.theme-paper .ab-particles span {
+  background-color: rgb(180 148 105 / 0.5);
+}
+
 /* Font utilities: Tailwind v4 generates font-display / font-body /
    font-mono2 from these keys. (mono2: leaves the default font-mono
    utility untouched.) --color-on-accent likewise generates text-on-accent
