@@ -27,11 +27,13 @@ export default defineConfig({
         scope: './',
         id: './',
         display: 'standalone',
-        theme_color: '#020617',
-        background_color: '#020617',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
         icons: [
-          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
@@ -47,24 +49,13 @@ export default defineConfig({
             // on cache.match with a stale SWR cache — permanent loading
             // skeletons). Cache reads happen only when the network fetch
             // fails or exceeds the 3s Workbox timeout.
-            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(audit|dashboard|masters|users|assets|tickets|cmdb)(\/|\?|$).*/,
+            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(audit|dashboard|masters|users|assets|tickets|cmdb|templates|kb|notifications|sla|locations|vendors|claims|licenses|requests|onboarding|reports)(\/|\?|$).*/,
             handler: 'NetworkFirst',
             method: 'GET',
             options: {
               cacheName: 'api-fresh',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            // Read-only catalog GETs — offline-usable via SWR (stale-first, revalidate bg).
-            // ORDER: must precede the NetworkOnly catch-all (first match wins).
-            urlPattern: /^https?:\/\/[^/]+\/api\/v1\/(assets|tickets|cmdb)(\/|\?|$).*/,
-            handler: 'StaleWhileRevalidate',
-            method: 'GET',
-            options: {
-              cacheName: 'api-catalog',
-              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

@@ -50,8 +50,25 @@ export function initSwUpdateHandling() {
       .then((reg) => {
         const check = () => reg.update().catch(() => {});
         check();
-        const interval = window.setInterval(check, 60_000); // check every minute
-        window.addEventListener('beforeunload', () => window.clearInterval(interval));
+        let interval: number | undefined = window.setInterval(check, 60_000); // check every minute
+        const stopInterval = () => {
+          if (interval !== undefined) {
+            window.clearInterval(interval);
+            interval = undefined;
+          }
+        };
+        // bfcache-safe lifecycle: pagehide fires reliably on iOS (beforeunload
+        // does not) and does not break bfcache (P-558). Resume checks when the
+        // installed PWA returns to the foreground.
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            check();
+            if (interval === undefined) interval = window.setInterval(check, 60_000);
+          } else if (document.visibilityState === 'hidden') {
+            stopInterval();
+          }
+        });
+        window.addEventListener('pagehide', stopInterval);
 
         reg.addEventListener('updatefound', () => {
           const next = reg.installing;

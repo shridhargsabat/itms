@@ -26,7 +26,7 @@ export default function OAuthCallback() {
   }, [navigate, params]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-base">
+    <div className="flex min-h-dvh items-center justify-center bg-base">
       <p className="text-sm text-secondary">Signing you in…</p>
     </div>
   );
