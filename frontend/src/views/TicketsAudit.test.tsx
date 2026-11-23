@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -239,5 +239,81 @@ describe('Tickets Module 14-bug audit regressions', () => {
     const title = chip!.getAttribute('title')!;
     expect(title).toContain('2026');
     expect(title).not.toMatch(/1,7\d{2},\d{3},\d{3}/);
+  });
+});
+
+describe('Tickets mobile regressions (Bugs #1, #4, #5, #7)', () => {
+  it('Mobile #1/#7: drawer is portaled to document.body (z-[60]) and hides the raw requester_id UUID', async () => {
+    render(
+      <QueryClientProvider client={makeQc()}>
+        <MemoryRouter initialEntries={['/tickets']}>
+          <Tickets />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByText('Laptop screen flickering'));
+    const desc = await screen.findByText('Flickers on battery power');
+
+    // Portaled: overlay root is a direct child of document.body (escapes <main>),
+    // above the mobile header (z-40) and BottomNav (z-50).
+    const overlay = desc.closest('div.fixed.inset-0');
+    expect(overlay).not.toBeNull();
+    expect(overlay!.parentElement).toBe(document.body);
+    expect(overlay!.getAttribute('class')).toContain('z-[60]');
+
+    // Requester name shown; raw 36-char requester_id UUID in parens is gone.
+    expect(overlay!.textContent).toContain('Aarav Gupta');
+    expect(overlay!.textContent).not.toContain('(u-1)');
+    expect(screen.queryByText('(u-1)')).toBeNull();
+  });
+
+  it('Mobile #5: Kanban column card lists have bounded vertical scroll', async () => {
+    render(
+      <QueryClientProvider client={makeQc()}>
+        <MemoryRouter initialEntries={['/tickets']}>
+          <Tickets />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText('Laptop screen flickering');
+    fireEvent.click(screen.getByRole('button', { name: /kanban/i }));
+    await screen.findByText(/Showing newest 1 of 500 tickets/i);
+
+    const lists = document.querySelectorAll('[class*="max-h-[calc(100dvh-19rem)]"]');
+    expect(lists.length).toBe(4);
+    lists.forEach((el) => {
+      const cls = el.getAttribute('class') ?? '';
+      expect(cls).toContain('overflow-y-auto');
+      expect(cls).toContain('space-y-2');
+    });
+  });
+
+  it('Mobile #4: FilterBar wraps view toggle + 3 filter selects in a 2-col mobile grid (sm:contents)', async () => {
+    render(
+      <QueryClientProvider client={makeQc()}>
+        <MemoryRouter initialEntries={['/tickets']}>
+          <Tickets />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText('Laptop screen flickering');
+
+    const grid = document.querySelector('[class*="grid-cols-2"][class*="sm:contents"]');
+    expect(grid).not.toBeNull();
+    const cls = grid!.getAttribute('class') ?? '';
+    expect(cls).toContain('grid');
+    expect(cls).toContain('w-full');
+
+    // Cell 1: Table | Kanban toggle; cells 2-4: the three filter selects.
+    const scope = within(grid as HTMLElement);
+    expect(scope.getByRole('button', { name: /table/i })).toBeInTheDocument();
+    expect(scope.getByRole('button', { name: /kanban/i })).toBeInTheDocument();
+    expect(scope.getByText('All Statuses')).toBeInTheDocument();
+    expect(scope.getByText('All Priorities')).toBeInTheDocument();
+    expect(scope.getByText('All Types')).toBeInTheDocument();
+    expect(grid!.children.length).toBe(4);
   });
 });

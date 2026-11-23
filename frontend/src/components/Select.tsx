@@ -54,11 +54,16 @@ export default function Select({
     // Cap: never wider than 340px nor wider than the viewport (minus a
     // small margin). The menu grows to fit its longest option up to this.
     const cappedW = Math.min(340, window.innerWidth - 16);
+    const actualW = Math.min(
+      cappedW,
+      Math.max(r.width, menuRef.current?.offsetWidth || r.width),
+    );
+    const clampedLeft = Math.max(8, Math.min(r.left, window.innerWidth - actualW - 8));
     setMenu({
       // Flip upward only when the menu wouldn't fit below; exact height
       // (measured, not guessed) so there's never a floating gap.
       top: spaceBelow >= mh + 12 ? r.bottom + 6 : Math.max(8, r.top - mh - 6),
-      left: r.left,
+      left: clampedLeft,
       width: r.width,
       maxWidth: cappedW,
     });
@@ -82,17 +87,22 @@ export default function Select({
       close();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        close();
+      }
     };
     document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     // Follow the trigger while the page scrolls instead of closing
     // (mobile users scroll under an open dropdown all the time).
     window.addEventListener('scroll', reposition, true);
     window.addEventListener('resize', reposition);
     return () => {
       document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
       cancelAnimationFrame(raf);
