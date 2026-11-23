@@ -36,7 +36,8 @@ export function roundedRectSDF(
 export function liquidGlassFragment(uv: Vec2): Vec2 {
   const ix = uv.x - 0.5;
   const iy = uv.y - 0.5;
-  const distanceToEdge = roundedRectSDF(ix, iy, 0.3, 0.2, 0.6);
+  // Square 0.38 x 0.38 SDF keeps X and Y refractive rim thickness balanced.
+  const distanceToEdge = roundedRectSDF(ix, iy, 0.38, 0.38, 0.55);
   const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
   const scaled = smoothStep(0, 1, displacement);
   return {
@@ -143,6 +144,22 @@ export function computeSpecularAngle(mouseOffset: Vec2) {
   const stop1Pct = Math.round(Math.max(10, 33 + mouseOffset.y * 0.3));
   const stop2Pct = Math.round(Math.min(90, 66 + mouseOffset.y * 0.4));
   return { angleDeg, stop1Opacity, stop2Opacity, stop1Pct, stop2Pct };
+}
+
+/**
+ * Builds the CSS linear-gradient string for the xor-masked specular border.
+ * Dark mode uses luminous white stops; Light mode uses an iridescent
+ * indigo -> pure white -> sky-blue prism rim so it remains visible against
+ * bright frosted-white cards.
+ */
+export function computeSpecularGradient(mouseOffset: Vec2, isDark: boolean): string {
+  const spec = computeSpecularAngle(mouseOffset);
+  if (isDark) {
+    return `linear-gradient(${spec.angleDeg}deg, rgba(255,255,255,0) 0%, rgba(255,255,255,${spec.stop1Opacity.toFixed(3)}) ${spec.stop1Pct}%, rgba(255,255,255,${spec.stop2Opacity.toFixed(3)}) ${spec.stop2Pct}%, rgba(255,255,255,0) 100%)`;
+  }
+  const indigoAlpha = Math.min(0.75, spec.stop1Opacity + 0.18).toFixed(3);
+  const skyAlpha = Math.min(0.85, spec.stop2Opacity + 0.12).toFixed(3);
+  return `linear-gradient(${spec.angleDeg}deg, rgba(79,70,229,0) 0%, rgba(79,70,229,${indigoAlpha}) ${spec.stop1Pct}%, rgba(255,255,255,0.95) 50%, rgba(14,165,233,${skyAlpha}) ${spec.stop2Pct}%, rgba(14,165,233,0) 100%)`;
 }
 
 /**

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeDirectionalScale,
   computeSpecularAngle,
+  computeSpecularGradient,
   generateLiquidDisplacementMap,
   liquidGlassFragment,
   roundedRectSDF,
@@ -13,20 +14,20 @@ describe('liquid-glass-shader (rdev/liquid-glass-react port)', () => {
     expect(roundedRectSDF(0.9, 0.9, 0.3, 0.2, 0.1)).toBeGreaterThan(0);
   });
 
-  it('keeps center UV stationary (0.5, 0.5) and warps edges in liquidGlassFragment', () => {
+  it('keeps center UV stationary (0.5, 0.5) and warps X/Y edges symmetrically in liquidGlassFragment', () => {
     const center = liquidGlassFragment({ x: 0.5, y: 0.5 });
     expect(center.x).toBeCloseTo(0.5, 4);
     expect(center.y).toBeCloseTo(0.5, 4);
 
-    const edge = liquidGlassFragment({ x: 0.05, y: 0.05 });
-    expect(edge.x).not.toBeCloseTo(0.05, 3);
-    expect(edge.y).not.toBeCloseTo(0.05, 3);
+    // Symmetric 0.38 x 0.38 SDF box ensures top/bottom and left/right rims warp equally
+    const leftEdge = liquidGlassFragment({ x: 0.05, y: 0.5 });
+    const topEdge = liquidGlassFragment({ x: 0.5, y: 0.05 });
+    expect(Math.abs(leftEdge.x - 0.05)).toBeCloseTo(Math.abs(topEdge.y - 0.05), 4);
   });
 
   it('returns a valid data:image/ URI from generateLiquidDisplacementMap even in jsdom', () => {
     const uri = generateLiquidDisplacementMap(64, 64);
     expect(uri.startsWith('data:image/')).toBe(true);
-    // Second call with same dimensions hits memoized cache
     expect(generateLiquidDisplacementMap(64, 64)).toBe(uri);
   });
 
@@ -39,6 +40,14 @@ describe('liquid-glass-shader (rdev/liquid-glass-react port)', () => {
     const shifted = computeSpecularAngle({ x: 25, y: -20 });
     expect(shifted.angleDeg).toBe(165);
     expect(shifted.stop1Opacity).toBeGreaterThan(neutral.stop1Opacity);
+  });
+
+  it('generates distinct dark-mode white specular rim and light-mode indigo/sky prism rim', () => {
+    const darkGrad = computeSpecularGradient({ x: 10, y: -10 }, true);
+    const lightGrad = computeSpecularGradient({ x: 10, y: -10 }, false);
+    expect(darkGrad).toContain('rgba(255,255,255,');
+    expect(lightGrad).toContain('rgba(79,70,229,');
+    expect(lightGrad).toContain('rgba(14,165,233,');
   });
 
   it('returns scale(1) outside 200px activation zone and directional scaleX/Y inside', () => {
