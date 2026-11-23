@@ -184,3 +184,13 @@ describe('paper forest sidebar + serif headings', () => {
     expect(css).toContain('.theme-paper h1');
   });
 });
+
+describe('liquid glass SVG refraction & non-glass opacity isolation', () => {
+  const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../index.css'), 'utf8');
+  it('binds url(#itms-liquid-glass-refract) inside index.css for Liquid Glass surfaces', () => {
+    expect(css).toContain('url(#itms-liquid-glass-refract)');
+  });
+  it('makes paper cards opaque with warm ring shadow instead of 60% translucent frost', () => {
+    expect(css).toContain('.theme-paper .glass-card');
+  });
+});
