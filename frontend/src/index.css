@@ -303,6 +303,52 @@
   background-color: rgb(180 148 105 / 0.5);
 }
 
+/* Paper forest sidebar + serif headings (mirrors the login brand panel).
+   Tailwind v4 color utilities resolve at :root, so subtree token scoping
+   can't recolor them — these explicit overrides remap exactly the
+   utilities the app-shell aside uses. New/legacy themes are untouched;
+   the theme menu subtree is reset to light paper below. */
+.theme-paper h1,
+.theme-paper h2 {
+  font-family: var(--t-font-display);
+  letter-spacing: -0.01em;
+}
+
+.theme-paper aside {
+  --t-surface: #14301f;
+  --t-elevated: #1d4229;
+  --t-glass-hi: rgb(255 255 255 / 0.06);
+  --t-glass-edge: rgb(255 255 255 / 0.10);
+  --t-glass-shadow: rgb(0 0 0 / 0.45);
+}
+.theme-paper aside.glass-chrome {
+  background-color: #14301f;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: rgb(242 239 230 / 0.10);
+  box-shadow: none;
+}
+.theme-paper aside .text-primary { color: #f2efe6; }
+.theme-paper aside .text-secondary { color: #cfc9b8; }
+.theme-paper aside .text-muted { color: #9db3a1; }
+.theme-paper aside .border-edge,
+.theme-paper aside .border-edge2 { border-color: rgb(242 239 230 / 0.14); }
+.theme-paper aside .bg-elevated { background-color: #1d4229; }
+.theme-paper aside .hover\:bg-elevated:hover,
+.theme-paper aside .hover\:bg-elevated\/60:hover { background-color: rgb(242 239 230 / 0.08); }
+.theme-paper aside .hover\:text-primary:hover { color: #f2efe6; }
+.theme-paper aside .text-accent { color: #d8cfae; }
+.theme-paper aside .bg-accent\/15 { background-color: rgb(216 207 174 / 0.15); }
+.theme-paper aside .hover\:bg-accent\/10:hover { background-color: rgb(216 207 174 / 0.12); }
+.theme-paper aside .hover\:text-accent:hover { color: #d8cfae; }
+
+/* Theme menu inside the sidebar stays light paper. */
+.theme-paper aside [role="menu"] { background-color: #ffffff; border-color: #e2ddd2; }
+.theme-paper aside [role="menu"] .text-primary { color: #1c1917; }
+.theme-paper aside [role="menu"] .text-secondary { color: #57534e; }
+.theme-paper aside [role="menu"] .text-muted { color: #6f6a61; }
+.theme-paper aside [role="menu"] .text-accent { color: #2f6b3c; }
+
 /* Font utilities: Tailwind v4 generates font-display / font-body /
    font-mono2 from these keys. (mono2: leaves the default font-mono
    utility untouched.) --color-on-accent likewise generates text-on-accent

@@ -168,3 +168,19 @@ describe('paper ambient background', () => {
     });
   });
 });
+
+describe('paper forest sidebar + serif headings', () => {
+  const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../index.css'), 'utf8');
+  it('paper remaps the aside subtree to forest without touching other themes', () => {
+    expect(css).toContain('.theme-paper aside.glass-chrome');
+    expect(css).toContain('.theme-paper aside .text-primary');
+    expect(css).toContain('.theme-paper aside .bg-elevated');
+    expect(css).toContain('.theme-paper aside [role="menu"] .text-primary');
+    ['theme-console', 'theme-bold', 'theme-shell', 'theme-terminal'].forEach((cls) => {
+      expect(css).not.toContain(`.${cls} aside`);
+    });
+  });
+  it('paper uses the display face for headings', () => {
+    expect(css).toContain('.theme-paper h1');
+  });
+});
