@@ -8,6 +8,7 @@ import ConsoleLogin from './login/skins/ConsoleLogin';
 import BoldLogin from './login/skins/BoldLogin';
 import ShellLogin from './login/skins/ShellLogin';
 import TerminalLogin from './login/skins/TerminalLogin';
+import ClarityLogin from './login/skins/ClarityLogin';
 export default function Login() {
   const [mode, setMode] = useState(getThemeMode());
   useEffect(() => onThemeChanged(() => setMode(getThemeMode())), []);
@@ -22,6 +23,7 @@ export default function Login() {
       : skin === 'bold' ? <BoldLogin />
       : skin === 'shell' ? <ShellLogin />
       : skin === 'terminal' ? <TerminalLogin />
+      : skin === 'clarity' ? <ClarityLogin />
       : <LegacyLogin />}
     </>
   );
