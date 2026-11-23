@@ -33,7 +33,7 @@ export interface ThemeMeta {
   glass: boolean;
 }
 
-export const DEFAULT_THEME: ThemeMode = 'paper';
+export const DEFAULT_THEME: ThemeMode = 'light';
 
 export const THEME_REGISTRY: Record<ThemeMode, ThemeMeta> = {
   light: {

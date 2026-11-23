@@ -3,9 +3,9 @@ import { DEFAULT_THEME, THEME_REGISTRY, skinForTheme, type ThemeMode } from './t
 
 const TEN: ThemeMode[] = ['light','dark','ledgerly','ledgerly-light','system','paper','console','bold','shell','terminal','clarity','clarity-dark'];
 describe('theme registry', () => {
-  it('covers exactly 12 modes with default paper', () => {
+  it('covers exactly 12 modes with default light', () => {
     expect(Object.keys(THEME_REGISTRY).sort()).toEqual([...TEN].sort());
-    expect(DEFAULT_THEME).toBe('paper');
+    expect(DEFAULT_THEME).toBe('light');
   });
   it('maps dark families correctly', () => {
     expect(THEME_REGISTRY.console.dark).toBe(true);

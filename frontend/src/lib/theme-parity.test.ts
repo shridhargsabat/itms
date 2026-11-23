@@ -11,8 +11,8 @@ describe('fouc parity', () => {
     resolve(dirname(fileURLToPath(import.meta.url)), '../../index.html'),
     'utf8',
   );
-  it('defaults to paper and maps every slug to its classes', () => {
-    expect(html).toContain(`|| 'paper'`);
+  it('defaults to light and maps every slug to its classes', () => {
+    expect(html).toContain(`|| 'light'`);
     (Object.keys(THEME_REGISTRY) as ThemeMode[]).forEach((m) => {
       if (m === 'light' || m === 'system') return; // default branch covers these
       expect(html).toContain(`'${m}'`);
@@ -30,10 +30,10 @@ describe('fouc parity', () => {
     expect(html).toContain(`d.classList.add('dark', 'theme-terminal')`);
     expect(html).toContain(`d.classList.add('dark', 'theme-clarity-dark')`);
   });
-  it('falls unknown stored values through to the paper branch', () => {
-    // Missing values default via `|| 'paper'`, but an invalid string (e.g.
+  it('falls unknown stored values through to the light branch', () => {
+    // Missing values default via `|| 'light'`, but an invalid string (e.g.
     // 'banana') must not land in the unthemed else branch either.
-    expect(html).toContain(`=== -1) m = 'paper'`);
+    expect(html).toContain(`=== -1) m = 'light'`);
   });
   it('sets meta theme-color per theme before first paint', () => {
     // PWA chrome must match the theme from the first paint, not stay
