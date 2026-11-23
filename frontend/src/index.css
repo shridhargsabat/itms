@@ -416,16 +416,47 @@
 
 /* Apple Liquid Glass SVG refraction (rdev/liquid-glass-react port):
    Applies edge-bending SVG feDisplacementMap + chromatic aberration on top of
-   the frosted blur for Liquid Glass themes (light, dark, system). */
-:root:not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+   the frosted blur for ALL .glass-card and .glass-chrome surfaces in Liquid
+   Glass themes (light, dark, system) — covering BentoCards, KPI link cards,
+   sticky headers, Sidebar, Modals, and Notification popovers. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+  .glass-card,
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
   [data-liquid-glass="active"].glass-card {
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   backdrop-filter: url(#itms-liquid-glass-refract) blur(22px) saturate(190%);
 }
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+  .glass-chrome,
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+  [data-liquid-glass="active"].glass-chrome {
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  backdrop-filter: url(#itms-liquid-glass-refract) blur(28px) saturate(190%);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
+  .glass-card,
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
   [data-liquid-glass="active"].glass-card {
   -webkit-backdrop-filter: blur(16px) saturate(160%);
   backdrop-filter: url(#itms-liquid-glass-refract) blur(16px) saturate(175%);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
+  .glass-chrome,
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
+  [data-liquid-glass="active"].glass-chrome {
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: url(#itms-liquid-glass-refract) blur(20px) saturate(175%);
+}
+
+/* Liquid Glass Light login title contrast fix:
+   LegacyLogin's h1 uses from-indigo-300 via-white to-indigo-300 (designed for
+   dark mode). When .dark is absent, remap the gradient stops to deep indigo/
+   violet so the ITMS title hits WCAG AA contrast against white frosted glass. */
+:root:not(.dark) .animate-shimmer {
+  --tw-gradient-from: #4338ca;
+  --tw-gradient-via: #7c3aed;
+  --tw-gradient-to: #4338ca;
+  background-image: linear-gradient(90deg, #4338ca, #7c3aed, #4338ca);
 }
 
 @layer base {
@@ -638,8 +669,9 @@
   .dark .glass-chrome, .dark .glass-card,
   .ledgerly-dark .glass-chrome, .ledgerly-dark .glass-card,
   .ledgerly-light .glass-chrome, .ledgerly-light .glass-card,
-  [data-liquid-glass="active"].glass-card {
-    -webkit-backdrop-filter: none; backdrop-filter: none;
+  [data-liquid-glass="active"].glass-card,
+  [data-liquid-glass="active"].glass-chrome {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
     background: var(--t-surface); box-shadow: none;
   }
 }

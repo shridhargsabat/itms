@@ -187,8 +187,13 @@ describe('paper forest sidebar + serif headings', () => {
 
 describe('liquid glass SVG refraction & non-glass opacity isolation', () => {
   const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../index.css'), 'utf8');
-  it('binds url(#itms-liquid-glass-refract) inside index.css for Liquid Glass surfaces', () => {
+  it('binds url(#itms-liquid-glass-refract) to all .glass-card and .glass-chrome surfaces in Liquid Glass themes', () => {
     expect(css).toContain('url(#itms-liquid-glass-refract)');
+    expect(css).toContain('.glass-chrome');
+    expect(css).toMatch(/\.glass-chrome\s*\{[^}]*url\(#itms-liquid-glass-refract\)/s);
+  });
+  it('provides a high-contrast light-mode override for .animate-shimmer on LegacyLogin', () => {
+    expect(css).toContain(':root:not(.dark) .animate-shimmer');
   });
   it('makes paper cards opaque with warm ring shadow instead of 60% translucent frost', () => {
     expect(css).toContain('.theme-paper .glass-card');
