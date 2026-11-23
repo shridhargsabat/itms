@@ -17,12 +17,13 @@ import PaginationFooter from '@/components/PaginationFooter';
 import { Button } from '@/components/Button';
 import Select from '@/components/Select';
 import type { KbArticle } from '@/api/types';
+import { TICKET_TYPES } from '@/api/types';
 
 // P1-7 (issue #48): lite knowledge base — articles by ticket type + canned
 // responses. Guardrails: created_by/updated_by shown (single KB owner),
 // capture-at-close via the ticket detail convert button.
 
-const TYPES = ['INCIDENT', 'REQUEST', 'CHANGE', 'PROBLEM', 'ACCESS', 'OTHER'];
+const TYPES = TICKET_TYPES;
 
 export default function KnowledgeBase() {
   const user = getCachedUser();

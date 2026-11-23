@@ -38,6 +38,7 @@ import type {
   Ticket,
   Topology,
   UpdateAssetInput,
+  UpdateTicketInput,
   UpdateUserInput,
   UserRecord,
   LocationWithCount,
@@ -413,6 +414,8 @@ export const exportTicketsCsv = async (params?: {
   status?: string;
   priority?: string;
   type?: string;
+  overdue?: boolean;
+  search?: string;
   sort?: string;
   order?: 'asc' | 'desc';
 }) => {
@@ -420,6 +423,8 @@ export const exportTicketsCsv = async (params?: {
   if (params?.status) q.set('status', params.status);
   if (params?.priority) q.set('priority', params.priority);
   if (params?.type) q.set('type', params.type);
+  if (params?.overdue) q.set('overdue', 'true');
+  if (params?.search) q.set('search', params.search);
   if (params?.sort) q.set('sort', params.sort);
   if (params?.order) q.set('order', params.order);
   const qs = q.toString();
@@ -428,12 +433,13 @@ export const exportTicketsCsv = async (params?: {
 };
 
 // ---- tickets ----
-export const listTickets = (params?: { status?: string; priority?: string; type?: string; overdue?: boolean; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
+export const listTickets = (params?: { status?: string; priority?: string; type?: string; overdue?: boolean; search?: string; limit?: number; offset?: number; sort?: string; order?: 'asc' | 'desc' }) => {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.priority) q.set('priority', params.priority);
   if (params?.type) q.set('type', params.type);
   if (params?.overdue) q.set('overdue', 'true');
+  if (params?.search) q.set('search', params.search);
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
   if (params?.sort) q.set('sort', params.sort);
@@ -441,8 +447,19 @@ export const listTickets = (params?: { status?: string; priority?: string; type?
   const qs = q.toString();
   return apiFetchCount<Ticket>(`/tickets${qs ? `?${qs}` : ''}`);
 };
-export const createTicket = (input: CreateTicketInput) =>
-  apiFetch<Ticket>('/tickets', { method: 'POST', body: JSON.stringify(input) });
+export const getTicket = (ticketId: string) => apiFetch<Ticket>(`/tickets/${ticketId}`);
+export const createTicket = (input: CreateTicketInput) => {
+  const payload = {
+    ...input,
+    description: input.description ?? '',
+    requester_id: input.requester_id?.trim() || undefined,
+    assignee_id: input.assignee_id?.trim() || undefined,
+    asset_id: input.asset_id?.trim() || undefined,
+  };
+  return apiFetch<Ticket>('/tickets', { method: 'POST', body: JSON.stringify(payload) });
+};
+export const updateTicket = (ticketId: string, input: UpdateTicketInput) =>
+  apiFetch<Ticket>(`/tickets/${ticketId}`, { method: 'PATCH', body: JSON.stringify(input) });
 export const patchTicketStatus = (ticketId: string, status: string) =>
   apiFetch<Ticket>(`/tickets/${ticketId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
 
@@ -619,6 +636,11 @@ export const uploadTicketAttachment = async (ticketId: string, file: File) => {
     body: form,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
+  if (res.status === 401) {
+    clearSession();
+    if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+    throw new ApiError(401, 'Session expired — please sign in again');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.error || `upload failed: ${res.status}`);
@@ -634,7 +656,15 @@ export const downloadTicketAttachment = async (attachmentId: string) => {
   const res = await fetch(`/api/v1/attachments/${attachmentId}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error(`download failed: ${res.status}`);
+  if (res.status === 401) {
+    clearSession();
+    if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+    throw new ApiError(401, 'Session expired — please sign in again');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => null) as { error?: string } | null;
+    throw new ApiError(res.status, err?.error || `download failed: ${res.status}`);
+  }
   return res.blob();
 };
 

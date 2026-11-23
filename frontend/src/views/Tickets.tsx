@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   BookOpen,
@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Paperclip,
   Plus,
+  Search,
   Table,
   Ticket as TicketIcon,
   Trash2,
@@ -19,10 +20,9 @@ import {
 } from 'lucide-react';
 import {
   convertTicketToArticle,
-  createTicket,
-  listTemplates,
   createTicketComment,
   getCachedUser,
+  getTicket,
   deleteTicketAttachment,
   deleteTicketComment,
   downloadTicketAttachment,
@@ -30,16 +30,18 @@ import {
   getTicketTimeline,
   listCanned,
   listTickets,
+  listUsers,
   patchTicketStatus,
-  suggestArticles,
+  updateTicket,
   uploadTicketAttachment,
 } from '@/api/client';
-import { PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
-import type { CreateTicketInput, Ticket, TicketStatus, TicketTemplate } from '@/api/types';
+import { ALLOWED_TICKET_TRANSITIONS, PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
+import type { Priority, Ticket, TicketStatus, UpdateTicketInput } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
 import FilterBar from '@/components/FilterBar';
 import Modal from '@/components/Modal';
+import NewTicketForm from '@/components/NewTicketForm';
 import PageHeader from '@/components/PageHeader';
 import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
@@ -51,151 +53,42 @@ import { useServerPagination } from '@/lib/usePagination';
 
 const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
-const NEXT_STATUS: Partial<Record<TicketStatus, TicketStatus>> = {
-  OPEN: 'IN_PROGRESS',
-  IN_PROGRESS: 'RESOLVED',
-};
-
-function NewTicketForm({ onDone }: { onDone: () => void }) {
-  const qc = useQueryClient();
-  const [form, setForm] = useState<CreateTicketInput>({
-    title: '',
-    description: '',
-    ticket_type: 'INCIDENT',
-    priority: 'MEDIUM',
-  });
-  const mutation = useMutation({
-    mutationFn: createTicket,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tickets'] });
-      qc.invalidateQueries({ queryKey: ['metrics'] });
-      onDone();
-    },
-  });
-  const set = <K extends keyof CreateTicketInput>(k: K, v: CreateTicketInput[K]) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  return (
-    <form
-      className="space-y-4"
-      onSubmit={(ev) => {
-        ev.preventDefault();
-        mutation.mutate(form);
-      }}
-    >
-      <TemplatePicker
-        onApply={(t) => setForm((f) => ({
-          ...f,
-          ticket_type: t.ticket_type as CreateTicketInput['ticket_type'],
-          priority: t.priority as CreateTicketInput['priority'],
-          description: t.description || f.description,
-        }))}
-      />
-      <div>
-        <label className={labelCls}>Title *</label>
-        <input
-          required
-          className={inputCls}
-          value={form.title}
-          onChange={(e) => set('title', e.target.value)}
-          placeholder="What's the issue?"
-        />
-      </div>
-      <div>
-        <label className={labelCls}>Description</label>
-        <textarea
-          className={inputCls}
-          rows={3}
-          value={form.description ?? ''}
-          onChange={(e) => set('description', e.target.value)}
-          placeholder="Details (optional)"
-        />
-      </div>
-      <SuggestionPanel query={form.title} />
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Type</label>
-          <Select
-            className="w-full"
-            value={form.ticket_type}
-            onChange={(v) => set('ticket_type', v as CreateTicketInput['ticket_type'])}
-            options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
-          />
-        </div>
-        <div>
-          <label className={labelCls}>Priority</label>
-          <Select
-            className="w-full"
-            value={form.priority}
-            onChange={(v) => set('priority', v as CreateTicketInput['priority'])}
-            options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Requester ID</label>
-          <input
-            className={inputCls}
-            value={form.requester_id ?? ''}
-            onChange={(e) => set('requester_id', e.target.value)}
-            placeholder="User ID (optional)"
-          />
-        </div>
-        <div>
-          <label className={labelCls}>Asset ID</label>
-          <input
-            className={inputCls}
-            value={form.asset_id ?? ''}
-            onChange={(e) => set('asset_id', e.target.value)}
-            placeholder="Linked asset (optional)"
-          />
-        </div>
-      </div>
-      {mutation.isError && (
-        <p className="text-xs text-red-400">
-          {mutation.error instanceof Error ? mutation.error.message : 'Failed to create ticket.'}
-        </p>
-      )}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button
-          type="button"
-          onClick={onDone}
-          variant="secondary"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={mutation.isPending}
-          loading={mutation.isPending}
-          variant="primary"
-        >
-          Create Ticket
-        </Button>
-      </div>
-    </form>
-  );
-}
+const KANBAN_LIMIT = 200;
 
 export default function Tickets() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<'table' | 'kanban'>('table');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const openParam = params.get('open');
+  const [selectedId, setSelectedId] = useState<string | null>(() => params.get('open'));
   const [newOpen, setNewOpen] = useState(false);
   const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
 
   const status = params.get('status') ?? '';
   const priority = params.get('priority') ?? '';
   const type = params.get('type') ?? '';
+  const search = params.get('search') ?? '';
   const sort = params.get('sort') ?? null;
   const order = (params.get('order') as 'asc' | 'desc' | null) ?? null;
+
+  const selectTicket = (id: string | null) => {
+    setSelectedId(id);
+    if (!id && params.has('open')) {
+      const next = new URLSearchParams(params);
+      next.delete('open');
+      setParams(next, { replace: true });
+    }
+  };
+
+  useEffect(() => {
+    if (openParam) setSelectedId(openParam);
+  }, [openParam]);
 
   const filters = {
     status: status || undefined,
     priority: priority || undefined,
     type: type || undefined,
+    search: search || undefined,
     overdue: params.get('overdue') === 'true' ? true : undefined,
     sort: sort ?? undefined,
     order: order ?? undefined,
@@ -205,15 +98,22 @@ export default function Tickets() {
     queryFn: () =>
       view === 'table'
         ? listTickets({ ...filters, limit: pageSize, offset })
-        : listTickets(filters),
+        : listTickets({ ...filters, limit: KANBAN_LIMIT }),
   });
   const rows = data?.items ?? [];
-  const selected = rows.find((t) => t.id === selectedId) ?? null;
+  const rowMatch = rows.find((t) => t.id === selectedId) ?? null;
+  const singleTicket = useQuery({
+    queryKey: ['ticket', selectedId],
+    queryFn: () => getTicket(selectedId!),
+    enabled: Boolean(selectedId && !rowMatch),
+  });
+  const selected = rowMatch ?? singleTicket.data ?? null;
+  const users = useQuery({ queryKey: ['users', 'picker'], queryFn: () => listUsers({ limit: 200 }) });
 
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedId(null);
+      if (e.key === 'Escape') selectTicket(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -222,7 +122,7 @@ export default function Tickets() {
   // any filter change or view switch resets to page 1
   useEffect(() => {
     reset();
-  }, [status, priority, type, view, sort, order]);
+  }, [status, priority, type, search, view, sort, order]);
 
   const onSortChange = (s: { key: string; dir: 'asc' | 'desc' } | null) => {
     const next = new URLSearchParams(params);
@@ -240,8 +140,24 @@ export default function Tickets() {
     mutationFn: ({ id, st }: { id: string; st: TicketStatus }) => patchTicketStatus(id, st),
     onSuccess: (t) => {
       qc.invalidateQueries({ queryKey: ['tickets'] });
+      qc.invalidateQueries({ queryKey: ['ticket', t.id] });
+      qc.invalidateQueries({ queryKey: ['ticket-timeline', t.id] });
       qc.invalidateQueries({ queryKey: ['metrics'] });
+      qc.invalidateQueries({ queryKey: ['service-queue'] });
       setSelectedId(t.id);
+    },
+  });
+
+  const editTicket = useMutation({
+    mutationFn: (input: UpdateTicketInput) => updateTicket(selected!.id, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      if (selected) {
+        qc.invalidateQueries({ queryKey: ['ticket', selected.id] });
+        qc.invalidateQueries({ queryKey: ['ticket-timeline', selected.id] });
+      }
+      qc.invalidateQueries({ queryKey: ['metrics'] });
+      qc.invalidateQueries({ queryKey: ['service-queue'] });
     },
   });
 
@@ -303,15 +219,20 @@ export default function Tickets() {
     },
   ];
 
-  const next = selected ? NEXT_STATUS[selected.status] : undefined;
+  const nextStatuses = selected ? (ALLOWED_TICKET_TRANSITIONS[selected.status] ?? []) : [];
 
-  const matchCount = view === 'table' ? (data?.total ?? rows.length) : rows.length;
+  const matchCount = data?.total ?? rows.length;
+  const kanbanTruncated = view === 'kanban' && (data?.total ?? 0) > rows.length;
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Tickets"
-        description={`${matchCount} ticket${matchCount === 1 ? '' : 's'} matching filters`}
+        description={
+          kanbanTruncated
+            ? `Showing newest ${rows.length} of ${data?.total} tickets`
+            : `${matchCount} ticket${matchCount === 1 ? '' : 's'} matching filters`
+        }
         actions={
           <>
             <Button
@@ -321,6 +242,8 @@ export default function Tickets() {
                   status: status || undefined,
                   priority: priority || undefined,
                   type: type || undefined,
+                  overdue: filters.overdue,
+                  search: filters.search,
                   sort: sort ?? undefined,
                   order: order ?? undefined,
                 })
@@ -344,6 +267,7 @@ export default function Tickets() {
       />
 
       <FilterBar>
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-56"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={search} onChange={(e) => update('search', e.target.value)} placeholder="Search tickets..." aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
         <div className="flex overflow-hidden rounded-lg glass-dense">
           <button
             type="button"
@@ -481,7 +405,7 @@ export default function Tickets() {
           <div className="fixed inset-0 z-[60]">
             <div
               className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setSelectedId(null)}
+              onClick={() => selectTicket(null)}
             />
             <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
               <div className="flex items-start justify-between border-b border-edge px-5 py-4">
@@ -503,7 +427,7 @@ export default function Tickets() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSelectedId(null)}
+                  onClick={() => selectTicket(null)}
                   aria-label="Close"
                   className="rounded-md p-1 text-secondary transition-colors hover:bg-elevated hover:text-primary"
                 >
@@ -564,19 +488,65 @@ export default function Tickets() {
 
             <TicketThread ticketId={selected.id} isAdmin={getCachedUser()?.role === 'ADMIN'} />
 
+            <div className="mt-5 grid grid-cols-2 gap-3 border-t border-edge pt-4">
+              <div>
+                <label className={labelCls}>Priority</label>
+                <Select
+                  className="w-full"
+                  value={selected.priority}
+                  onChange={(v) => editTicket.mutate({ priority: v as Priority })}
+                  options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Assignee</label>
+                <Select
+                  className="w-full"
+                  value={selected.assignee_id ?? ''}
+                  onChange={(v) => editTicket.mutate({ assignee_id: v || null })}
+                  options={[
+                    { value: '', label: 'Unassigned' },
+                    ...(users.data?.items ?? []).map((u) => ({
+                      value: u.id,
+                      label: `${u.name} (${u.department})`,
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
+            {editTicket.isError && (
+              <p className="mt-2 text-xs text-red-400">
+                {editTicket.error instanceof Error ? editTicket.error.message : 'Ticket update failed.'}
+              </p>
+            )}
+
             <div className="mt-5 border-t border-edge pt-4">
-              {next ? (
-                <Button
-                  type="button"
-                  onClick={() => advance.mutate({ id: selected.id, st: next })}
-                  disabled={advance.isPending}
-                  loading={advance.isPending}
-                  fullWidth
-                  variant="primary"
-                  rightIcon={!advance.isPending ? <ArrowRight className="h-4 w-4" /> : undefined}
-                >
-                  Advance to {next.replace('_', ' ')}
-                </Button>
+              {nextStatuses.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => advance.mutate({ id: selected.id, st: nextStatuses[0] })}
+                    disabled={advance.isPending}
+                    loading={advance.isPending}
+                    fullWidth
+                    variant="primary"
+                    rightIcon={!advance.isPending ? <ArrowRight className="h-4 w-4" /> : undefined}
+                  >
+                    Advance to {nextStatuses[0].replace('_', ' ')}
+                  </Button>
+                  {nextStatuses.slice(1).map((st) => (
+                    <Button
+                      key={st}
+                      type="button"
+                      onClick={() => advance.mutate({ id: selected.id, st })}
+                      disabled={advance.isPending}
+                      fullWidth
+                      variant="secondary"
+                    >
+                      {st === 'OPEN' ? 'Reopen to OPEN' : st === 'CLOSED' ? 'Close' : `Move to ${st.replace('_', ' ')}`}
+                    </Button>
+                  ))}
+                </div>
               ) : (
                 <p className="text-center text-xs text-muted">
                   No further status transition.
@@ -619,11 +589,14 @@ const CHANGE_LABEL: Record<string, string> = {
   TICKET_CREATE: 'opened the ticket',
   TICKET_STATUS: 'changed status',
   TICKET_PRIORITY: 'changed priority',
-  TICKET_ASSIGN: 'assigned the ticket',
+  TICKET_ASSIGN: 'updated assignee',
   TICKET_COMMENT: 'commented',
   TICKET_ATTACH: 'attached a file',
   TICKET_COMMENT_DELETE: 'deleted a comment',
   TICKET_ATTACH_DELETE: 'removed a file',
+  TICKET_EMAIL_INTAKE: 'created ticket via email',
+  TICKET_EMAIL_REPLY: 'replied via email',
+  SLA_ESCALATE: 'escalated SLA breach',
 };
 
 function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolean }) {
@@ -671,9 +644,9 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
   const changes = tl.data?.changes ?? [];
   const attachments = tl.data?.attachments ?? [];
 
-  const entries: { kind: 'comment' | 'change'; at: string; key: string }[] = [
-    ...comments.map((c) => ({ kind: 'comment' as const, at: c.created_at, key: `c-${c.id}` })),
-    ...changes.map((c) => ({ kind: 'change' as const, at: c.at, key: `h-${c.at}-${c.action}` })),
+  const entries = [
+    ...comments.map((c) => ({ kind: 'comment' as const, at: c.created_at, key: `c-${c.id}`, comment: c })),
+    ...changes.map((c, idx) => ({ kind: 'change' as const, at: c.at, key: `h-${c.id ?? idx}-${c.at}-${c.action}`, change: c })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
   return (
@@ -698,7 +671,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
                   el.download = a.file_name;
                   el.click();
                   URL.revokeObjectURL(url);
-                })}
+                }).catch((e: unknown) => setUploadErr((e as Error).message || 'download failed'))}
                 variant="text"
                 className="min-w-0 flex-1 truncate text-left text-xs"
                 title={`Download ${a.file_name}`}
@@ -727,7 +700,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
         {entries.length === 0 && <p className="text-xs text-muted">No activity yet.</p>}
         {entries.map((e) => {
           if (e.kind === 'comment') {
-            const c = comments.find((x) => x.id === e.key.slice(2))!;
+            const c = e.comment;
             return (
               <div key={e.key} className="rounded-lg glass-dense p-2">
                 <div className="flex items-center gap-2 text-[10px] text-muted">
@@ -749,13 +722,16 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
               </div>
             );
           }
-          const h = changes.find((x) => x.at === e.at && e.key === `h-${x.at}-${x.action}`)!;
+          const h = e.change;
           return (
             <div key={e.key} className="flex items-baseline gap-2 text-[11px] text-muted">
               <span className="h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full bg-accent/60" />
               <span className="min-w-0 flex-1">
                 <span className="font-medium text-secondary">{h.actor || 'System'}</span>{' '}
                 {CHANGE_LABEL[h.action] ?? h.action.replace('TICKET_', '').toLowerCase()}
+                {(h.action === 'TICKET_STATUS' || h.action === 'TICKET_PRIORITY') && Boolean(h.details?.from && h.details?.to) && (
+                  <span> ({String(h.details.from).replace('_', ' ')} → {String(h.details.to).replace('_', ' ')})</span>
+                )}
               </span>
               <span className="shrink-0 font-mono text-[9px]">{formatDate(h.at)}</span>
             </div>
@@ -816,44 +792,8 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
 }
 
 // ---------------------------------------------------------------------------
-// P1-7 (issue #48): KB integrations — suggestions at creation, convert at
-// close, canned responses in the comment composer.
-
-function SuggestionPanel({ query }: { query: string }) {
-  const [debounced, setDebounced] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 400);
-    return () => clearTimeout(t);
-  }, [query]);
-  const suggestions = useQuery({
-    queryKey: ['kb-suggest', debounced],
-    queryFn: () => suggestArticles(debounced),
-    enabled: debounced.length >= 3,
-  });
-  if (debounced.length < 3 || !suggestions.data?.length) return null;
-  return (
-    <div className="rounded-lg glass-card border-accent/20 bg-accent/5 p-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">
-        Maybe this already exists in the KB?
-      </p>
-      <div className="mt-1.5 space-y-1">
-        {suggestions.data.slice(0, 3).map((a) => (
-          <Link
-            key={a.id}
-            to={`/kb?open=${a.id}`}
-            className="block truncate text-xs text-secondary hover:text-accent hover:underline"
-            title={a.body}
-          >
-            <span className="mr-1.5 rounded bg-accent/15 px-1 py-0.5 text-[9px] font-medium text-accent">
-              {a.ticket_type}
-            </span>
-            {a.title}
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
+// P1-7 (issue #48): KB integrations — convert at close, canned responses
+// in the comment composer. (Suggestions at creation live in NewTicketForm.)
 
 function ConvertButton({ ticket }: { ticket: Ticket }) {
   const qc = useQueryClient();
@@ -921,25 +861,3 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
   );
 }
 
-
-function TemplatePicker({ onApply }: { onApply: (t: TicketTemplate) => void }) {
-  const templates = useQuery({ queryKey: ['templates', 'active'], queryFn: () => listTemplates(true) });
-  const [selected, setSelected] = useState('');
-  if (!templates.data?.length) return null;
-  return (
-    <div>
-      <label className={labelCls}>Start from a template</label>
-      <Select
-        className="w-full"
-        value={selected}
-        placeholder="Choose a template…"
-        onChange={(v) => {
-          const t = templates.data?.find((x) => x.id === v);
-          if (t) onApply(t);
-          setSelected('');
-        }}
-        options={templates.data.map((t) => ({ value: t.id, label: `${t.name} — ${t.ticket_type} / ${t.priority}` }))}
-      />
-    </div>
-  );
-}

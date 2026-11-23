@@ -41,6 +41,7 @@ import {
   updateLocation,
 } from '@/api/client';
 import type { LookupOption, LocationWithCount, MasterFamily, TicketTemplate, UserRecord, Vendor, VendorInput } from '@/api/types';
+import { TICKET_TYPES } from '@/api/types';
 
 const TABS: { id: MasterFamily | 'users' | 'templates' | 'vendors' | 'locations'; label: string }[] = [
   { id: 'vendors', label: 'Vendors' },
@@ -645,7 +646,7 @@ function TemplatesTab() {
           <div>
             <label className={labelCls}>Type</label>
             <Select className="w-full" value={tt} onChange={(v) => setTt(v as string)}
-              options={['INCIDENT', 'REQUEST', 'CHANGE', 'PROBLEM', 'ACCESS', 'OTHER'].map((x) => ({ value: x, label: x }))} />
+              options={TICKET_TYPES.map((x) => ({ value: x, label: x.replace('_', ' ') }))} />
           </div>
           <div>
             <label className={labelCls}>Priority</label>

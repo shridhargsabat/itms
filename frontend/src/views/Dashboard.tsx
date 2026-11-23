@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { PriorityBadge } from '@/components/TicketBadge';
@@ -18,12 +18,10 @@ import {
 import {
   Link } from 'react-router-dom';
 import {
-  createTicket, getAuditLog, getDashboardMetrics, getCachedUser, listOverdueTickets } from '@/api/client';
-import {
-  PRIORITIES, TICKET_TYPES } from '@/api/types';
-import type { CreateTicketInput, DashboardMetrics } from '@/api/types';
+  getAuditLog, getDashboardMetrics, getCachedUser, listOverdueTickets } from '@/api/client';
+import type { DashboardMetrics } from '@/api/types';
 import Modal from '@/components/Modal';
-import Select from '@/components/Select';
+import NewTicketForm from '@/components/NewTicketForm';
 import AddAssetButton from '@/components/AddAssetButton';
 import EmptyState from '@/components/EmptyState';
 import VelocityChart from '@/components/VelocityChart';
@@ -32,7 +30,7 @@ import ServiceQueue from '@/components/ServiceQueue';
 import { getResolvedTheme, onThemeChanged, setThemeMode } from '@/lib/theme';
 import { THEME_REGISTRY } from '@/lib/theme-registry';
 import {
-  cn, formatDate, inputCls, labelCls } from '@/lib/utils';
+  cn, formatDate } from '@/lib/utils';
 
 /** One KPI lens: whole lens is a Link, visual identical to the reference. */
 type KpiLens = {
@@ -158,108 +156,6 @@ function CountUp({ value }: { value: number }) {
   }, [value]);
 
   return <>{display}</>;
-}
-
-function NewTicketForm({ onDone }: { onDone: () => void }) {
-  const qc = useQueryClient();
-  const [form, setForm] = useState<CreateTicketInput>({
-    title: '',
-    description: '',
-    ticket_type: 'INCIDENT',
-    priority: 'MEDIUM',
-  });
-  const mutation = useMutation({
-    mutationFn: createTicket,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tickets'] });
-      qc.invalidateQueries({ queryKey: ['metrics'] });
-      onDone();
-    },
-  });
-  const set = <K extends keyof CreateTicketInput>(k: K, v: CreateTicketInput[K]) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  return (
-    <form
-      className="space-y-4"
-      onSubmit={(ev) => {
-        ev.preventDefault();
-        mutation.mutate(form);
-      }}
-    >
-      <div>
-        <label className={labelCls}>Title *</label>
-        <input
-          required
-          className={inputCls}
-          value={form.title}
-          onChange={(e) => set('title', e.target.value)}
-          placeholder="What's the issue?"
-        />
-      </div>
-      <div>
-        <label className={labelCls}>Description</label>
-        <textarea
-          className={inputCls}
-          rows={3}
-          value={form.description ?? ''}
-          onChange={(e) => set('description', e.target.value)}
-          placeholder="Details (optional)"
-        />
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className={labelCls}>Type</label>
-          <Select
-            className="w-full"
-            value={form.ticket_type}
-            onChange={(v) => set('ticket_type', v as CreateTicketInput['ticket_type'])}
-            options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
-          />
-        </div>
-        <div>
-          <label className={labelCls}>Priority</label>
-          <Select
-            className="w-full"
-            value={form.priority}
-            onChange={(v) => set('priority', v as CreateTicketInput['priority'])}
-            options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-          />
-        </div>
-      </div>
-      <div>
-        <label className={labelCls}>Requester ID</label>
-        <input
-          className={inputCls}
-          value={form.requester_id ?? ''}
-          onChange={(e) => set('requester_id', e.target.value)}
-          placeholder="User ID (optional)"
-        />
-      </div>
-      {mutation.isError && (
-        <p className="text-xs text-red-400">
-          {mutation.error instanceof Error ? mutation.error.message : 'Failed to create ticket.'}
-        </p>
-      )}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button
-          type="button"
-          onClick={onDone}
-          variant="secondary"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={mutation.isPending}
-          loading={mutation.isPending}
-          variant="primary"
-        >
-          Create Ticket
-        </Button>
-      </div>
-    </form>
-  );
 }
 
 export default function Dashboard() {

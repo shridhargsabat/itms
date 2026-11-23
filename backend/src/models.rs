@@ -256,12 +256,49 @@ pub struct UpdateAssetRequest {
 /// Option<Option<T>> — JSON null collapses into the outer None, so explicit
 /// "clear this field" becomes indistinguishable from "leave unchanged".
 /// This wrapper forces null → Some(None); absent → None (via #[serde(default)]).
-fn double_option<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
+pub(crate) fn double_option<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: serde::Deserialize<'de>,
 {
     Ok(Some(Option::<T>::deserialize(d)?))
+}
+
+/// Empty-string-tolerant UUID: missing/absent/"" → None, otherwise parse.
+fn empty_string_as_none_uuid<'de, D>(d: D) -> Result<Option<Uuid>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(d)?;
+    match opt {
+        None => Ok(None),
+        Some(s) => {
+            if s.trim().is_empty() {
+                Ok(None)
+            } else {
+                Uuid::parse_str(s.trim()).map(Some).map_err(serde::de::Error::custom)
+            }
+        }
+    }
+}
+
+/// Double-option UUID with empty-string tolerance: explicit null or "" →
+/// Some(None) (clear), absent → None (unchanged), otherwise parse.
+fn double_option_uuid<'de, D>(d: D) -> Result<Option<Option<Uuid>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(d)?;
+    match opt {
+        None => Ok(Some(None)),
+        Some(s) => {
+            if s.trim().is_empty() {
+                Ok(Some(None))
+            } else {
+                Uuid::parse_str(s.trim()).map(|u| Some(Some(u))).map_err(serde::de::Error::custom)
+            }
+        }
+    }
 }
 
 /// Row from asset_lifecycle_events (+ actor name).
@@ -292,17 +329,30 @@ pub struct WarrantyAlert {
 #[derive(Debug, Deserialize)]
 pub struct CreateTicketRequest {
     pub title: String,
+    #[serde(default)]
     pub description: String,
     pub ticket_type: Option<String>,
     pub priority: Option<String>,
-    pub requester_id: Uuid,
+    #[serde(default, deserialize_with = "empty_string_as_none_uuid")]
+    pub requester_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "empty_string_as_none_uuid")]
     pub assignee_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "empty_string_as_none_uuid")]
     pub asset_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateTicketStatusRequest {
     pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateTicketRequest {
+    pub priority: Option<String>,
+    #[serde(default, deserialize_with = "double_option_uuid")]
+    pub assignee_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "double_option_uuid")]
+    pub asset_id: Option<Option<Uuid>>,
 }
 
 // ---------------------------------------------------------------------------

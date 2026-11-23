@@ -35,6 +35,19 @@ fn require_staff(role: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Canonical ticket-type: trim + uppercase, default INCIDENT,
+/// legacy "REQUEST" → "SERVICE_REQUEST".
+fn normalize_type(t: Option<String>) -> String {
+    let upper = t.as_deref().unwrap_or("INCIDENT").trim().to_uppercase();
+    if upper.is_empty() {
+        return "INCIDENT".to_string();
+    }
+    if upper == "REQUEST" {
+        return "SERVICE_REQUEST".to_string();
+    }
+    upper
+}
+
 // GET /templates?active_only=1
 #[derive(Deserialize)]
 pub struct TemplateListQuery {
@@ -48,7 +61,9 @@ pub async fn list_templates(
     Query(q): Query<TemplateListQuery>,
 ) -> Result<Json<Vec<TicketTemplate>>, AppError> {
     let rows = sqlx::query_as::<_, TicketTemplate>(
-        "SELECT t.id, t.name, t.ticket_type, t.priority, t.description, t.active, \
+        "SELECT t.id, t.name, \
+                CASE WHEN t.ticket_type = 'REQUEST' THEN 'SERVICE_REQUEST' ELSE t.ticket_type END AS ticket_type, \
+                t.priority, t.description, t.active, \
                 t.created_by, t.updated_by, t.created_at, t.updated_at, \
                 cu.name AS created_by_name \
          FROM ticket_templates t \
@@ -86,7 +101,7 @@ pub async fn create_template(
          VALUES ($1, $2, $3, $4, $5, $5) RETURNING id",
     )
     .bind(body.name.trim())
-    .bind(body.ticket_type.unwrap_or_else(|| "INCIDENT".into()))
+    .bind(normalize_type(body.ticket_type))
     .bind(body.priority.unwrap_or_else(|| "MEDIUM".into()))
     .bind(body.description.unwrap_or_default().trim())
     .bind(uid)
@@ -140,7 +155,7 @@ pub async fn update_template(
     )
     .bind(id)
     .bind(body.name.map(|s| s.trim().to_string()).unwrap_or(name))
-    .bind(body.ticket_type.unwrap_or(tt))
+    .bind(normalize_type(Some(body.ticket_type.unwrap_or(tt))))
     .bind(body.priority.unwrap_or(prio))
     .bind(body.description.map(|s| s.trim().to_string()).unwrap_or(desc))
     .bind(body.active.unwrap_or(act))
@@ -188,7 +203,9 @@ pub async fn delete_template(
 
 async fn fetch_one(pool: &PgPool, id: Uuid) -> Result<TicketTemplate, AppError> {
     Ok(sqlx::query_as::<_, TicketTemplate>(
-        "SELECT t.id, t.name, t.ticket_type, t.priority, t.description, t.active, \
+        "SELECT t.id, t.name, \
+                CASE WHEN t.ticket_type = 'REQUEST' THEN 'SERVICE_REQUEST' ELSE t.ticket_type END AS ticket_type, \
+                t.priority, t.description, t.active, \
                 t.created_by, t.updated_by, t.created_at, t.updated_at, \
                 cu.name AS created_by_name \
          FROM ticket_templates t \

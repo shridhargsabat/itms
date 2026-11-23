@@ -184,7 +184,7 @@ async fn intake_email(
 
         crate::audit::write(
             pool,
-            None,
+            Some(sender),
             "TICKET_EMAIL_REPLY",
             "ticket",
             ticket_id,
@@ -197,9 +197,10 @@ async fn intake_email(
             "SELECT DISTINCT user_id FROM (
                 SELECT requester_id AS user_id FROM tickets WHERE id = $1
                 UNION SELECT assignee_id FROM tickets WHERE id = $1 AND assignee_id IS NOT NULL
-             ) p WHERE user_id IS NOT NULL",
+             ) p WHERE user_id IS NOT NULL AND user_id <> $2",
         )
         .bind(ticket_id)
+        .bind(sender)
         .fetch_all(pool)
         .await?;
         for uid in participants {
@@ -249,24 +250,57 @@ async fn intake_email(
     };
 
     let title = if subject_clean.is_empty() { "Email request".to_string() } else { subject_clean };
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tickets").fetch_one(pool).await?;
-    let ticket_number = format!("INC-{:04}", count + 1);
 
-    let ticket = sqlx::query_as::<_, crate::models::Ticket>(
-        "INSERT INTO tickets (ticket_number, title, description, ticket_type, priority, status, \
-            source, requester_id, assignee_id, asset_id) \
-         VALUES ($1, $2, $3, 'INCIDENT', 'MEDIUM', 'OPEN', 'EMAIL', $4, NULL, NULL) \
-         RETURNING id, ticket_number, title, description, ticket_type, priority, status, source, \
-            requester_id, assignee_id, asset_id, created_at, updated_at, \
-            NULL::text AS requester_name, NULL::text AS assignee_name, \
-            NULL::text AS asset_tag, NULL::text AS asset_name",
-    )
-    .bind(&ticket_number)
-    .bind(&title)
-    .bind(&body.body)
-    .bind(requester)
-    .fetch_one(pool)
-    .await?;
+    let mut ticket_opt: Option<crate::models::Ticket> = None;
+    let mut ticket_number = String::new();
+    for attempt in 0..10 {
+        let next_num: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX((substring(ticket_number FROM '([0-9]+)$'))::bigint), COUNT(*)) + 1 FROM tickets"
+        )
+        .fetch_one(pool)
+        .await?;
+        ticket_number = format!("INC-{:04}", next_num + attempt as i64);
+
+        let result = sqlx::query_as::<_, crate::models::Ticket>(
+            "INSERT INTO tickets (ticket_number, title, description, ticket_type, priority, status, \
+                source, requester_id, assignee_id, asset_id) \
+             VALUES ($1, $2, $3, 'INCIDENT', 'MEDIUM', 'OPEN', 'EMAIL', $4, NULL, NULL) \
+             RETURNING id, ticket_number, title, description, ticket_type, priority, status, source, \
+                requester_id, assignee_id, asset_id, created_at, updated_at, \
+                NULL::text AS requester_name, NULL::text AS assignee_name, \
+                NULL::text AS asset_tag, NULL::text AS asset_name",
+        )
+        .bind(&ticket_number)
+        .bind(&title)
+        .bind(&body.body)
+        .bind(requester)
+        .fetch_one(pool)
+        .await;
+
+        match result {
+            Ok(t) => {
+                ticket_opt = Some(t);
+                break;
+            }
+            Err(sqlx::Error::Database(db_err))
+                if db_err.is_unique_violation()
+                    && db_err.constraint() == Some("tickets_ticket_number_key")
+                    && attempt < 9 =>
+            {
+                tracing::warn!("intake: ticket number {ticket_number} collided, retrying");
+                continue;
+            }
+            Err(err) => return Err(err.into()),
+        }
+    }
+    let ticket = ticket_opt.ok_or_else(|| {
+        AppError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "could not allocate a unique ticket number",
+        )
+    })?;
+
+    super::sla::set_sla_due(pool, ticket.id, &ticket.priority, "OPEN", ticket.created_at).await?;
 
     sqlx::query(
         "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind) \
@@ -283,7 +317,7 @@ async fn intake_email(
 
     crate::audit::write(
         pool,
-        None,
+        Some(requester),
         "TICKET_EMAIL_INTAKE",
         "ticket",
         ticket.id,
