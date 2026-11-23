@@ -12,8 +12,8 @@ import { Button } from '@/components/Button';
  * lives in the sheet). Desktop keeps the sidebar (this is hidden on lg+).
  *
  * The bar deliberately has NO env(safe-area-inset-bottom) padding — the
- * accepted flush-to-bottom SAPL-matching look (see mobile-webapp-ui skill).
- * The sheet panel DOES pad for the safe area.
+ * floating capsule keeps the flush-content rule (no extra safe-area padding
+ * on the bar itself). The sheet panel DOES pad for the safe area.
  */
 export default function BottomNav() {
   const { pathname } = useLocation();
@@ -46,7 +46,7 @@ export default function BottomNav() {
             onClick={() => setMore(false)}
           />
           {/* intentional literal shadow (no shadow-color token exists; task-14 sweep) */}
-          <div className="animate-sheet-up absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-xl glass-chrome pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_44px_rgba(0,0,0,0.35)]">
+          <div className="animate-sheet-up absolute inset-x-4 bottom-4 max-h-[80vh] overflow-y-auto rounded-[26px] glass-chrome pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_44px_rgba(0,0,0,0.35)]">
             <div className="flex justify-center pb-1 pt-3">
               <span className="h-1 w-10 rounded-full bg-edge" />
             </div>
@@ -87,7 +87,7 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-edge glass-chrome lg:hidden">
+      <nav className="fixed inset-x-4 bottom-4 z-50 rounded-[26px] border glass-chrome lg:hidden">
         <div className="flex h-14 items-stretch">
           {primary.map(({ to, label, icon: Icon, end }) => (
             <NavLink

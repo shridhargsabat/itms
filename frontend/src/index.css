@@ -1019,3 +1019,54 @@
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) body {
   background: linear-gradient(135deg,#0B1226 0%,#131836 50%,#0A192F 100%);
 }
+
+/* ---------- Task 5: floating shell — nav pills + Quick Capture dock (appended) --
+   Glass scope only: day rules ride the light guard chain, night rules the
+   dark guard chain (copied verbatim from the Task 4 selectors above). The
+   guard chains exclude all 9 non-glass theme classes, so every other theme
+   keeps token behavior with zero per-theme rules (R9: no .theme-X selectors
+   here at all). Unlayered, so these beat the layered Tailwind utilities. */
+
+/* Nav pills: day active link — #007AFF on a frosted pill (ref mockup). */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) aside nav a[aria-current="page"] {
+  color: #007AFF;
+  background-color: rgb(255 255 255 / 0.90);
+  border: 1px solid rgb(255 255 255 / 0.85);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 6px 18px rgb(0 122 255 / 0.14);
+}
+
+/* Nav pills: night active link — luminous bg-white/20 pill (ref mockup). */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) aside nav a[aria-current="page"] {
+  color: #ffffff;
+  background-color: rgb(255 255 255 / 0.20);
+  border: 1px solid rgb(255 255 255 / 0.35);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.5), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+/* Quick Capture dock buttons: token base (non-glass themes), glass fills
+   under the guard chains. Radius 16px per the ref mockup. */
+.quick-capture-btn {
+  background-color: var(--t-elevated);
+  color: var(--t-primary);
+  border: 1px solid var(--t-edge);
+  border-radius: 16px;
+  transition: filter 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+}
+.quick-capture-btn:hover {
+  filter: brightness(1.04);
+}
+.quick-capture-btn:active {
+  transform: scale(0.97);
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .quick-capture-btn {
+  background-color: rgb(255 255 255 / 0.85);
+  color: #334155;
+  border-color: rgb(255 255 255 / 0.85);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 4px 14px rgb(15 23 42 / 0.06);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .quick-capture-btn {
+  background-color: rgb(255 255 255 / 0.10);
+  color: #ffffff;
+  border-color: rgb(255 255 255 / 0.20);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.30);
+}

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SidebarNav from '@/components/SidebarNav';
+import QuickCapture from '@/components/QuickCapture';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateToast from '@/components/UpdateToast';
 import BottomNav from '@/components/BottomNav';
@@ -153,7 +154,7 @@ export default function Layout() {
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
         className={cn(
-          'fixed inset-y-0 left-0 hidden flex-col glass-chrome transition-all duration-300 lg:flex',
+          'fixed inset-y-0 left-0 hidden flex-col glass-chrome transition-all duration-300 lg:flex lg:left-4 lg:top-4 lg:bottom-4 lg:rounded-[28px]',
           wide ? 'w-60' : 'w-16',
           // Transient hover peek overlays the page (higher z + shadow, content not pushed).
           hovering && collapsed && 'z-[60] shadow-2xl',
@@ -185,6 +186,11 @@ export default function Layout() {
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
           <SidebarNav wide={wide} user={user} onExpandSidebar={expandSidebar} />
         </nav>
+
+        {/* Quick Capture glass dock (bottom of the sidebar, above the footer). */}
+        <div className="px-2 pb-1">
+          <QuickCapture wide={wide} />
+        </div>
 
         {wide && user && (
           <div className="flex items-center gap-3 border-t border-edge px-4 py-3">
@@ -283,7 +289,7 @@ export default function Layout() {
           // wrapper, for any non-table overflow) scrolls. Removes the
           // redundant outer page scrollbar seen next to the window controls.
           'lg:flex lg:h-screen lg:flex-col lg:overflow-hidden',
-          collapsed ? 'lg:ml-16' : 'lg:ml-60',
+          collapsed ? 'lg:ml-[5.5rem]' : 'lg:ml-[16.5rem]',
         )}
       >
         {/* Full-width scroll frame. Its scrollbar must sit at the window's
