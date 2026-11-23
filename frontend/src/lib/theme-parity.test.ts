@@ -55,7 +55,7 @@ describe('css token contract', () => {
   );
   const TOKENS = ['base','surface','elevated','elevated2','input','edge','edge2','primary','secondary','muted','accent','accent-strong','glass-hi','glass-edge','glass-shadow'];
   const FONTS = ['font-display','font-body','font-mono'];
-  it.each(['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal'])(
+  it.each(['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal','theme-clarity','theme-clarity-dark'])(
     '.%s defines all tokens', (cls) => {
       const block = css.match(new RegExp(`\\.${cls}\\s*{([^}]*)}`, 's'))?.[1] ?? '';
       [...TOKENS, ...FONTS].forEach((t) => expect(block).toContain(`--t-${t}:`));
@@ -95,7 +95,7 @@ describe('css token contract', () => {
     const lum = (h: string) => { const c = [0,2,4].map((i) => { const v = parseInt(h.slice(1+i,3+i),16)/255;
       return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
     const ratio = (a: string, b: string) => { const [x,y] = [lum(a),lum(b)].sort((p,q)=>q-p); return (x+0.05)/(y+0.05); };
-    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal'].forEach((cls) => {
+    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal','theme-clarity','theme-clarity-dark'].forEach((cls) => {
       const base = hex(cls,'base');
       expect(ratio(hex(cls,'primary'),base)).toBeGreaterThanOrEqual(7.0);
       expect(ratio(hex(cls,'secondary'),base)).toBeGreaterThanOrEqual(4.5);
@@ -105,7 +105,7 @@ describe('css token contract', () => {
   it('every theme block defines --t-on-accent (task-15 sweep)', () => {
     // White-on-accent text is unreadable on bold lime / terminal green /
     // console emerald — each theme needs its own on-accent ink.
-    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal'].forEach((cls) => {
+    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal','theme-clarity','theme-clarity-dark'].forEach((cls) => {
       const block = css.match(new RegExp(`\\.${cls}\\s*{([^}]*)}`, 's'))?.[1] ?? '';
       expect(block).toContain('--t-on-accent:');
     });
@@ -124,7 +124,7 @@ describe('css token contract', () => {
     const lum = (h: string) => { const c = [0,2,4].map((i) => { const v = parseInt(h.slice(1+i,3+i),16)/255;
       return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); }); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
     const ratio = (a: string, b: string) => { const [x,y] = [lum(a),lum(b)].sort((p,q)=>q-p); return (x+0.05)/(y+0.05); };
-    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal'].forEach((cls) => {
+    ['theme-paper','theme-console','theme-bold','theme-shell','theme-terminal','theme-clarity','theme-clarity-dark'].forEach((cls) => {
       expect(ratio(hex(cls,'on-accent'),hex(cls,'accent'))).toBeGreaterThanOrEqual(4.5);
     });
   });
