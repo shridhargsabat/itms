@@ -1222,3 +1222,11 @@
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) table tbody tr:hover {
   background-color: rgb(255 255 255 / 0.09);
 }
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) {
+  --t-accent: #0066D6;
+  --t-accent-strong: #0051A8;
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) {
+  --t-accent: #0A84FF;
+  --t-accent-strong: #409CFF;
+}
