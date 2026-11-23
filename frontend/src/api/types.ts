@@ -107,6 +107,19 @@ export interface DashboardMetrics {
   assets_by_status: MetricBucket[];
 }
 
+/** One point of the dashboard velocity chart (Task 2). */
+export interface VelocityPoint {
+  day: string;
+  incidents: number;
+  requests: number;
+  resolved: number;
+}
+
+export interface VelocityResponse {
+  range: string;
+  points: VelocityPoint[];
+}
+
 export interface Asset {
   id: string;
   asset_tag: string;

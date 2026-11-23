@@ -20,6 +20,7 @@ export default function BentoCard({
       {...rest}
       className={cn(
         'min-w-0 rounded-2xl p-4 transition-all duration-150 sm:p-5',
+        'liquid-glass-panel rounded-[26px] hover:-translate-y-0.5',
         className,
       )}
     >

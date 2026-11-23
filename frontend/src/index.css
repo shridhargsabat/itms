@@ -448,6 +448,167 @@
   backdrop-filter: url(#itms-liquid-glass-refract) blur(20px) saturate(175%);
 }
 
+/* ---------- Apple Liquid Glass tokens (additive-only) ----------
+   Glass-scoped panel/subcard/pill/btn-primary for the Liquid Glass
+   themes (light/dark/system). Day rules ride the light guard, night
+   rules the dark guard (chains copied verbatim from the refraction
+   selectors above); the 9 non-glass themes fall back to token
+   surfaces below. Later tasks consume these four classes. No existing
+   block above or below is edited — this section only adds. */
+
+/* Day panel: radius 26px. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .liquid-glass-panel {
+  background: rgba(255,255,255,0.50);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  backdrop-filter: blur(40px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.78);
+  border-radius: 26px;
+  box-shadow: inset 0 1.5px 1px rgba(255,255,255,0.95), 0 12px 36px rgba(15,23,42,0.08);
+}
+
+/* Day subcard: radius 20px, no backdrop-filter (spec §3B / reference). */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .liquid-glass-subcard {
+  background: rgba(255,255,255,0.62);
+  border: 1px solid rgba(255,255,255,0.85);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.92), 0 4px 14px rgba(15,23,42,0.04);
+}
+
+/* Day pill: radius full. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .liquid-glass-pill {
+  background: rgba(255,255,255,0.62);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.85);
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 6px 20px rgba(15,23,42,0.06);
+}
+
+/* Night panel (spec §3B): blur/radius carry over from day. */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .liquid-glass-panel {
+  background: rgba(255,255,255,0.09);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  backdrop-filter: blur(40px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 26px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.35), 0 16px 40px rgba(0,0,0,0.45);
+}
+
+/* Night subcard (spec §3B): no backdrop-filter, inset-only shadow. */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .liquid-glass-subcard {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.20);
+}
+
+/* Night pill (spec §3B): inset-only shadow. */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .liquid-glass-pill {
+  background: rgba(255,255,255,0.10);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.30);
+}
+
+/* Primary glass button: unscoped (solid gradient, no transparency to
+   guard); non-glass themes override to --t-accent below. Gradient runs
+   top #0A84FF → bottom #0066D6 (direction unspecified in the brief). */
+.liquid-glass-btn-primary {
+  background: linear-gradient(180deg, #0A84FF, #0066D6);
+  border-radius: 9999px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.5);
+  color: #fff;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.liquid-glass-btn-primary:hover {
+  filter: brightness(1.06);
+}
+.liquid-glass-btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Non-glass fallbacks: token surfaces, same radii, no backdrop-filter.
+   box-shadow: none is a defensive no-op (no glass shadow reaches these
+   scopes — the glass rules are guard-excluded). */
+.theme-paper .liquid-glass-panel,
+.theme-console .liquid-glass-panel,
+.theme-bold .liquid-glass-panel,
+.theme-shell .liquid-glass-panel,
+.theme-terminal .liquid-glass-panel,
+.theme-clarity .liquid-glass-panel,
+.theme-clarity-dark .liquid-glass-panel,
+.ledgerly-dark .liquid-glass-panel,
+.ledgerly-light .liquid-glass-panel {
+  background: var(--t-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--t-edge);
+  border-radius: 26px;
+  box-shadow: none;
+}
+.theme-paper .liquid-glass-subcard,
+.theme-console .liquid-glass-subcard,
+.theme-bold .liquid-glass-subcard,
+.theme-shell .liquid-glass-subcard,
+.theme-terminal .liquid-glass-subcard,
+.theme-clarity .liquid-glass-subcard,
+.theme-clarity-dark .liquid-glass-subcard,
+.ledgerly-dark .liquid-glass-subcard,
+.ledgerly-light .liquid-glass-subcard {
+  background: var(--t-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--t-edge);
+  border-radius: 20px;
+  box-shadow: none;
+}
+.theme-paper .liquid-glass-pill,
+.theme-console .liquid-glass-pill,
+.theme-bold .liquid-glass-pill,
+.theme-shell .liquid-glass-pill,
+.theme-terminal .liquid-glass-pill,
+.theme-clarity .liquid-glass-pill,
+.theme-clarity-dark .liquid-glass-pill,
+.ledgerly-dark .liquid-glass-pill,
+.ledgerly-light .liquid-glass-pill {
+  background: var(--t-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--t-edge);
+  border-radius: 9999px;
+  box-shadow: none;
+}
+.theme-paper .liquid-glass-btn-primary,
+.theme-console .liquid-glass-btn-primary,
+.theme-bold .liquid-glass-btn-primary,
+.theme-shell .liquid-glass-btn-primary,
+.theme-terminal .liquid-glass-btn-primary,
+.theme-clarity .liquid-glass-btn-primary,
+.theme-clarity-dark .liquid-glass-btn-primary,
+.ledgerly-dark .liquid-glass-btn-primary,
+.ledgerly-light .liquid-glass-btn-primary {
+  background: var(--t-accent);
+  color: #fff;
+}
+
+/* Transparency + print guards for the four classes. New appended
+   blocks (same declarations as .glass-card in the existing guards) —
+   the existing guard blocks are left unedited per append-only. */
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass-panel, .liquid-glass-subcard, .liquid-glass-pill, .liquid-glass-btn-primary {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    background: var(--t-surface); box-shadow: none;
+  }
+}
+@media print {
+  .liquid-glass-panel, .liquid-glass-subcard, .liquid-glass-pill, .liquid-glass-btn-primary {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    background: #fff !important; box-shadow: none !important;
+  }
+}
+
 /* Liquid Glass Light login title contrast fix:
    LegacyLogin's h1 uses from-indigo-300 via-white to-indigo-300 (designed for
    dark mode). When .dark is absent, remap the gradient stops to deep indigo/
@@ -832,4 +993,196 @@
 .theme-clarity :focus-visible, .theme-clarity-dark :focus-visible {
   outline: 2px solid var(--t-accent);
   outline-offset: 2px;
+}
+
+/* ---------- Task 4: ambient glass orbs + canvas gradient (appended) -------
+   Glass scope only: the orb container is `display: none` by default and
+   shows ONLY under the light/dark guard chains (copied verbatim from the
+   refraction selectors above). No per-theme hide rules: the guard chains
+   exclude all 9 non-glass theme classes, so base-none already hides the
+   orbs in every non-glass theme — and theme-parity.test.ts forbids
+   `.theme-{console,bold,shell,terminal} .ab-*` selectors. Existing
+   mesh/blobs/grid/particles are untouched (other themes rely on them).
+   Canvas gradients ride the same guard chains. */
+.ab-glass-orbs {
+  display: none;
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ab-glass-orbs {
+  display: block;
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ab-glass-orbs {
+  display: block;
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) body {
+  background: linear-gradient(135deg,#DCEBFF 0%,#EEF2FF 50%,#FCE7F3 100%);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) body {
+  background: linear-gradient(135deg,#0B1226 0%,#131836 50%,#0A192F 100%);
+}
+
+/* ---------- Task 5: floating shell — nav pills + Quick Capture dock (appended) --
+   Glass scope only: day rules ride the light guard chain, night rules the
+   dark guard chain (copied verbatim from the Task 4 selectors above). The
+   guard chains exclude all 9 non-glass theme classes, so every other theme
+   keeps token behavior with zero per-theme rules (R9: no .theme-X selectors
+   here at all). Unlayered, so these beat the layered Tailwind utilities. */
+
+/* Nav pills: day active link — #007AFF on a frosted pill (ref mockup). */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) aside nav a[aria-current="page"] {
+  color: #007AFF;
+  background-color: rgb(255 255 255 / 0.90);
+  border: 1px solid rgb(255 255 255 / 0.85);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 6px 18px rgb(0 122 255 / 0.14);
+}
+
+/* Nav pills: night active link — luminous bg-white/20 pill (ref mockup). */
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) aside nav a[aria-current="page"] {
+  color: #ffffff;
+  background-color: rgb(255 255 255 / 0.20);
+  border: 1px solid rgb(255 255 255 / 0.35);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.5), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+/* Quick Capture dock buttons: token base (non-glass themes), glass fills
+   under the guard chains. Radius 16px per the ref mockup. */
+.quick-capture-btn {
+  background-color: var(--t-elevated);
+  color: var(--t-primary);
+  border: 1px solid var(--t-edge);
+  border-radius: 16px;
+  transition: filter 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+}
+.quick-capture-btn:hover {
+  filter: brightness(1.04);
+}
+.quick-capture-btn:active {
+  transform: scale(0.97);
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .quick-capture-btn {
+  background-color: rgb(255 255 255 / 0.85);
+  color: #334155;
+  border-color: rgb(255 255 255 / 0.85);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 4px 14px rgb(15 23 42 / 0.06);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .quick-capture-btn {
+  background-color: rgb(255 255 255 / 0.10);
+  color: #ffffff;
+  border-color: rgb(255 255 255 / 0.20);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.30);
+}
+
+/* ---------- Task 6: glass badge overrides — Apple semantic tints (appended) --
+   Glass scope only: day rules ride the light guard chain, night rules the
+   dark guard chain (copied verbatim from the Task 4/5 selectors above). The
+   guard chains exclude all 9 non-glass theme classes, so every other theme
+   keeps the TicketBadge.tsx token classes with zero per-theme rules (R9: no
+   affirmative .theme-X selectors here at all). TicketBadge.tsx itself is
+   UNTOUCHED — each variant is addressed by the unique light-mode text utility
+   it already emits, qualified with .ring-inset (the badge-pill marker; no
+   other component combines ring-inset with these text colors). Unlayered, so
+   these beat the layered Tailwind utilities (incl. the dark: variants, whose
+   :where() guard carries zero specificity).
+   Day ink = Apple light semantic (brief verbatim); night ink = Apple dark
+   semantic (#FF453A/#FF9F0A/#0A84FF/#30D158) for AA contrast on dark glass.
+   --tw-ring-color is the pill border (Tailwind v4 ring paints from it). */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-red-700 {
+  color: #FF3B30;
+  background-color: rgb(255 59 48 / 0.12);
+  --tw-ring-color: rgb(255 59 48 / 0.35);
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-orange-700 {
+  color: #FF9500;
+  background-color: rgb(255 149 0 / 0.12);
+  --tw-ring-color: rgb(255 149 0 / 0.35);
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-yellow-700 {
+  color: #007AFF;
+  background-color: rgb(0 122 255 / 0.12);
+  --tw-ring-color: rgb(0 122 255 / 0.35);
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-blue-700 {
+  color: #007AFF;
+  background-color: rgb(0 122 255 / 0.12);
+  --tw-ring-color: rgb(0 122 255 / 0.35);
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-amber-700 {
+  color: #FF9500;
+  background-color: rgb(255 149 0 / 0.12);
+  --tw-ring-color: rgb(255 149 0 / 0.35);
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-emerald-700 {
+  color: #34C759;
+  background-color: rgb(52 199 89 / 0.12);
+  --tw-ring-color: rgb(52 199 89 / 0.35);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-red-700 {
+  color: #FF453A;
+  background-color: rgb(255 69 58 / 0.14);
+  --tw-ring-color: rgb(255 69 58 / 0.40);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-orange-700 {
+  color: #FF9F0A;
+  background-color: rgb(255 159 10 / 0.14);
+  --tw-ring-color: rgb(255 159 10 / 0.40);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-yellow-700 {
+  color: #0A84FF;
+  background-color: rgb(10 132 255 / 0.14);
+  --tw-ring-color: rgb(10 132 255 / 0.40);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-blue-700 {
+  color: #0A84FF;
+  background-color: rgb(10 132 255 / 0.14);
+  --tw-ring-color: rgb(10 132 255 / 0.40);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-amber-700 {
+  color: #FF9F0A;
+  background-color: rgb(255 159 10 / 0.14);
+  --tw-ring-color: rgb(255 159 10 / 0.40);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-emerald-700 {
+  color: #30D158;
+  background-color: rgb(48 209 88 / 0.14);
+  --tw-ring-color: rgb(48 209 88 / 0.40);
+}
+
+/* ---------- Task 10: CMDB glass scope — root tag + depth pill (appended) --
+   Glass scope only: day rules ride the light guard chain, night rules the
+   dark guard chain (copied verbatim from the Task 4/5/6 selectors above). The
+   guard chains exclude all 9 non-glass theme classes, so every other theme
+   keeps the CMDB.tsx token classes with zero per-theme rules (R9: no
+   affirmative .theme-X selectors here at all). Unlayered, so these beat the
+   layered Tailwind utilities.
+   Root tag: Apple blue #007AFF day and night (reference hardcodes it).
+   Depth pill: #AF52DE `DEPTH n` pill (reference verbatim: rounded-full
+   bg-[#AF52DE]/20 text-[#AF52DE] font-mono text-[11px] font-bold). The TSX
+   keeps its "depth n" text and token classes — text-transform uppercases it
+   in glass scope only, so the diff stays class-only. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .cmdb-root-tag {
+  color: #007AFF;
+}
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .cmdb-depth {
+  color: #AF52DE;
+  background-color: rgb(175 82 222 / 0.20);
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .cmdb-root-tag {
+  color: #007AFF;
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .cmdb-depth {
+  color: #AF52DE;
+  background-color: rgb(175 82 222 / 0.20);
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
 }

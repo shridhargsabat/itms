@@ -70,7 +70,7 @@ export default function SidebarNav({ wide, user, onExpandSidebar }: SidebarNavPr
   };
 
   const rowBase =
-    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors';
+    'flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition-colors';
   const leafCls = (isActive: boolean, extra = '') =>
     cn(
       rowBase,
@@ -137,7 +137,7 @@ export default function SidebarNav({ wide, user, onExpandSidebar }: SidebarNavPr
               aria-expanded={open}
               aria-controls={`navgroup-${group.id}`}
               onClick={() => toggle(group.id)}
-              className="h-auto w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-elevated/60"
+              className="h-auto w-full justify-start gap-3 rounded-full px-3 py-2.5 text-sm font-medium hover:bg-elevated/60"
               rightIcon={
                 <ChevronDown
                   className={cn(

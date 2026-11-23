@@ -1,0 +1,223 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, Search, Ticket, X } from 'lucide-react';
+import { listTickets, patchTicketStatus } from '@/api/client';
+import { TICKET_STATUSES } from '@/api/types';
+import type { TicketStatus } from '@/api/types';
+import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
+import SlaChip from '@/components/SlaChip';
+import Select from '@/components/Select';
+import EmptyState from '@/components/EmptyState';
+
+const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
+
+const LIVE_STATUSES: TicketStatus[] = ['OPEN', 'IN_PROGRESS'];
+
+/**
+ * Live service queue (Task 9): OPEN/IN_PROGRESS tickets with client-side
+ * filter, PriorityBadge + SlaChip rows, and an inspect slide-over with an
+ * inline status Select. No admin gate — every signed-in user sees it.
+ */
+export default function ServiceQueue() {
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<string | null>(null);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['service-queue'],
+    queryFn: () => listTickets({ limit: 25 }),
+    refetchInterval: 60_000,
+  });
+
+  const rows = useMemo(() => {
+    const live = (data?.items ?? []).filter((t) =>
+      (LIVE_STATUSES as string[]).includes(t.status),
+    );
+    const q = filter.trim().toLowerCase();
+    if (!q) return live;
+    return live.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        t.ticket_number.toLowerCase().includes(q) ||
+        (t.asset_tag ?? '').toLowerCase().includes(q),
+    );
+  }, [data, filter]);
+
+  const selected = (data?.items ?? []).find((t) => t.id === selectedId) ?? null;
+
+  const close = () => {
+    setSelectedId(null);
+    setConfirmed(null);
+  };
+
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selected]);
+
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: TicketStatus }) =>
+      patchTicketStatus(id, status),
+    onSuccess: (t) => {
+      qc.invalidateQueries({ queryKey: ['service-queue'] });
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      qc.invalidateQueries({ queryKey: ['metrics'] });
+      setConfirmed(t.status);
+    },
+  });
+
+  return (
+    <>
+      <section
+        data-testid="service-queue"
+        className="liquid-glass-panel min-w-0 space-y-3 rounded-[28px] p-5 sm:p-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-primary">Live Service Queue</h2>
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              type="text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter tickets..."
+              aria-label="Filter service queue"
+              className="liquid-glass-pill rounded-full py-1.5 pr-4 pl-8 text-xs text-primary focus:outline-none"
+            />
+          </div>
+        </div>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-16 animate-pulse rounded-[20px] bg-elevated" />
+            ))}
+          </div>
+        ) : isError ? (
+          <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            Failed to load the service queue.
+          </p>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={Ticket}
+            title="Queue is clear"
+            description="No open tickets match. New incidents and requests will show up here automatically."
+          />
+        ) : (
+          <div className="space-y-2">
+            {rows.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  setSelectedId(t.id);
+                  setConfirmed(null);
+                }}
+                className="liquid-glass-subcard w-full cursor-pointer rounded-[20px] p-3.5 transition"
+              >
+                <span className="flex flex-wrap items-center justify-between gap-3 text-left">
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-[#007AFF]">
+                        {t.ticket_number}
+                      </span>
+                      <span className="truncate text-xs font-medium text-primary sm:text-sm">
+                        {t.title}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-muted">
+                      CI: {t.asset_tag ?? '—'} · Assignee: {t.assignee_name ?? 'Unassigned'}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <PriorityBadge priority={t.priority} />
+                    <SlaChip dueAt={t.sla_due_at} policyHours={SLA_HOURS[t.priority]} />
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {selected && (
+        <>
+          <div
+            data-testid="service-queue-scrim"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+            onClick={close}
+          />
+          <div
+            data-testid="service-queue-drawer"
+            role="dialog"
+            aria-label={`Inspect ${selected.ticket_number}`}
+            className="liquid-glass-panel fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto p-6"
+          >
+            <div className="flex flex-col justify-between gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold text-[#007AFF]">
+                    {selected.ticket_number}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={close}
+                    aria-label="Close ticket details"
+                    className="liquid-glass-subcard rounded-full p-1.5"
+                  >
+                    <X className="h-4 w-4 text-secondary" />
+                  </button>
+                </div>
+                <h3 className="text-base font-semibold text-primary">{selected.title}</h3>
+                <p className="text-xs leading-relaxed text-secondary">
+                  {selected.description || 'No description provided.'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge status={selected.status} />
+                  <PriorityBadge priority={selected.priority} />
+                  <SlaChip dueAt={selected.sla_due_at} policyHours={SLA_HOURS[selected.priority]} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-muted">Update Status</label>
+                  <Select
+                    className="w-full"
+                    value={selected.status}
+                    onChange={(v) => {
+                      setConfirmed(null);
+                      updateStatus.mutate({ id: selected.id, status: v as TicketStatus });
+                    }}
+                    options={TICKET_STATUSES.map((s) => ({ value: s, label: s }))}
+                  />
+                  {confirmed && (
+                    <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Status updated to {confirmed}
+                    </p>
+                  )}
+                  {updateStatus.isError && (
+                    <p className="mt-2 text-xs text-red-400">
+                      {updateStatus.error instanceof Error
+                        ? updateStatus.error.message
+                        : 'Failed to update status.'}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Link
+                to="/tickets"
+                className="text-xs font-semibold text-[#007AFF] hover:underline"
+              >
+                Open in Service Desk →
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}

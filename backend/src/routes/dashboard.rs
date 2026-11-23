@@ -1,14 +1,20 @@
-use axum::extract::State;
+use axum::extract::{Query, State};
+use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
+use serde::Deserialize;
 
 use crate::db::AppState;
-use crate::models::{DashboardMetrics, DashboardMetricsScalars, MetricBucket};
+use crate::models::{
+    DashboardMetrics, DashboardMetricsScalars, MetricBucket, VelocityPoint, VelocityResponse,
+};
 
 use super::AppError;
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/metrics", get(metrics))
+    Router::new()
+        .route("/metrics", get(metrics))
+        .route("/velocity", get(velocity))
 }
 
 /// GET /api/v1/dashboard/metrics
@@ -83,5 +89,113 @@ async fn metrics(
         overdue_tickets: scalars.overdue_tickets,
         tickets_by_priority,
         assets_by_status,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+struct VelocityParams {
+    range: Option<String>,
+}
+
+/// GET /api/v1/dashboard/velocity?range=7d|30d
+///
+/// Ticket flow over time: incidents opened, service requests opened, and
+/// tickets resolved (TICKET_STATUS audit transitions into RESOLVED/CLOSED).
+/// `7d` (default) returns 7 daily rows (today-6..today); `30d` returns 4
+/// weekly rows (7-day buckets ending today, oldest first). Auth is inherited
+/// from the dashboard router's middleware, same as /metrics.
+async fn velocity(
+    State(state): State<AppState>,
+    Query(params): Query<VelocityParams>,
+) -> Result<Json<VelocityResponse>, AppError> {
+    let range = params.range.as_deref().unwrap_or("7d");
+    // Tuple decode + map, same style as the metrics breakdowns above.
+    let rows: Vec<(String, i64, i64, i64)> = match range {
+        "7d" => {
+            sqlx::query_as(
+                r#"
+                SELECT to_char(CURRENT_DATE - 6 + g.n, 'Dy') AS day,
+                       COALESCE(i.cnt, 0)::int8 AS incidents,
+                       COALESCE(r.cnt, 0)::int8 AS requests,
+                       COALESCE(s.cnt, 0)::int8 AS resolved
+                FROM generate_series(0, 6) AS g(n)
+                LEFT JOIN (
+                    SELECT created_at::date AS d, COUNT(*) AS cnt FROM tickets
+                    WHERE ticket_type = 'INCIDENT' AND created_at::date >= CURRENT_DATE - 6
+                    GROUP BY 1
+                ) i ON i.d = (CURRENT_DATE - 6 + g.n)
+                LEFT JOIN (
+                    SELECT created_at::date AS d, COUNT(*) AS cnt FROM tickets
+                    WHERE ticket_type = 'SERVICE_REQUEST' AND created_at::date >= CURRENT_DATE - 6
+                    GROUP BY 1
+                ) r ON r.d = (CURRENT_DATE - 6 + g.n)
+                LEFT JOIN (
+                    SELECT created_at::date AS d, COUNT(*) AS cnt FROM audit_logs
+                    WHERE action = 'TICKET_STATUS' AND target_type = 'ticket'
+                      AND diff->>'to' IN ('RESOLVED', 'CLOSED')
+                      AND created_at::date >= CURRENT_DATE - 6
+                    GROUP BY 1
+                ) s ON s.d = (CURRENT_DATE - 6 + g.n)
+                ORDER BY g.n
+                "#,
+            )
+            .fetch_all(&state.pool)
+            .await?
+        }
+        "30d" => {
+            sqlx::query_as(
+                r#"
+                SELECT 'Wk ' || (g.w + 1) AS day,
+                       COALESCE(i.cnt, 0)::int8 AS incidents,
+                       COALESCE(r.cnt, 0)::int8 AS requests,
+                       COALESCE(s.cnt, 0)::int8 AS resolved
+                FROM generate_series(0, 3) AS g(w)
+                LEFT JOIN (
+                    SELECT ((created_at::date - (CURRENT_DATE - 27)) / 7) AS w, COUNT(*) AS cnt
+                    FROM tickets
+                    WHERE ticket_type = 'INCIDENT' AND created_at::date >= CURRENT_DATE - 27
+                    GROUP BY 1
+                ) i ON i.w = g.w
+                LEFT JOIN (
+                    SELECT ((created_at::date - (CURRENT_DATE - 27)) / 7) AS w, COUNT(*) AS cnt
+                    FROM tickets
+                    WHERE ticket_type = 'SERVICE_REQUEST' AND created_at::date >= CURRENT_DATE - 27
+                    GROUP BY 1
+                ) r ON r.w = g.w
+                LEFT JOIN (
+                    SELECT ((created_at::date - (CURRENT_DATE - 27)) / 7) AS w, COUNT(*) AS cnt
+                    FROM audit_logs
+                    WHERE action = 'TICKET_STATUS' AND target_type = 'ticket'
+                      AND diff->>'to' IN ('RESOLVED', 'CLOSED')
+                      AND created_at::date >= CURRENT_DATE - 27
+                    GROUP BY 1
+                ) s ON s.w = g.w
+                ORDER BY g.w
+                "#,
+            )
+            .fetch_all(&state.pool)
+            .await?
+        }
+        _ => {
+            return Err(AppError::new(
+                StatusCode::BAD_REQUEST,
+                "range must be one of: 7d, 30d",
+            ));
+        }
+    };
+
+    let points = rows
+        .into_iter()
+        .map(|(day, incidents, requests, resolved)| VelocityPoint {
+            day,
+            incidents,
+            requests,
+            resolved,
+        })
+        .collect();
+
+    Ok(Json(VelocityResponse {
+        range: range.to_string(),
+        points,
     }))
 }

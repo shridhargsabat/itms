@@ -308,7 +308,7 @@ export default function DataTable<T extends { id: string }>({
                     aria-expanded={renderExpanded ? expanded : undefined}
                     className={cn(
                       'animate-list-in transition-colors',
-                      clickable && 'cursor-pointer hover:bg-surface',
+                      clickable && 'cursor-pointer hover:bg-white/40 dark:hover:bg-white/10',
                     )}
                     style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                   >

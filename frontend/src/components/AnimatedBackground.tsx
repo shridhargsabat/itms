@@ -54,6 +54,25 @@ export default function AnimatedBackground() {
       {/* faint grid */}
       <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(148,163,184,0.4)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.4)_1px,transparent_1px)] [background-size:44px_44px]" />
 
+      {/* glass orbs (Apple Liquid Glass themes only — base display:none
+          in index.css, shown only under the glass guard chains):
+          3 refracting color fields behind the frosted panels. Day fills
+          first, dark: fills for glass-night. */}
+      <div className="ab-glass-orbs absolute inset-0">
+        <div
+          data-testid="glass-orb"
+          className="pointer-events-none fixed -left-32 -top-40 h-[480px] w-[480px] rounded-full bg-[rgba(56,189,248,0.45)] blur-[80px] dark:bg-[rgba(14,165,233,0.28)]"
+        />
+        <div
+          data-testid="glass-orb"
+          className="pointer-events-none fixed -right-36 top-1/3 h-[520px] w-[520px] rounded-full bg-[rgba(129,140,248,0.35)] blur-[80px] dark:bg-[rgba(124,58,237,0.28)]"
+        />
+        <div
+          data-testid="glass-orb"
+          className="pointer-events-none fixed -bottom-44 left-1/2 h-[460px] w-[460px] -translate-x-1/2 rounded-full bg-[rgba(253,164,175,0.38)] blur-[80px] dark:bg-[rgba(45,212,191,0.18)]"
+        />
+      </div>
+
       {/* rising particles */}
       <div className="ab-particles absolute inset-0 overflow-hidden">
         {Array.from({ length: 14 }).map((_, i) => (
