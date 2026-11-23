@@ -200,6 +200,18 @@ describe('liquid glass SVG refraction & non-glass opacity isolation', () => {
   it('makes paper cards opaque with warm ring shadow instead of 60% translucent frost', () => {
     expect(css).toContain('.theme-paper .glass-card');
   });
+  it('excludes clarity themes from the SVG refraction selectors (opaque by design)', () => {
+    // Every selector binding url(#itms-liquid-glass-refract) must exclude
+    // .theme-clarity and .theme-clarity-dark, else Clarity surfaces pay for
+    // (and risk artifacts from) a filter they are specced not to use.
+    const blocks = css.split('url(#itms-liquid-glass-refract)');
+    expect(blocks.length).toBeGreaterThan(1);
+    blocks.slice(0, -1).forEach((before) => {
+      const selector = before.slice(before.lastIndexOf('}') + 1);
+      expect(selector).toContain(':not(.theme-clarity)');
+      expect(selector).toContain(':not(.theme-clarity-dark)');
+    });
+  });
 });
 
 describe('clarity shared surfaces', () => {

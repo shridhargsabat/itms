@@ -419,30 +419,30 @@
    the frosted blur for ALL .glass-card and .glass-chrome surfaces in Liquid
    Glass themes (light, dark, system) — covering BentoCards, KPI link cards,
    sticky headers, Sidebar, Modals, and Notification popovers. */
-:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light)
   .glass-card,
-:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light)
   [data-liquid-glass="active"].glass-card {
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   backdrop-filter: url(#itms-liquid-glass-refract) blur(22px) saturate(190%);
 }
-:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light)
   .glass-chrome,
-:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.ledgerly-dark):not(.ledgerly-light)
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light)
   [data-liquid-glass="active"].glass-chrome {
   -webkit-backdrop-filter: blur(36px) saturate(180%);
   backdrop-filter: url(#itms-liquid-glass-refract) blur(28px) saturate(190%);
 }
-.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark)
   .glass-card,
-.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark)
   [data-liquid-glass="active"].glass-card {
   -webkit-backdrop-filter: blur(16px) saturate(160%);
   backdrop-filter: url(#itms-liquid-glass-refract) blur(16px) saturate(175%);
 }
-.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark)
   .glass-chrome,
-.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.ledgerly-dark)
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark)
   [data-liquid-glass="active"].glass-chrome {
   -webkit-backdrop-filter: blur(24px) saturate(170%);
   backdrop-filter: url(#itms-liquid-glass-refract) blur(20px) saturate(175%);
