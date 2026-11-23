@@ -210,6 +210,15 @@ export default function Tickets() {
   const rows = data?.items ?? [];
   const selected = rows.find((t) => t.id === selectedId) ?? null;
 
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedId(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected]);
+
   // any filter change or view switch resets to page 1
   useEffect(() => {
     reset();
