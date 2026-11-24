@@ -171,3 +171,30 @@ describe('themed scrollbars (rules)', () => {
     expect(css).toContain('scrollbar-color: var(--t-scroll-thumb) transparent');
   });
 });
+
+describe('themed scrollbars (a11y guards)', () => {
+  const css = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), './index.css'),
+    'utf8',
+  );
+  const LIGHT_GUARD =
+    ':root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light)';
+  const DARK_GUARD =
+    '.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark)';
+
+  it('goes solid under prefers-reduced-transparency, glass themes only', () => {
+    expect(css).toContain('@media (prefers-reduced-transparency: reduce)');
+    expect(css).toContain(`${LIGHT_GUARD} {`);
+    expect(css).toContain(`${DARK_GUARD} {`);
+    expect(css).toContain('--t-scroll-thumb: #64748b');
+    expect(css).toContain('--t-scroll-thumb-hover: #475569');
+    expect(css).toContain('--t-scroll-thumb: #94a3b8');
+    expect(css).toContain('--t-scroll-thumb-hover: #cbd5e1');
+  });
+
+  it('reverts to native scrollbars under forced-colors', () => {
+    expect(css).toContain('@media (forced-colors: active)');
+    expect(css).toContain('scrollbar-color: auto');
+    expect(css).toContain('scrollbar-width: auto');
+  });
+});

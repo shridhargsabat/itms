@@ -1320,3 +1320,21 @@
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ---------- Themed scrollbars: accessibility guards ---------- */
+@media (prefers-reduced-transparency: reduce) {
+  :root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) {
+    --t-scroll-thumb: #64748b;
+    --t-scroll-thumb-hover: #475569;
+  }
+  .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) {
+    --t-scroll-thumb: #94a3b8;
+    --t-scroll-thumb-hover: #cbd5e1;
+  }
+}
+@media (forced-colors: active) {
+  :root {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
