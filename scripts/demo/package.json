@@ -1,0 +1,14 @@
+{
+  "name": "itms-demo-capture",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "capture:png": "node capture.mjs --only=png",
+    "capture:video": "node capture.mjs --only=video"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
