@@ -276,7 +276,7 @@ export default function Assets() {
         }
       />
 
-      <FilterBar className="mb-0">
+      <FilterBar>
         <div className="relative min-w-[200px] basis-full flex-1 sm:max-w-xs sm:flex-none sm:basis-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input

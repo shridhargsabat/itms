@@ -190,13 +190,16 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center gap-2">
           <DayNightToggle />
           <AddAssetButton />
-          <button
+          <Button
             type="button"
             onClick={() => setNewOpen(true)}
-            className="liquid-glass-btn-primary flex items-center gap-1 px-4 py-2 text-xs font-semibold text-white"
+            variant="primary"
+            size="lg"
+            className="liquid-glass-btn-primary"
+            leftIcon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-3.5 w-3.5" /> New Ticket
-          </button>
+            New Ticket
+          </Button>
         </div>
       </header>
 

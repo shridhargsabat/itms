@@ -171,4 +171,17 @@ describe('Dashboard Bento shell (task 7)', () => {
     fireEvent.click(screen.getByRole('button', { name: /new ticket/i }));
     expect(await screen.findByRole('heading', { name: 'New Ticket' })).toBeInTheDocument();
   });
+
+  it('header Add Asset and New Ticket share the same button geometry', async () => {
+    // Regression: New Ticket was a hand-rolled px-4 py-2 text-xs button next
+    // to Add Asset's canonical Button size=lg (h-10 px-4 text-sm).
+    setUser('ADMIN');
+    renderDashboard();
+    expect(await screen.findByTestId('kpi-lenses')).toBeInTheDocument();
+    for (const name of [/^add asset$/i, /new ticket/i]) {
+      const btn = screen.getByRole('button', { name });
+      expect(btn).toHaveClass('h-10');
+      expect(btn).toHaveClass('text-sm');
+    }
+  });
 });
