@@ -24,6 +24,45 @@ use super::{notifications::notify, AppError};
 
 const MAX_ATTACHMENT_BYTES: i64 = 10 * 1024 * 1024; // 10 MB
 
+/// Strict allowlist for attachment content types. Deliberately excludes
+/// `text/html` / scripts: a stored MIME is later reflected as the download
+/// Content-Type, so anything outside this list falls back to
+/// `application/octet-stream`.
+const ALLOWED_CONTENT_TYPES: &[&str] = &[
+    "application/pdf",
+    "application/json",
+    "application/zip",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "text/plain",
+    "text/csv",
+    "text/markdown",
+    "application/octet-stream",
+];
+
+/// Normalize a client-supplied Content-Type: strip parameters (`; charset=…`),
+/// lowercase, and keep it only when allowlisted — otherwise fall back to
+/// `application/octet-stream`. Never fails.
+fn sanitize_content_type(raw: Option<&str>) -> String {
+    let normalized = raw
+        .unwrap_or("")
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
+    if ALLOWED_CONTENT_TYPES.contains(&normalized.as_str()) {
+        normalized
+    } else {
+        "application/octet-stream".to_string()
+    }
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/{ticket_id}/comments", get(list_comments).post(create_comment))
@@ -269,6 +308,10 @@ async fn upload_attachment(
     if clean.is_empty() {
         return Err(AppError::new(StatusCode::BAD_REQUEST, "invalid file name"));
     }
+    // Validate the client-supplied MIME against the strict allowlist (unknown
+    // or missing → octet-stream fallback), so downloads never reflect an
+    // attacker-chosen Content-Type.
+    let content_type = sanitize_content_type(content_type.as_deref());
     let storage_key = format!("{ticket_id}/{}.bin", Uuid::new_v4());
     let abs = PathBuf::from(&dir).join(&storage_key);
     if let Some(parent) = abs.parent() {
@@ -374,15 +417,26 @@ pub async fn download_attachment(
     })?;
 
     let mut headers = HeaderMap::new();
+    // Re-sanitize the stored value (pre-hardening rows may hold anything) and
+    // never unwrap header parsing — fall back instead of panicking the worker.
+    let ct = sanitize_content_type(content_type.as_deref());
     headers.insert(
         header::CONTENT_TYPE,
-        content_type.unwrap_or_else(|| "application/octet-stream".to_string()).parse().unwrap(),
+        ct.parse()
+            .unwrap_or_else(|_| header::HeaderValue::from_static("application/octet-stream")),
     );
     headers.insert(
         header::CONTENT_DISPOSITION,
-        format!("attachment; filename=\"{}\"", file_name.replace('"', "_")).parse().unwrap(),
+        format!("attachment; filename=\"{}\"", file_name.replace('"', "_"))
+            .parse()
+            .unwrap_or_else(|_| header::HeaderValue::from_static("attachment")),
     );
-    headers.insert(header::CONTENT_LENGTH, size.to_string().parse().unwrap());
+    headers.insert(
+        header::CONTENT_LENGTH,
+        size.to_string()
+            .parse()
+            .unwrap_or_else(|_| header::HeaderValue::from_static("0")),
+    );
     Ok((headers, bytes).into_response())
 }
 
@@ -442,4 +496,39 @@ async fn ticket_timeline(
         .fetch_all(pool)
         .await?,
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn content_type_allowlist_keeps_known_types() {
+        assert_eq!(sanitize_content_type(Some("application/pdf")), "application/pdf");
+        assert_eq!(sanitize_content_type(Some("image/png")), "image/png");
+        assert_eq!(sanitize_content_type(Some("text/csv")), "text/csv");
+    }
+
+    #[test]
+    fn content_type_normalizes_case_and_params() {
+        assert_eq!(sanitize_content_type(Some("Image/JPEG")), "image/jpeg");
+        assert_eq!(
+            sanitize_content_type(Some("text/plain; charset=utf-8")),
+            "text/plain"
+        );
+        assert_eq!(sanitize_content_type(Some("  application/pdf  ")), "application/pdf");
+    }
+
+    #[test]
+    fn content_type_falls_back_for_unknown_or_missing() {
+        // text/html is deliberately NOT allowlisted (reflected-MIME XSS risk).
+        assert_eq!(sanitize_content_type(Some("text/html")), "application/octet-stream");
+        assert_eq!(
+            sanitize_content_type(Some("application/x-sh")),
+            "application/octet-stream"
+        );
+        assert_eq!(sanitize_content_type(Some("not a mime\ninjected: x")), "application/octet-stream");
+        assert_eq!(sanitize_content_type(None), "application/octet-stream");
+        assert_eq!(sanitize_content_type(Some("")), "application/octet-stream");
+    }
 }

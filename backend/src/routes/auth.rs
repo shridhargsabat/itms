@@ -194,8 +194,30 @@ pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppErro
     Ok(next.run(req).await)
 }
 
-pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<String, AppError> {
-    let value = headers
+/// Staff check shared by handler-level gates (tickets, audit): ADMIN or AGENT.
+/// Strict allowlist — any unexpected role value is denied.
+pub fn is_staff_role(role: &str) -> bool {
+    matches!(role, "ADMIN" | "AGENT")
+}
+
+/// RBAC middleware: 403 unless the authenticated user is staff (ADMIN/AGENT).
+/// Must run inside `require_auth` (the role extension is populated there).
+pub async fn require_staff(req: Request, next: Next) -> Result<Response, AppError> {
+    let role = req
+        .extensions()
+        .get::<String>()
+        .map(|r| r.as_str())
+        .unwrap_or("");
+    if !is_staff_role(role) {
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "staff role required",
+        ));
+    }
+    Ok(next.run(req).await)
+}
+
+pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<String, AppError> {    let value = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "authentication required"))?;
@@ -359,7 +381,7 @@ pub async fn demo_login(
 
 #[cfg(test)]
 mod theme_tests {
-    use super::is_valid_theme;
+    use super::{is_staff_role, is_valid_theme};
     #[test]
     fn allowlist_covers_all_twelve_modes() {
         for t in ["light","dark","ledgerly","ledgerly-light","system","paper","console","bold","shell","terminal","clarity","clarity-dark"] {
@@ -368,6 +390,16 @@ mod theme_tests {
         assert!(!is_valid_theme("paper "));
         assert!(!is_valid_theme("DARK"));
         assert!(!is_valid_theme(""));
+    }
+
+    #[test]
+    fn staff_gate_allows_admin_and_agent_only() {
+        assert!(is_staff_role("ADMIN"));
+        assert!(is_staff_role("AGENT"));
+        assert!(!is_staff_role("EMPLOYEE"));
+        assert!(!is_staff_role(""));
+        assert!(!is_staff_role("admin")); // case-sensitive: exact role strings only
+        assert!(!is_staff_role("SUPERADMIN"));
     }
 }
 
