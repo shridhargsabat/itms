@@ -3,6 +3,7 @@ import {
   ABSOLUTE_SESSION_MS,
   clearSession,
   evaluateSessionFreshness,
+  getToken,
   IDLE_TIMEOUT_MS,
   setSession,
 } from '@/api/client';
@@ -109,5 +110,40 @@ describe('wave-2a clearSession purge', () => {
 
   it('resolves fine with no CacheStorage (jsdom / private mode)', async () => {
     await expect(clearSession()).resolves.toBeUndefined();
+  });
+});
+
+describe('wave-2b memory-only Bearer (code-scanning #2)', () => {
+  const user = { id: '1', email: 'a@b.c', name: 'A', role: 'ADMIN', department: 'IT' } as const;
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('setSession keeps the Bearer token out of localStorage but available in-session', () => {
+    setSession('tok', { ...user });
+    expect(localStorage.getItem('itms_token')).toBeNull();
+    expect(getToken()).toBe('tok');
+    // Profile cache stays: offline PWA + sync role gating need it (alert #3 accepted risk).
+    expect(JSON.parse(localStorage.getItem('itms_user') ?? 'null')).toMatchObject({ email: 'a@b.c' });
+  });
+
+  it('clearSession drops the in-memory token and purges any legacy stored token', async () => {
+    setSession('tok', { ...user });
+    localStorage.setItem('itms_token', 'legacy');
+    await clearSession();
+    expect(getToken()).toBeNull();
+    expect(localStorage.getItem('itms_token')).toBeNull();
+  });
+
+  it('purges a legacy localStorage token on module load', async () => {
+    localStorage.setItem('itms_token', 'legacy');
+    vi.resetModules();
+    await import('@/api/client');
+    expect(localStorage.getItem('itms_token')).toBeNull();
   });
 });

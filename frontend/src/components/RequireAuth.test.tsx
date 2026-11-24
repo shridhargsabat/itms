@@ -68,11 +68,19 @@ afterEach(() => {
 });
 
 describe('RequireAuth matrix (Wave 2-C)', () => {
-  it('no token → /login without calling me()', async () => {
-    setup(null, null, () => Promise.resolve(cachedUser));
+  it('no token + 401 me() → /login (wave-2b: gate calls me() even without token)', async () => {
+    setup(null, null, () => Promise.reject(new ApiError(401, 'expired')));
     renderGate();
     expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument();
-    expect(client.me).not.toHaveBeenCalled();
+    expect(client.me).toHaveBeenCalled();
+    expect(client.clearSession).toHaveBeenCalled();
+  });
+
+  it('no token + me() ok (cookie session after reload) → renders children', async () => {
+    setup(null, cachedUser, () => Promise.resolve(cachedUser));
+    renderGate();
+    expect(await screen.findByText('PROTECTED')).toBeInTheDocument();
+    expect(client.clearSession).not.toHaveBeenCalled();
   });
 
   it('valid session → renders children', async () => {
