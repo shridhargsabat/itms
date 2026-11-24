@@ -53,8 +53,11 @@ const GROUPS: Array<{ heading: 'New' | 'Classic'; modes: RegistryMeta[] }> = [
  * direction controls which way the menu opens: the sidebar footer sits at
  * the bottom of the viewport so it must open upward ('up'); the header
  * toggle opens downward ('down', default).
+ * variant styles the trigger: icon-only surfaces (header, collapsed rail)
+ * use the default 'secondary' glass pill; the wide sidebar footer passes
+ * 'ghost' so the row matches its ghost siblings (collapse/sign-out/account).
  */
-export default function ThemeToggle({ className, showLabel, direction = 'down' }: { className?: string; showLabel?: boolean; direction?: 'up' | 'down' }) {
+export default function ThemeToggle({ className, showLabel, direction = 'down', variant = 'secondary' }: { className?: string; showLabel?: boolean; direction?: 'up' | 'down'; variant?: 'secondary' | 'ghost' }) {
   const [mode, setMode] = useState<ThemeMode>(getThemeMode());
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -107,7 +110,7 @@ export default function ThemeToggle({ className, showLabel, direction = 'down' }
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={closeOnEscape}
-        variant="secondary"
+        variant={variant}
         size="icon"
         className={className}
       >

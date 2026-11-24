@@ -200,7 +200,7 @@ export default function Layout() {
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-medium text-primary">{user.name ?? user.email}</p>
               <p className="truncate text-[11px] text-muted">
-                {user.role ?? ''} · build {__BUILD_SHA__}
+                {user.role ?? ''}
               </p>
             </div>
           </div>
@@ -230,7 +230,7 @@ export default function Layout() {
             onClick={signOut}
             variant="ghost"
             className={cn(
-              'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm text-muted hover:bg-red-500/10 hover:text-red-400',
+              'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm hover:bg-red-500/10 hover:text-red-400',
               wide ? '' : 'justify-center px-0',
             )}
             title="Sign out"
@@ -241,7 +241,7 @@ export default function Layout() {
           <Link
             to="/account"
             className={cn(
-              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-accent/10 hover:text-accent',
+              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary',
               wide ? '' : 'justify-center px-0',
             )}
             title="Change password"
@@ -255,20 +255,20 @@ export default function Layout() {
               onClick={promptInstall}
               variant="ghost"
               className={cn(
-                'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm text-muted hover:text-accent',
+                'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm',
                 wide ? '' : 'justify-center px-0',
               )}
               title="Install app"
-            >
-              <Download className="h-4 w-4 shrink-0" />
+              >
+              <Download className="h-5 w-5 shrink-0" />
               {wide && <span>Install app</span>}
             </Button>
           )}
-          <div className={cn('mt-1', wide && 'px-2')}>
-            <ThemeToggle showLabel={wide} direction="up" className={cn('w-full', wide ? 'h-9 justify-start gap-3 px-3 py-2 text-sm' : 'h-9 w-9')} />
+          <div className={cn('mt-2 border-t border-edge pt-2', wide ? 'px-2' : 'flex justify-center')}>
+            <ThemeToggle showLabel={wide} direction="up" variant="ghost" className={cn('w-full', wide ? 'h-9 justify-start gap-3 px-3 py-2 text-sm' : 'h-9 w-9')} />
           </div>
           {wide && (
-            <p className="mt-2 px-2 text-center text-[10px] text-muted">build {__BUILD_SHA__}</p>
+            <p className="mt-1 px-3 text-left text-[10px] text-muted">build {__BUILD_SHA__}</p>
           )}
         </div>
       </aside>
