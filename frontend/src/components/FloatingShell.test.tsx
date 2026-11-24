@@ -52,8 +52,9 @@ describe('FloatingShell (task 5: QuickCapture dock + floating nav)', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /invoice/i }));
     expect(await screen.findByRole('heading', { name: 'Add Asset' })).toBeInTheDocument();
-    // AddAssetForm body (same form AddAssetButton opens).
-    expect(screen.getByText('Asset Tag')).toBeInTheDocument();
+    // FORM-07: Invoice opens AddAssetForm on the Upload invoice tab.
+    expect(screen.getByText('Upload an invoice PDF')).toBeInTheDocument();
+    expect(screen.queryByText('Asset Tag')).not.toBeInTheDocument();
   });
 
   it('non-admin: Invoice is hidden but Scan stays', () => {

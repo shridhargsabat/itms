@@ -460,18 +460,27 @@ export default function Assets() {
                 {(file.size / 1024).toFixed(1)} KB)
               </p>
             )}
-            <Button
-              type="button"
-              onClick={onImport}
-              disabled={!file}
-              loading={importMutation.isPending}
-              fullWidth
-              variant="primary"
-              size="lg"
-              leftIcon={!importMutation.isPending ? <FileUp className="h-4 w-4" /> : undefined}
-            >
-              Import {file ? file.name : 'CSV'}
-            </Button>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                onClick={() => setImportOpen(false)}
+                variant="secondary"
+                size="lg"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={onImport}
+                disabled={!file}
+                loading={importMutation.isPending}
+                variant="primary"
+                size="lg"
+                leftIcon={!importMutation.isPending ? <FileUp className="h-4 w-4" /> : undefined}
+              >
+                Import {file ? file.name : 'CSV'}
+              </Button>
+            </div>
             {importMutation.isError && (
               <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
                 {(importMutation.error as Error).message}

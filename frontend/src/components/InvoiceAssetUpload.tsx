@@ -176,6 +176,9 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
         <p className="max-w-xs text-xs text-muted">
           The backend will OCR / extract each line item and prep drafts for review.
         </p>
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancel
+        </Button>
       </div>
     );
   } else if (parseFailed) {
@@ -190,6 +193,9 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
           and add the assets by hand.
         </p>
         <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={onDone}>
+            Cancel
+          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -215,9 +221,14 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
           Line items are extracted into editable drafts. Each draft becomes its own
           asset with the invoice attached.
         </p>
-        <Button type="button" leftIcon={<FileUp className="h-4 w-4" />} onClick={pickFile}>
-          Choose PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="button" leftIcon={<FileUp className="h-4 w-4" />} onClick={pickFile}>
+            Choose PDF
+          </Button>
+        </div>
       </div>
     );
   } else {
@@ -371,7 +382,7 @@ export default function InvoiceAssetUpload({ onDone, onSwitchManual }: Props) {
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => onSwitchManual()}
+                      onClick={() => onDone()}
                     >
                       Cancel
                     </Button>
