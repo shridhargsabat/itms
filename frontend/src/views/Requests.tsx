@@ -13,6 +13,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
+import { formatDetailValue } from '@/lib/formatValue';
 import { useServerPagination } from '@/lib/usePagination';
 import EmptyState from '@/components/EmptyState';
 import FilterBar from '@/components/FilterBar';
@@ -132,23 +133,27 @@ export default function Requests() {
 
       {/* tabs */}
       <FilterBar>
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-              tab === t.id ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
-            )}
-          >
-            {t.label}
-            {t.badge != null && t.badge > 0 && (
-              <span className="rounded-full bg-red-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                {t.badge}
-              </span>
-            )}
-          </button>
-        ))}
+        <div role="tablist" aria-label="Request views" className="flex flex-1 flex-wrap items-center gap-2">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
+                tab === t.id ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
+              )}
+            >
+              {t.label}
+              {t.badge != null && t.badge > 0 && (
+                <span className="rounded-full bg-red-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </FilterBar>
 
       {/* list */}
@@ -324,10 +329,10 @@ function RequestCard({
       {Object.keys(r.details || {}).length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1.5 border-t border-edge pt-2">
           {Object.entries(r.details as Record<string, unknown>)
-            .filter(([, v]) => v !== '' && v != null)
+            .filter(([, v]) => formatDetailValue(v) !== '')
             .map(([k, v]) => (
               <span key={k} className="rounded-md bg-elevated px-2 py-1 text-[10px] text-secondary">
-                <span className="font-medium capitalize">{k.replace(/_/g, ' ')}:</span> {String(v)}
+                <span className="font-medium capitalize">{k.replace(/_/g, ' ')}:</span> {formatDetailValue(v)}
               </span>
             ))}
         </div>
@@ -375,9 +380,11 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
   };
 
   const fieldInput = (f: CatalogFormField) => {
+    const fieldId = `req-field-${f.key}`;
     if (f.type === 'textarea') {
       return (
         <textarea
+          id={fieldId}
           className={cn(inputCls, 'min-h-[72px]')}
           value={answers[f.key] ?? ''}
           onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
@@ -387,6 +394,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
     if (f.type === 'select') {
       return (
         <Select
+          id={fieldId}
           value={answers[f.key] ?? ''}
           onChange={(v) => setAnswers((a) => ({ ...a, [f.key]: v }))}
           options={(f.options ?? []).map((o) => ({ value: o, label: o }))}
@@ -397,6 +405,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
     if (f.type === 'date') {
       return (
         <input
+          id={fieldId}
           type="date"
           className={inputCls}
           value={answers[f.key] ?? ''}
@@ -406,6 +415,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
     }
     return (
       <input
+        id={fieldId}
         className={inputCls}
         value={answers[f.key] ?? ''}
         onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
@@ -417,9 +427,10 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
   return (
     <Modal onClose={onClose} title="New Service Request">
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1">
+        <label htmlFor="req-catalog" className="flex flex-col gap-1">
           <span className={labelCls}>Request type</span>
           <Select
+            id="req-catalog"
             value={catalogId}
             onChange={pickItem}
             options={items.map((i) => ({ value: i.id, label: `${i.name}${i.approval_required ? ' · needs approval' : ''}` }))}
@@ -438,13 +449,13 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
               )}
             </div>
 
-            <label className="flex flex-col gap-1">
+            <label htmlFor="req-subject" className="flex flex-col gap-1">
               <span className={labelCls}>Subject</span>
-              <input className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Short summary" />
+              <input id="req-subject" className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Short summary" />
             </label>
 
             {item.form_fields.map((f) => (
-              <label key={f.key} className="flex flex-col gap-1">
+              <label key={f.key} htmlFor={`req-field-${f.key}`} className="flex flex-col gap-1">
                 <span className={labelCls}>
                   {f.label} {f.required && <span className="text-red-400">*</span>}
                 </span>
@@ -452,9 +463,10 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
               </label>
             ))}
 
-            <label className="flex flex-col gap-1">
+            <label htmlFor="req-priority" className="flex flex-col gap-1">
               <span className={labelCls}>Priority</span>
               <Select
+                id="req-priority"
                 value={priority}
                 onChange={(v) => setPriority(v as RequestPriority)}
                 options={PRIORITIES.map((p) => ({ value: p, label: p }))}

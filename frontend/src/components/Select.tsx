@@ -14,6 +14,8 @@ interface SelectProps {
   options: SelectOption[];
   placeholder?: string;
   className?: string;
+  /** Forwarded to the trigger button so a <label htmlFor> can target it. */
+  id?: string;
   /** Classes for the trigger BUTTON (size/typography overrides). The outer
    *  wrapper is styled by `className`; the trigger is otherwise fixed by
    *  inputCls + py-2.5, which is too tall for compact controls (e.g. the
@@ -34,6 +36,7 @@ export default function Select({
   options,
   placeholder = 'Select…',
   className,
+  id,
   triggerClassName,
   'aria-label': ariaLabel,
 }: SelectProps) {
@@ -141,6 +144,7 @@ export default function Select({
     <div ref={ref} className={cn('relative', className)}>
       <button
         type="button"
+        id={id}
         onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
