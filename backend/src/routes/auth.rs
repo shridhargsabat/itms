@@ -259,16 +259,20 @@ pub fn client_ip_public(headers: &HeaderMap) -> String {
         .unwrap_or_else(|| "unknown".into())
 }
 
-/// Wave-1a fix: trusted-proxy-aware rate-limit key source.
+/// Wave-1a fix (hardened): trusted-proxy-aware rate-limit key source.
 ///
-/// Behind Traefik the TCP peer is ALWAYS the proxy container IP, so blindly
-/// preferring peer collapses every client into one shared 10-fail/15min
-/// bucket (10 bad logins lock everyone out — anonymous global login DoS).
+/// Behind TWO proxies (client -> traefik -> nginx(frontend) -> backend) the
+/// TCP peer is ALWAYS nginx, and each proxy APPENDS to X-Forwarded-For, so a
+/// leftmost pick is spoofable: an attacker-prepended entry stays leftmost
+/// through appends. Blindly preferring peer is also wrong: it collapses every
+/// client into one shared 10-fail/15min bucket (anonymous global login DoS).
 /// `TRUSTED_PROXIES` (comma-separated IPv4 addresses and/or CIDRs, default
-/// empty = trust none) lists the proxies allowed to vouch via X-Forwarded-For:
-/// - peer in trust set → leftmost XFF entry, ONLY if it parses as an IP
-///   (garbage/empty falls back to peer, never to attacker text);
-/// - peer untrusted, or trust set empty → peer (previous safe behavior);
+/// empty = trust none) lists the proxies allowed to vouch via X-Forwarded-For.
+/// Chain = valid XFF IPs in order (invalid/empty dropped) + TCP peer as the
+/// rightmost entry; walk from the RIGHT skipping trust-set members and return
+/// the first UNTRUSTED address:
+/// - untrusted peer, or empty trust set → peer immediately (XFF ignored);
+/// - all-trusted chain, or no valid XFF → peer;
 /// - no peer (unix sockets, unit tests) → existing XFF fallback.
 pub fn client_ip(peer: Option<SocketAddr>, headers: &HeaderMap) -> String {
     let trusted_raw = std::env::var("TRUSTED_PROXIES").unwrap_or_default();
@@ -284,9 +288,11 @@ fn client_ip_with_trust(
         None => client_ip_public(headers),
         Some(addr) => {
             let peer_ip = addr.ip();
-            if !trusted_raw.trim().is_empty() && peer_is_trusted(&peer_ip, trusted_raw) {
-                if let Some(xff_ip) = leftmost_valid_xff_ip(headers) {
-                    return xff_ip;
+            let mut chain = parse_valid_xff_ips(headers);
+            chain.push(peer_ip);
+            for ip in chain.iter().rev() {
+                if !peer_is_trusted(ip, trusted_raw) {
+                    return ip.to_string();
                 }
             }
             peer_ip.to_string()
@@ -294,17 +300,21 @@ fn client_ip_with_trust(
     }
 }
 
-/// Leftmost X-Forwarded-For entry, validated as an IP. Returns None when the
-/// header is missing, empty, or not an IP (spoofed garbage must not become
-/// a rate-limit key).
-fn leftmost_valid_xff_ip(headers: &HeaderMap) -> Option<String> {
+/// All valid X-Forwarded-For entries in header order, dropping invalid/empty
+/// entries. Attacker garbage must neither become a rate-limit key nor shift
+/// the rightmost-untrusted walk.
+fn parse_valid_xff_ips(headers: &HeaderMap) -> Vec<IpAddr> {
     headers
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .and_then(|s| s.parse::<IpAddr>().ok().map(|ip| ip.to_string()))
+        .map(|s| {
+            s.split(',')
+                .map(|e| e.trim())
+                .filter(|e| !e.is_empty())
+                .filter_map(|e| e.parse::<IpAddr>().ok())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn peer_is_trusted(peer_ip: &IpAddr, trusted_raw: &str) -> bool {
@@ -575,7 +585,7 @@ mod wave1a_tests {
             client_ip_with_trust(Some(peer), &h, "10.0.0.1"),
             "203.0.113.9"
         );
-        // leftmost of a chain wins
+        // rightmost-untrusted of a chain wins
         let h = headers_with_xff("203.0.113.9, 10.0.0.1");
         assert_eq!(
             client_ip_with_trust(Some(peer), &h, "10.0.0.2, 10.0.0.1"),
@@ -673,6 +683,105 @@ mod wave1a_tests {
         assert_eq!(
             client_ip_with_trust(Some(outside), &h, "172.20.0.0/16"),
             "172.21.0.5"
+        );
+    }
+
+    #[test]
+    fn two_proxy_chain_with_spoof_yields_real() {
+        // client -> traefik (172.18.0.2) -> nginx peer (10.0.0.1) -> backend.
+        // Attacker prepends spoof; proxies append real client + traefik.
+        // XFF [spoof, real, traefik] + peer nginx; trust covers traefik+nginx.
+        // Leftmost would yield the spoof; rightmost-untrusted must yield real.
+        let peer: SocketAddr = "10.0.0.1:4321".parse().unwrap();
+        let trust = "10.0.0.1, 172.18.0.2";
+        let h = headers_with_xff("198.51.100.99, 203.0.113.9, 172.18.0.2");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, trust),
+            "203.0.113.9"
+        );
+        // CIDR trust entries behave the same
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.0/8, 172.18.0.0/16"),
+            "203.0.113.9"
+        );
+        // invalid/empty entries are dropped, walk is unaffected
+        let h = headers_with_xff("garbage, 198.51.100.99, 203.0.113.9, 172.18.0.2, , ");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, trust),
+            "203.0.113.9"
+        );
+    }
+
+    #[test]
+    fn two_proxy_chain_without_spoof_yields_real() {
+        let peer: SocketAddr = "10.0.0.1:4321".parse().unwrap();
+        let trust = "10.0.0.1, 172.18.0.2";
+        let h = headers_with_xff("203.0.113.9, 172.18.0.2");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, trust),
+            "203.0.113.9"
+        );
+    }
+
+    #[test]
+    fn all_trusted_chain_yields_peer() {
+        // Every address in chain + peer is trusted → fall back to peer.
+        let peer: SocketAddr = "10.0.0.1:4321".parse().unwrap();
+        let h = headers_with_xff("10.0.0.2, 172.18.0.2");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.0/8, 172.18.0.0/16"),
+            "10.0.0.1"
+        );
+        // exact-IP trust entries, same outcome
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.1, 10.0.0.2, 172.18.0.2"),
+            "10.0.0.1"
+        );
+    }
+
+    #[test]
+    fn untrusted_peer_ignores_xff_chain_entirely() {
+        // Direct-hit attacker: peer not in trust set → peer wins even though
+        // XFF carries a plausible real client + trusted proxy entries.
+        let peer: SocketAddr = "198.51.100.7:4321".parse().unwrap();
+        let h = headers_with_xff("203.0.113.9, 172.18.0.2");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.1, 172.18.0.2"),
+            "198.51.100.7"
+        );
+        // spoofed variant: still peer, never the spoof or the real client
+        let h = headers_with_xff("198.51.100.99, 203.0.113.9, 172.18.0.2");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.1, 172.18.0.2"),
+            "198.51.100.7"
+        );
+    }
+
+    #[test]
+    fn empty_trust_set_ignores_two_proxy_chain() {
+        let peer: SocketAddr = "10.0.0.1:4321".parse().unwrap();
+        let h = headers_with_xff("198.51.100.99, 203.0.113.9, 172.18.0.2");
+        for trust in ["", "   ", " , , "] {
+            assert_eq!(
+                client_ip_with_trust(Some(peer), &h, trust),
+                "10.0.0.1",
+                "empty trust {trust:?} must ignore full chain"
+            );
+        }
+    }
+
+    #[test]
+    fn single_proxy_chain_still_correct() {
+        // Regression: one proxy in front, XFF [real] + trusted peer → real.
+        let peer: SocketAddr = "10.0.0.1:4321".parse().unwrap();
+        let h = headers_with_xff("203.0.113.9");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.1"),
+            "203.0.113.9"
+        );
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.0/8"),
+            "203.0.113.9"
         );
     }
 }
