@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const inputCls =
-  'w-full rounded-lg glass-dense px-3 py-2 text-sm text-primary placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent';
+  'w-full rounded-lg glass-dense px-3 py-2 text-sm text-primary placeholder:text-muted/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent';
 
 export const labelCls = 'mb-1.5 block text-xs font-medium uppercase tracking-wide text-secondary';
 

@@ -29,10 +29,10 @@ export default function Modal({ title, onClose, children }: ModalProps) {
   }, [onClose]);
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
-      <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
       <LiquidGlassSurface
         variant="chrome"
-        className="animate-sheet-up relative flex max-h-[92dvh] w-full flex-col rounded-t-[26px] liquid-glass-panel sm:max-w-lg sm:rounded-[26px]"
+        className="animate-sheet-up modal-panel relative flex max-h-[92dvh] w-full flex-col rounded-t-[26px] liquid-glass-panel sm:max-w-lg sm:rounded-[26px]"
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-elevated2 sm:hidden" />
         <div className="flex items-center justify-between border-b border-edge px-5 py-4">

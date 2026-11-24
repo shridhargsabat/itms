@@ -826,7 +826,7 @@
 @media (prefers-reduced-transparency: reduce) {
   /* Themed selectors included: the .dark/.ledgerly freeze overrides
      carry (0,2,0) specificity and would otherwise beat this guard. */
-  .glass-chrome, .glass-card, .glass-dense,
+  .glass-chrome, .glass-card, .glass-dense, .modal-panel,
   .dark .glass-chrome, .dark .glass-card,
   .ledgerly-dark .glass-chrome, .ledgerly-dark .glass-card,
   .ledgerly-light .glass-chrome, .ledgerly-light .glass-card,
@@ -837,7 +837,7 @@
   }
 }
 @media print {
-  .glass-chrome, .glass-card, .glass-dense {
+  .glass-chrome, .glass-card, .glass-dense, .modal-panel {
     -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
     background: #fff !important; box-shadow: none !important;
   }
@@ -1349,4 +1349,21 @@
     scrollbar-width: auto;
     scrollbar-color: auto;
   }
+}
+
+/* ---------- FORM shared: modal-panel opacity boost (appended) ----------
+   Glass scope only: day rules ride the light guard chain, night rules the
+   dark guard chain (both copied verbatim from the glass-chrome refraction
+   selectors above). ~85% opaque surface so form content stays readable over
+   busy backdrops while the frosted blur still shows through. Only
+   `background` is set — blur, border, radius, and shadow keep the
+   liquid-glass-panel recipe. Later in the file at equal specificity, so
+   this wins the tie on elements carrying both classes. R9: guard chains
+   only, no affirmative .theme-X selectors. Reduced-transparency and print
+   mirrors live in the guard lists above. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .modal-panel {
+  background: color-mix(in srgb, var(--t-surface) 85%, transparent);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .modal-panel {
+  background: color-mix(in srgb, var(--t-surface) 85%, transparent);
 }

@@ -8,7 +8,7 @@ import {
   listCanned, listKbArticles, updateKbArticle,
 } from '@/api/client';
 import { getCachedUser } from '@/api/client';
-import { cn, formatDate, inputCls } from '@/lib/utils';
+import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 import EmptyState from '@/components/EmptyState';
 import FilterBar from '@/components/FilterBar';
@@ -285,20 +285,45 @@ function ArticleForm({ article, onClose }: { article: KbArticle | null; onClose:
     <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
       <h2 className="text-sm font-bold text-primary">{article ? 'Edit article' : 'New article'}</h2>
       <div className="mt-3 space-y-3">
-        <Select
-          className="w-48"
-          value={type}
-          onChange={setType}
-          options={TYPES.map((t) => ({ value: t, label: t }))}
-        />
-        <input className={inputCls} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <textarea
-          className={cn(inputCls, 'min-h-32 resize-y')}
-          placeholder="Solution / steps…"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
-        <div className="flex gap-2">
+        <label className="flex flex-col gap-1">
+          <span className={labelCls}>Ticket type</span>
+          <Select
+            className="w-48"
+            value={type}
+            onChange={setType}
+            options={TYPES.map((t) => ({ value: t, label: t }))}
+          />
+        </label>
+        <div className="flex flex-col">
+          <label htmlFor="kb-article-title" className={labelCls}>
+            Title <span aria-hidden="true" className="text-red-400">*</span>
+          </label>
+          <input
+            id="kb-article-title"
+            className={inputCls}
+            placeholder="Title"
+            value={title}
+            aria-required="true"
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col">
+          <label htmlFor="kb-article-body" className={labelCls}>
+            Solution <span aria-hidden="true" className="text-red-400">*</span>
+          </label>
+          <textarea
+            id="kb-article-body"
+            className={cn(inputCls, 'min-h-32 resize-y')}
+            placeholder="Solution / steps…"
+            value={body}
+            aria-required="true"
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" onClick={onClose} variant="secondary" size="sm" className="border-edge text-muted">
+            Cancel
+          </Button>
           <Button
             type="button"
             disabled={!title.trim() || !body.trim() || mutation.isPending}
@@ -308,9 +333,6 @@ function ArticleForm({ article, onClose }: { article: KbArticle | null; onClose:
             size="sm"
           >
             {article ? 'Save changes' : 'Create article'}
-          </Button>
-          <Button type="button" onClick={onClose} variant="secondary" size="sm" className="border-edge text-muted">
-            Cancel
           </Button>
         </div>
       </div>
@@ -334,20 +356,47 @@ function CannedForm({ onDone }: { onDone: () => void }) {
     <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
       <h2 className="text-sm font-bold text-primary">New canned response</h2>
       <div className="mt-3 space-y-3">
-        <input className={inputCls} placeholder="Title (e.g. Password reset steps)" value={title}
-          onChange={(e) => setTitle(e.target.value)} />
-        <textarea className={cn(inputCls, 'min-h-24 resize-y')} placeholder="Template body…" value={body}
-          onChange={(e) => setBody(e.target.value)} />
-        <Button
-          type="button"
-          disabled={!title.trim() || !body.trim() || mutation.isPending}
-          loading={mutation.isPending}
-          onClick={() => mutation.mutate()}
-          variant="primary"
-          size="sm"
-        >
-          Save
-        </Button>
+        <div className="flex flex-col">
+          <label htmlFor="kb-canned-title" className={labelCls}>
+            Title <span aria-hidden="true" className="text-red-400">*</span>
+          </label>
+          <input
+            id="kb-canned-title"
+            className={inputCls}
+            placeholder="Title (e.g. Password reset steps)"
+            value={title}
+            aria-required="true"
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col">
+          <label htmlFor="kb-canned-body" className={labelCls}>
+            Body <span aria-hidden="true" className="text-red-400">*</span>
+          </label>
+          <textarea
+            id="kb-canned-body"
+            className={cn(inputCls, 'min-h-24 resize-y')}
+            placeholder="Template body…"
+            value={body}
+            aria-required="true"
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" onClick={onDone} variant="secondary" size="sm" className="border-edge text-muted">
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={!title.trim() || !body.trim() || mutation.isPending}
+            loading={mutation.isPending}
+            onClick={() => mutation.mutate()}
+            variant="primary"
+            size="sm"
+          >
+            Save
+          </Button>
+        </div>
       </div>
     </div>
   );

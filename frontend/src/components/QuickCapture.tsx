@@ -16,8 +16,13 @@ import AddAssetForm from '@/components/AddAssetForm';
  */
 export default function QuickCapture({ wide }: { wide: boolean }) {
   const [open, setOpen] = useState(false);
+  const [initialTab, setInitialTab] = useState<'manual' | 'invoice'>('manual');
   const navigate = useNavigate();
   const isAdmin = getCachedUser()?.role === 'ADMIN';
+  const openInvoice = () => {
+    setInitialTab('invoice');
+    setOpen(true);
+  };
 
   return (
     <>
@@ -31,7 +36,7 @@ export default function QuickCapture({ wide }: { wide: boolean }) {
             {isAdmin && (
               <button
                 type="button"
-                onClick={() => setOpen(true)}
+                onClick={openInvoice}
                 className="quick-capture-btn flex items-center justify-center gap-1 px-2 py-2 text-[11px] font-medium"
               >
                 <FileSpreadsheet className="h-3.5 w-3.5 text-[#007AFF]" aria-hidden="true" />
@@ -55,7 +60,7 @@ export default function QuickCapture({ wide }: { wide: boolean }) {
               type="button"
               title="Invoice"
               aria-label="Invoice"
-              onClick={() => setOpen(true)}
+              onClick={openInvoice}
               className="quick-capture-btn flex h-9 w-9 items-center justify-center"
             >
               <FileSpreadsheet className="h-4 w-4 text-[#007AFF]" aria-hidden="true" />
@@ -74,7 +79,7 @@ export default function QuickCapture({ wide }: { wide: boolean }) {
       )}
       {open && (
         <Modal title="Add Asset" onClose={() => setOpen(false)}>
-          <AddAssetForm onDone={() => setOpen(false)} />
+          <AddAssetForm onDone={() => setOpen(false)} defaultTab={initialTab} />
         </Modal>
       )}
     </>

@@ -168,6 +168,25 @@ export default function NewTicketForm({ onDone }: { onDone: () => void }) {
 function TemplatePicker({ onApply }: { onApply: (t: TicketTemplate) => void }) {
   const templates = useQuery({ queryKey: ['templates', 'active'], queryFn: () => listTemplates(true) });
   const [selected, setSelected] = useState('');
+  if (templates.isLoading) {
+    // Reserved-height skeleton so the form below doesn't jump when the
+    // picker resolves. Loaded-but-empty still renders null (no shift — the
+    // picker never appears).
+    return (
+      <div className="min-h-[68px]" aria-busy="true">
+        <label className={labelCls}>Start from a template</label>
+        <div className="pointer-events-none opacity-60" aria-disabled="true">
+          <Select
+            className="w-full"
+            value=""
+            onChange={() => {}}
+            options={[]}
+            placeholder="Loading templates…"
+          />
+        </div>
+      </div>
+    );
+  }
   if (!templates.data?.length) return null;
   return (
     <div>

@@ -26,6 +26,7 @@ import {
   approveRequest,
   createRequest,
   getCatalog,
+  getMasters,
   getRequests,
   rejectRequest,
   updateRequest,
@@ -338,10 +339,13 @@ function RequestCard({
 function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [catalogId, setCatalogId] = useState<string>('');
   const [subject, setSubject] = useState('');
+  const [subjectDirty, setSubjectDirty] = useState(false);
   const [priority, setPriority] = useState<RequestPriority>('MEDIUM');
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: getCatalog, staleTime: 60_000 });
+  const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
+  const departments = masters.data?.department ?? [];
   const items = useMemo(() => catalog.data ?? [], [catalog.data]);
   const item: CatalogItem | undefined = items.find((i) => i.id === catalogId);
 
@@ -366,12 +370,29 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
     const it = items.find((i) => i.id === id);
     if (it) {
       setAnswers(Object.fromEntries(it.form_fields.map((f) => [f.key, ''])));
-      // default subject from item name
-      setSubject((s) => s || `${it.name}`);
+      // FORM-05: default subject from item name until the user edits it
+      // manually; after that the typed subject is preserved across switches.
+      if (!subjectDirty) setSubject(it.name);
     }
   };
 
   const fieldInput = (f: CatalogFormField) => {
+    // FORM-06: the `department` key (migration 0007 NEW_LAPTOP seed) renders
+    // a Masters-backed Select instead of free text.
+    if (f.key === 'department') {
+      return (
+        <Select
+          value={answers[f.key] ?? ''}
+          onChange={(v) => setAnswers((a) => ({ ...a, [f.key]: v }))}
+          options={
+            departments.length > 0
+              ? departments.map((d) => ({ value: d.code, label: d.label }))
+              : (f.options ?? []).map((o) => ({ value: o, label: o }))
+          }
+          placeholder={f.required ? 'Select…' : 'Optional'}
+        />
+      );
+    }
     if (f.type === 'textarea') {
       return (
         <textarea
@@ -414,8 +435,10 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
   return (
     <Modal onClose={onClose} title="New Service Request">
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1">
-          <span className={labelCls}>Request type</span>
+        <label className="flex flex-col gap-1" aria-required="true">
+          <span className={labelCls}>
+            Request type <span aria-hidden="true" className="text-red-400">*</span>
+          </span>
           <Select
             value={catalogId}
             onChange={pickItem}
@@ -429,15 +452,26 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
             <div className="rounded-lg glass-dense p-3 text-[11px] text-secondary">
               {item.description}
               {item.approval_required && (
-                <span className="mt-1 flex items-center gap-1 text-amber-400">
+                <span className="mt-1 flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">
                   <ShieldCheck className="h-3 w-3" /> This request needs a one-click approval.
                 </span>
               )}
             </div>
 
             <label className="flex flex-col gap-1">
-              <span className={labelCls}>Subject</span>
-              <input className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Short summary" />
+              <span className={labelCls}>
+                Subject <span aria-hidden="true" className="text-red-400">*</span>
+              </span>
+              <input
+                className={inputCls}
+                value={subject}
+                aria-required="true"
+                onChange={(e) => {
+                  setSubject(e.target.value);
+                  setSubjectDirty(true);
+                }}
+                placeholder="Short summary"
+              />
             </label>
 
             {item.form_fields.map((f) => (
@@ -461,7 +495,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
         )}
 
         {create.isError && <p className="text-xs text-red-400">Failed to submit. Please try again.</p>}
-        <div className="flex justify-end gap-2">
+        <div className="sticky bottom-0 -mx-5 -mb-4 flex justify-end gap-2 border-t border-edge bg-surface px-5 py-3">
           <Button onClick={onClose} variant="secondary">Cancel</Button>
           <Button
             onClick={() => create.mutate()}
