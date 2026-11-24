@@ -65,7 +65,9 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/healthz"]
+      # wave-2b: readiness (SELECT 1 on the pool) gates traffic; /healthz stays
+      # the cheap liveness check used by the deploy smoke test.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/readyz"]
       interval: 15s
       timeout: 5s
       retries: 10
