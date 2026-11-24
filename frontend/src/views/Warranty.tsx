@@ -89,14 +89,17 @@ function BucketSection({
           </button>
         ))}
       </div>
-      <PaginationFooter
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        rowsLength={pageRows.length}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      {total > 0 && (
+        <PaginationFooter
+          variant="static"
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          rowsLength={pageRows.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
     </section>
   );
 }

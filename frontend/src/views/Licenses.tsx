@@ -228,14 +228,17 @@ export default function Licenses() {
           />
         ))}
 
-        <PaginationFooter
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          rowsLength={list.length}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+        {!pageQ.isLoading && total > 0 && (
+          <PaginationFooter
+            variant="static"
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            rowsLength={list.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </div>
 
       {/* detail modal */}

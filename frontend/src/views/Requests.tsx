@@ -188,14 +188,17 @@ export default function Requests() {
         ))}
       </div>
 
-      <PaginationFooter
-        page={page}
-        pageSize={pageSize}
-        total={requests.data?.total}
-        rowsLength={list.length}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      {!requests.isLoading && (requests.data?.total ?? 0) > 0 && (
+        <PaginationFooter
+          variant="static"
+          page={page}
+          pageSize={pageSize}
+          total={requests.data?.total}
+          rowsLength={list.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
 
       {creating && (
         <CreateRequestModal

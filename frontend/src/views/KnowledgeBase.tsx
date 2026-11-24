@@ -199,14 +199,17 @@ export default function KnowledgeBase() {
                 </div>
               </div>
             ))}
-            <PaginationFooter
-              page={page}
-              pageSize={pageSize}
-              total={articles.data?.total}
-              rowsLength={articles.data?.items.length ?? 0}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-            />
+            {!articles.isLoading && (articles.data?.total ?? 0) > 0 && (
+              <PaginationFooter
+                variant="static"
+                page={page}
+                pageSize={pageSize}
+                total={articles.data?.total}
+                rowsLength={articles.data?.items.length ?? 0}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            )}
           </div>
         ) : (
           <div className="space-y-2">

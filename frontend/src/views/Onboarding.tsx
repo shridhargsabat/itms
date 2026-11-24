@@ -279,14 +279,17 @@ export default function Onboarding() {
         ))}
       </div>
 
-      <PaginationFooter
-        page={page}
-        pageSize={pageSize}
-        total={events.data?.total}
-        rowsLength={list.length}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      {!events.isLoading && (events.data?.total ?? 0) > 0 && (
+        <PaginationFooter
+          variant="static"
+          page={page}
+          pageSize={pageSize}
+          total={events.data?.total}
+          rowsLength={list.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
 
       {/* Create modal */}
       {creating && (
