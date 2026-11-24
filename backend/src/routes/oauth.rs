@@ -583,18 +583,27 @@ mod wave2a_tests {
 
     #[test]
     fn state_cookie_is_httponly_lax_secure_with_ten_min_ttl() {
-        let v = oauth_state_set_cookie("nonce123");
-        assert!(v.starts_with("itms_oauth_state=nonce123;"), "carries nonce: {v}");
+        // Random nonce via the prod generator: no hard-coded crypto value
+        // (CodeQL rust/hard-coded-cryptographic-value), and the literal can
+        // never be copy-pasted into production code.
+        let nonce = generate_state();
+        let v = oauth_state_set_cookie(&nonce);
+        assert!(
+            v.starts_with(&format!("itms_oauth_state={nonce};")),
+            "carries nonce"
+        );
         for flag in ["Path=/", "HttpOnly", "SameSite=Lax", "Secure", "Max-Age=600"] {
-            assert!(v.contains(flag), "missing {flag}: {v}");
+            // Static message: cookie values never hit assert output
+            // (CodeQL rust/cleartext-logging treats assert! as a log sink).
+            assert!(v.contains(flag), "missing cookie flag");
         }
     }
 
     #[test]
     fn state_clear_cookie_empties_with_zero_max_age() {
         let v = oauth_state_clear_cookie();
-        assert!(v.starts_with("itms_oauth_state=;"), "empties value: {v}");
-        assert!(v.contains("Max-Age=0"), "zero max-age: {v}");
+        assert!(v.starts_with("itms_oauth_state=;"), "empties value");
+        assert!(v.contains("Max-Age=0"), "zero max-age");
     }
 
     #[test]
