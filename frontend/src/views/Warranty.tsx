@@ -1,13 +1,15 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, Clock, PackageX } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, PackageX, Search } from 'lucide-react';
 import { getWarrantyAlerts } from '@/api/client';
 import type { WarrantyAlert } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import { Button } from '@/components/Button';
 import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
-import { formatDateOnly } from '@/lib/utils';
+import FilterBar from '@/components/FilterBar';
+import { cn, formatDateOnly, inputCls } from '@/lib/utils';
 import { useClientPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
 
@@ -21,6 +23,22 @@ function bucket(a: WarrantyAlert): 'expired' | '30' | '60' | '90' {
 
 const alertsCount = (expired: WarrantyAlert[], expiring: WarrantyAlert[]) =>
   expired.length + expiring.length;
+
+type Tab = 'all' | 'expired' | 'expiring';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'expired', label: 'Expired' },
+  { id: 'expiring', label: 'Expiring ≤90d' },
+];
+
+/** Visible numeric label + screen-reader text for an urgency bar. */
+function urgency(a: WarrantyAlert): { label: string; aria: string } {
+  const d = a.days_left;
+  if (d == null) return { label: '—', aria: 'Warranty expiry date unknown' };
+  if (d < 0) return { label: `${-d}d past`, aria: `Warranty expired ${-d} days ago` };
+  return { label: `${d}d left`, aria: `Warranty expires in ${d} days` };
+}
 
 const BUCKET_META = {
   expired: { label: 'Expired', icon: PackageX, cls: 'text-red-400', bar: 'bg-red-500/80' },
@@ -41,6 +59,11 @@ function BucketSection({
   onOpen: (tag: string) => void;
 }) {
   const { page, pageSize, setPage, setPageSize, pageRows, total } = useClientPagination(items, 20);
+  // Search/tab filtering shrinks `items` in place: snap back to page 1 so
+  // the footer never points past the last row (reset-on-filter-change).
+  useEffect(() => {
+    setPage(1);
+  }, [total, setPage]);
   return (
     <section>
       <h2 className={`mb-2 flex items-center gap-2 text-sm font-semibold ${meta.cls}`}>
@@ -48,7 +71,9 @@ function BucketSection({
         <span className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary">{total}</span>
       </h2>
       <div className="overflow-hidden rounded-xl glass-card liquid-glass-panel">
-        {pageRows.map((a, i) => (
+        {pageRows.map((a, i) => {
+          const u = urgency(a);
+          return (
           <button
             key={a.id}
             type="button"
@@ -74,20 +99,29 @@ function BucketSection({
                   )}
                 </p>
               </div>
-              <span className="h-1.5 w-24 shrink-0 rounded-full bg-elevated">
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="text-[11px] font-medium tabular-nums text-muted">{u.label}</span>
                 <span
-                  className={`block h-full rounded-full ${meta.bar}`}
-                  style={{
-                    width:
-                      a.days_left != null && a.days_left < 0
-                        ? '100%'
-                        : `${Math.max(8, ((a.days_left ?? 90) / 90) * 100)}%`,
-                  }}
-                />
+                  role="img"
+                  aria-label={u.aria}
+                  title={u.aria}
+                  className="h-1.5 w-24 rounded-full bg-elevated"
+                >
+                  <span
+                    className={`block h-full rounded-full ${meta.bar}`}
+                    style={{
+                      width:
+                        a.days_left != null && a.days_left < 0
+                          ? '100%'
+                          : `${Math.max(8, ((a.days_left ?? 90) / 90) * 100)}%`,
+                    }}
+                  />
+                </span>
               </span>
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
       {total > 0 && (
         <PaginationFooter
@@ -108,18 +142,26 @@ export default function WarrantyView() {
   const nav = useNavigate();
   const expired = useQuery({ queryKey: ['alerts', 'expired'], queryFn: () => getWarrantyAlerts('expired') });
   const expiring = useQuery({ queryKey: ['alerts', 'expiring'], queryFn: () => getWarrantyAlerts('expiring') });
+  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<Tab>('all');
 
   const loading = expired.isLoading || expiring.isLoading;
   const expiredData = expired.data ?? [];
   const expiringData = expiring.data ?? [];
+  const q = search.trim().toLowerCase();
+  const matches = (a: WarrantyAlert) =>
+    q === '' || a.asset_tag.toLowerCase().includes(q) || a.name.toLowerCase().includes(q);
   // Expiring bucket is based on days_left; expired list = scope=expired.
   const groups = (['expired', '30', '60', '90'] as const)
+    .filter((k) => tab === 'all' || (tab === 'expired' ? k === 'expired' : k !== 'expired'))
     .map((k) => ({
       key: k,
       meta: BUCKET_META[k],
-      items: k === 'expired' ? expiredData : expiringData.filter((a) => bucket(a) === k),
+      items: (k === 'expired' ? expiredData : expiringData.filter((a) => bucket(a) === k)).filter(matches),
     }))
     .filter((g) => g.items.length > 0);
+
+  const hasAlerts = expiredData.length + expiringData.length > 0;
 
   const open = (tag: string) => nav(`/assets?search=${encodeURIComponent(tag)}`);
 
@@ -145,18 +187,61 @@ export default function WarrantyView() {
 
       {loading ? (
         <p className="py-10 text-center text-sm text-muted">Loading warranty alerts…</p>
-      ) : groups.length === 0 ? (
-        <EmptyState
-          icon={CheckCircle2}
-          title="No warranty alerts right now"
-          description="Everything has ≥ 90 days of warranty (or none recorded)."
-        />
       ) : (
-        <div className="space-y-6">
-          {groups.map(({ key, meta, items }) => (
-            <BucketSection key={key} meta={meta} items={items} onOpen={open} />
-          ))}
-        </div>
+        <>
+          <FilterBar>
+            <div className="relative min-w-0 flex-1 basis-full sm:basis-56">
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                inputMode="search"
+                aria-label="Search warranty alerts"
+                placeholder="Search asset tag or name…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className={cn(inputCls, 'pl-9')}
+              />
+            </div>
+            <div role="tablist" aria-label="Warranty views" className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={tab === t.id}
+                  onClick={() => setTab(t.id)}
+                  className={cn(
+                    'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition',
+                    tab === t.id ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </FilterBar>
+
+          {groups.length === 0 ? (
+            hasAlerts ? (
+              <EmptyState
+                icon={Search}
+                title="No matching warranty alerts"
+                description="No alerts match the current search or tab. Clear the search to see everything."
+              />
+            ) : (
+              <EmptyState
+                icon={CheckCircle2}
+                title="No warranty alerts right now"
+                description="Everything has ≥ 90 days of warranty (or none recorded)."
+              />
+            )
+          ) : (
+            <div className="space-y-6">
+              {groups.map(({ key, meta, items }) => (
+                <BucketSection key={key} meta={meta} items={items} onOpen={open} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
