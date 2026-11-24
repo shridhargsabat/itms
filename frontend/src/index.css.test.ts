@@ -177,6 +177,19 @@ describe('themed scrollbars (rules)', () => {
     expect(css).toContain('scrollbar-width: thin');
     expect(css).toContain('scrollbar-color: var(--t-scroll-thumb) transparent');
   });
+
+  it('sets color-scheme per mode so native scrollbar gutters match the theme', () => {
+    // Without color-scheme: dark, Chromium paints the dark-glass gutter white
+    // and the white translucent thumb disappears on it (caught by screenshots).
+    expect(css).toContain(':root {\n  color-scheme: light;');
+    expect(css).toContain('.dark {\n  color-scheme: dark;');
+  });
+
+  it('hides webkit scrollbar buttons', () => {
+    // Linux classic scrollbars DO render arrow buttons (caught by screenshots).
+    expect(css).toContain('::-webkit-scrollbar-button {');
+    expect(css).toContain('display: none');
+  });
 });
 
 describe('themed scrollbars (a11y guards)', () => {

@@ -1294,12 +1294,21 @@
    theme classes sit on <html>, so the per-theme vars resolve everywhere.
    Firefox: thin + themed thumb; hover there stays static (documented). */
 :root {
+  color-scheme: light;
   scrollbar-width: thin;
   scrollbar-color: var(--t-scroll-thumb) transparent;
+}
+.dark {
+  color-scheme: dark;
 }
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
+}
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
