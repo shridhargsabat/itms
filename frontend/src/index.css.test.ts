@@ -142,6 +142,13 @@ describe('themed scrollbars (tokens)', () => {
     expect(css).toContain('rgb(255 255 255 / 0.22)');
     expect(css).toContain('rgb(255 255 255 / 0.38)');
   });
+
+  it('has no early comment terminator in prose (a "*/" inside a comment would swallow the rule after it)', () => {
+    // Regression: ".theme-*/" in a comment once closed the comment early and
+    // dropped the :root token rule from the parsed sheet.
+    expect(css).not.toContain('theme-*/');
+    expect(css).not.toContain('ledgerly-*/');
+  });
 });
 
 describe('themed scrollbars (rules)', () => {

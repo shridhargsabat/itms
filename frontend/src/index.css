@@ -1079,7 +1079,7 @@
    solid pills sampled from their own edge2/muted tokens.
    POSITION: must stay BEFORE the Task 6 block below — the R9 invariant
    tests (GlassPrimitives.test.tsx, CMDBGlass.test.tsx) forbid affirmative
-   .theme-*/.ledgerly-* selectors anywhere past that marker. */
+   per-theme selectors anywhere past that marker. */
 :root {
   --t-scroll-thumb: rgb(15 23 42 / 0.28);
   --t-scroll-thumb-hover: rgb(15 23 42 / 0.45);
