@@ -348,12 +348,13 @@ export default function Layout() {
               read as "square" next to the sidebar's finished rounded bottom.
               A mask/filter on the FRAME is banned (containing block for
               inline-fixed drawers/sheets — same incident class as transforms),
-              so this is a sticky leaf with its own mask: frosts content
-              passing under it, pointer-transparent, hidden at true bottom. */}
+              and backdrop-blur on the scrim itself smeared/teared mid-scroll,
+              so this is a plain translucent veil: theme-adaptive base tint,
+              pointer-transparent, hidden at true bottom. */}
           {fadeBottom && (
             <div
               aria-hidden
-              className="pointer-events-none sticky bottom-0 z-10 -mt-16 h-16 [mask-image:linear-gradient(to_top,black,transparent)] backdrop-blur-lg"
+              className="pointer-events-none sticky bottom-0 z-10 -mt-10 h-10 bg-gradient-to-t from-base/80 to-transparent"
             />
           )}
         </div>
