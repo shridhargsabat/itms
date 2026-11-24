@@ -143,3 +143,31 @@ describe('themed scrollbars (tokens)', () => {
     expect(css).toContain('rgb(255 255 255 / 0.38)');
   });
 });
+
+describe('themed scrollbars (rules)', () => {
+  const css = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), './index.css'),
+    'utf8',
+  );
+
+  it('styles webkit scrollbars as thin floating pills', () => {
+    expect(css).toContain('::-webkit-scrollbar {');
+    expect(css).toContain('width: 10px');
+    expect(css).toContain('height: 10px');
+    expect(css).toContain('::-webkit-scrollbar-track');
+    expect(css).toContain('::-webkit-scrollbar-thumb');
+    expect(css).toContain('::-webkit-scrollbar-thumb:hover');
+    expect(css).toContain('::-webkit-scrollbar-thumb:active');
+    expect(css).toContain('::-webkit-scrollbar-corner');
+    expect(css).toContain('border-radius: 9999px');
+    expect(css).toContain('background-clip: padding-box');
+    expect(css).toContain('background-color: var(--t-scroll-thumb)');
+    expect(css).toContain('background-color: var(--t-scroll-thumb-hover)');
+    expect(css).toContain('background-color: var(--t-accent)');
+  });
+
+  it('sets the Firefox standard properties', () => {
+    expect(css).toContain('scrollbar-width: thin');
+    expect(css).toContain('scrollbar-color: var(--t-scroll-thumb) transparent');
+  });
+});
