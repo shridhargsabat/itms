@@ -107,4 +107,39 @@ describe('Slide-over drawers close on Escape key', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByText('Drops every 10 minutes')).not.toBeInTheDocument();
   });
+
+  it('ticket drawer X button closes without activating cards behind it', async () => {
+    render(
+      <QueryClientProvider client={qc()}>
+        <MemoryRouter initialEntries={['/tickets']}>
+          <Tickets />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const rowTitle = await screen.findByText('VPN connection drops');
+    fireEvent.click(rowTitle); // opens drawer
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    const onDocClick = vi.fn();
+    document.addEventListener('click', onDocClick);
+    // X in the drawer header is the first /close/i match (status "Close" advance button renders later)
+    const closeBtn = screen.getAllByRole('button', { name: /close/i })[0];
+    fireEvent.click(closeBtn);
+    document.removeEventListener('click', onDocClick);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onDocClick).not.toHaveBeenCalled(); // open only — no click-through past the drawer
+  });
+
+  it('drawer panel sits above the offline banner layer', async () => {
+    render(
+      <QueryClientProvider client={qc()}>
+        <MemoryRouter initialEntries={['/tickets']}>
+          <Tickets />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const rowTitle = await screen.findByText('VPN connection drops');
+    fireEvent.click(rowTitle);
+    const panel = await screen.findByRole('dialog');
+    expect(panel.parentElement?.className ?? '').toMatch(/z-\[70\]/);
+  });
 });

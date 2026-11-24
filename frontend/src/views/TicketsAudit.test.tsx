@@ -243,7 +243,7 @@ describe('Tickets Module 14-bug audit regressions', () => {
 });
 
 describe('Tickets mobile regressions (Bugs #1, #4, #5, #7)', () => {
-  it('Mobile #1/#7: drawer is portaled to document.body (z-[60]) and hides the raw requester_id UUID', async () => {
+  it('Mobile #1/#7: drawer is portaled to document.body (z-[70]) and hides the raw requester_id UUID', async () => {
     render(
       <QueryClientProvider client={makeQc()}>
         <MemoryRouter initialEntries={['/tickets']}>
@@ -256,11 +256,11 @@ describe('Tickets mobile regressions (Bugs #1, #4, #5, #7)', () => {
     const desc = await screen.findByText('Flickers on battery power');
 
     // Portaled: overlay root is a direct child of document.body (escapes <main>),
-    // above the mobile header (z-40) and BottomNav (z-50).
+    // above the mobile header (z-40) and BottomNav / OfflineBanner (z-50).
     const overlay = desc.closest('div.fixed.inset-0');
     expect(overlay).not.toBeNull();
     expect(overlay!.parentElement).toBe(document.body);
-    expect(overlay!.getAttribute('class')).toContain('z-[60]');
+    expect(overlay!.getAttribute('class')).toContain('z-[70]');
 
     // Requester name shown; raw 36-char requester_id UUID in parens is gone.
     expect(overlay!.textContent).toContain('Aarav Gupta');

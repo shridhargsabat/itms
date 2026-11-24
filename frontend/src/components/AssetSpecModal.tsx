@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CalendarDays, FileText, History, IndianRupee, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
 import { assignAsset, assetDocumentUrl, createClaim, getAssetLifecycle, getCachedUser, listAssetDocuments, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
@@ -128,10 +129,15 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
     setEditing(true);
   };
 
-  return (
-    <div className="fixed inset-0 z-[60]">
-      <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
+  return createPortal(
+    <div className="fixed inset-0 z-[70]">
+      <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Asset details"
+        className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-edge bg-surface shadow-2xl"
+      >
         <div className="flex items-start justify-between border-b border-edge px-5 py-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -154,7 +160,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
             )}
             <Button
               type="button"
-              onClick={onClose}
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
               variant="ghost"
               className="rounded-md p-1"
               aria-label="Close"
@@ -351,7 +357,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                   <p className="mt-1 text-primary">{fmtCost(asset.current_value)}</p>
                   <p className="mt-0.5 text-[10px] text-muted">{deprecBasis(asset)}</p>
                 </div>
-                <div className="col-span-2 rounded-lg border border-edge bg-base p-3">
+                <div className="rounded-lg border border-edge bg-base p-3">
                   <p className="text-xs uppercase tracking-wide text-muted">Expected EOL</p>
                   <p className="mt-1 text-primary">{formatDateOnly(asset.expected_eol) || '—'}</p>
                 </div>
@@ -412,6 +418,10 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                 </h3>
                 {documents.isLoading ? (
                   <p className="animate-pulse rounded-lg border border-edge p-3 text-xs text-muted">Loading…</p>
+                ) : documents.isError ? (
+                  <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+                    Failed to load documents{documents.error instanceof Error ? `: ${documents.error.message}` : '.'}
+                  </p>
                 ) : !documents.data || documents.data.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-edge p-4 text-center text-xs text-muted">
                     No documents attached.
@@ -557,6 +567,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

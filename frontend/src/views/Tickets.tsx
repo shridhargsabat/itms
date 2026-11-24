@@ -406,12 +406,18 @@ export default function Tickets() {
 
         {selected &&
           createPortal(
-            <div className="fixed inset-0 z-[60]">
+            <div className="fixed inset-0 z-[70]">
             <div
               className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => selectTicket(null)}
+              aria-hidden="true"
             />
-            <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Ticket details"
+              className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-edge bg-surface shadow-2xl"
+            >
               <div className="flex items-start justify-between border-b border-edge px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -431,7 +437,7 @@ export default function Tickets() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => selectTicket(null)}
+                  onClick={(e) => { e.stopPropagation(); selectTicket(null); }}
                   aria-label="Close"
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg p-2 text-secondary transition-colors hover:bg-elevated hover:text-primary"
                 >
@@ -740,7 +746,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
       </div>
 
       {/* new comment */}
-      <div className="flex flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <CannedPicker onPick={(t) => setDraft((d) => (d ? d + '\n\n' + t : t))} />
         <textarea
           value={draft}
@@ -751,7 +757,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           className={cn(inputCls, 'min-h-[60px] resize-y text-xs')}
         />
         {uploadErr && <p className="text-[10px] text-red-400">{uploadErr}</p>}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -781,7 +787,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
             loading={post.isPending}
             variant="primary"
             size="sm"
-            className="ml-auto px-3 py-1.5 text-[11px]"
+            className="ml-auto shrink-0 px-3 py-1.5 text-[11px]"
           >
             Post comment
           </Button>
