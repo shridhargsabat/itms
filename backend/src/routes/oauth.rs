@@ -4,33 +4,55 @@
 // Settings UI (PUT /admin/oauth). The flow is disabled until `enabled=true`.
 //
 //   /auth/oauth/status   (public)  → { enabled, client_id_set }
-//   /auth/oauth/start    (public)  → 302 to Google consent
-//   /auth/oauth/callback (public)  → exchange → link → issue session → 302 SPA
+//   /auth/oauth/start    (public)  → set state cookie + 302 to Google consent
+//   /auth/oauth/callback (public)  → exchange → link → mint code → 302 SPA (?code=)
+//   /auth/oauth/exchange (public)  → redeem code once → { token, user }
 //   /admin/oauth         (admin)   → GET masked config / PUT update
 //
 // Security defaults: NO auto-provisioning (SSO only links to existing
 // accounts — email must match a users row), optional domain allowlist
 // (empty = any existing user, best used with a non-empty allowlist),
-// one-time 10-min state nonces, email_verified required.
+// one-time 10-min state nonces (DB + HttpOnly cookie double-submit), single-use
+// 5-min exchange codes (sha256 hash at rest), email_verified required. The
+// session token NEVER appears in a URL — callback redirects carry only the
+// one-time code, redeemed over POST from JS (which strips it from history).
 //
 // Test-only env overrides (never set in prod): GOOGLE_OAUTH_TOKEN_URL and
 // GOOGLE_OAUTH_USERINFO_URL let local verification run a mock IdP.
 
-use axum::extract::{Extension, Query, State};
-use axum::http::{header, StatusCode};
+use axum::extract::{ConnectInfo, Extension, Query, State};
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::PgPool;
+use std::net::SocketAddr;
 use uuid::Uuid;
 
 use crate::auth::{generate_token, hash_token};
-use super::auth::SESSION_TTL;
+use super::auth::{cookie_value, set_cookie_headers, SESSION_TTL};
 use super::AppError;
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL: &str = "https://www.googleapis.com/oauth2/v3/userinfo";
 const STATE_TTL_MINUTES: i64 = 10;
+/// Wave-2a: single-use SSO exchange codes live only 5 minutes.
+const OAUTH_CODE_TTL_MINUTES: i64 = 5;
+/// Wave-2a: HttpOnly cookie binding the OAuth state nonce to the browser that
+/// started the flow (CSRF on the callback redirects nowhere without it).
+pub const OAUTH_STATE_COOKIE: &str = "itms_oauth_state";
+const OAUTH_STATE_COOKIE_MAX_AGE_SECS: i64 = STATE_TTL_MINUTES * 60;
+
+fn oauth_state_set_cookie(nonce: &str) -> String {
+    format!(
+        "{OAUTH_STATE_COOKIE}={nonce}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age={OAUTH_STATE_COOKIE_MAX_AGE_SECS}"
+    )
+}
+
+fn oauth_state_clear_cookie() -> String {
+    format!("{OAUTH_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0")
+}
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 struct OAuthConfigRow {
@@ -85,10 +107,12 @@ fn base_url(headers: &axum::http::HeaderMap) -> String {
 }
 
 /// GET /auth/oauth/start — build the Google consent URL and 302 to it.
+/// Wave-2a: also sets an HttpOnly cookie carrying the state nonce; the
+/// callback requires cookie == query state (double-submit binding).
 pub async fn start(
     State(state): State<super::AppState>,
     headers: axum::http::HeaderMap,
-) -> Result<axum::response::Redirect, AppError> {
+) -> Result<(HeaderMap, axum::response::Redirect), AppError> {
     let cfg = load_config(&state.pool).await?;
     if !cfg.enabled || cfg.client_id.trim().is_empty() {
         return Err(AppError::new(
@@ -116,7 +140,10 @@ pub async fn start(
         urlencode(&redirect_uri),
         urlencode(&state_nonce),
     );
-    Ok(axum::response::Redirect::temporary(&url))
+    Ok((
+        set_cookie_headers(oauth_state_set_cookie(&state_nonce))?,
+        axum::response::Redirect::temporary(&url),
+    ))
 }
 
 fn generate_state() -> String {
@@ -158,18 +185,20 @@ struct UserInfo {
     name: Option<String>,
 }
 
-/// GET /auth/oauth/callback — exchange code, link to an existing account,
-/// issue a session, then 302 to the SPA with the token in the query string.
+/// GET /auth/oauth/callback — verify state binding, exchange code, link to an
+/// existing account, mint a single-use exchange code, then 302 to the SPA
+/// with ONLY `?code=` (no token/user in the URL — wave-2a).
 pub async fn callback(
     State(state): State<super::AppState>,
     headers: axum::http::HeaderMap,
     Query(params): Query<CallbackParams>,
-) -> Result<axum::response::Redirect, AppError> {
+) -> Result<(HeaderMap, axum::response::Redirect), AppError> {
     let base = base_url(&headers);
     if let Some(err) = &params.error {
-        return Ok(axum::response::Redirect::temporary(&format!(
-            "{base}/login?error=sso_{err}"
-        )));
+        return Ok((
+            set_cookie_headers(oauth_state_clear_cookie())?,
+            axum::response::Redirect::temporary(&format!("{base}/login?error=sso_{err}")),
+        ));
     }
     let (code, state_nonce) = match (params.code, params.state) {
         (Some(c), Some(s)) => (c, s),
@@ -181,12 +210,26 @@ pub async fn callback(
         }
     };
 
-    // one-time state nonce
-    let consumed = sqlx::query("DELETE FROM oauth_states WHERE state = $1")
-        .bind(&state_nonce)
-        .execute(&state.pool)
-        .await?
-        .rows_affected();
+    // double-submit binding: the HttpOnly cookie set by /start must match the
+    // query state — a CSRF'd callback from another browser has no cookie.
+    // Checked BEFORE consuming the DB nonce so failures don't burn the state.
+    if cookie_value(&headers, OAUTH_STATE_COOKIE).as_deref() != Some(state_nonce.as_str()) {
+        return Err(AppError::new(
+            StatusCode::BAD_REQUEST,
+            "OAuth state mismatch — please try signing in again",
+        ));
+    }
+
+    // one-time state nonce, TTL-enforced in the predicate (not just by the
+    // /start housekeeping sweep, which may not have run recently).
+    let consumed = sqlx::query(
+        "DELETE FROM oauth_states WHERE state = $1 AND created_at > NOW() - make_interval(mins => $2::int)",
+    )
+    .bind(&state_nonce)
+    .bind(STATE_TTL_MINUTES)
+    .execute(&state.pool)
+    .await?
+    .rows_affected();
     if consumed == 0 {
         return Err(AppError::new(StatusCode::BAD_REQUEST, "invalid or expired OAuth state"));
     }
@@ -263,7 +306,105 @@ pub async fn callback(
     .bind(&email)
     .fetch_optional(&state.pool)
     .await?;
-    let (id, _, name, role, department, theme, active) = match row {
+    let (id, _, _, _, _, _, active) = match row {
+        Some(r) => r,
+        None => {
+            return Err(AppError::new(
+                StatusCode::FORBIDDEN,
+                "no ITMS account linked to this Google email — ask an administrator to create one",
+            ))
+        }
+    };
+    if !active {
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "account disabled — contact your administrator",
+        ));
+    }
+
+    // Mint a single-use exchange code (hash at rest, 5-min TTL). The session
+    // itself is created at redeem time in /exchange — never in this redirect.
+    let code = generate_token();
+    sqlx::query(
+        "INSERT INTO oauth_codes (code_hash, user_id, expires_at)
+         VALUES ($1, $2, NOW() + make_interval(mins => $3::int))",
+    )
+    .bind(hash_token(&code))
+    .bind(id)
+    .bind(OAUTH_CODE_TTL_MINUTES)
+    .execute(&state.pool)
+    .await?;
+    // housekeeping: drop expired codes
+    sqlx::query("DELETE FROM oauth_codes WHERE expires_at <= NOW()")
+        .execute(&state.pool)
+        .await?;
+
+    // SPA route POSTs the code to /exchange, strips it from history, goes home.
+    // The state cookie is single-flow: clear it now that the flow completed.
+    Ok((
+        set_cookie_headers(oauth_state_clear_cookie())?,
+        axum::response::Redirect::temporary(&format!("{base}/oauth/callback?code={code}")),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Wave-2a: single-use code redemption
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct ExchangeRequest {
+    pub code: String,
+}
+
+/// POST /auth/oauth/exchange — redeem the callback's one-time code for a real
+/// session. The DELETE...RETURNING both enforces single-use and the TTL
+/// atomically: concurrent double-redeems yield exactly one session.
+pub async fn exchange(
+    State(state): State<super::AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<ExchangeRequest>,
+) -> Result<(HeaderMap, Json<serde_json::Value>), AppError> {
+    // brute-force brake on code guessing (legit clients redeem exactly once)
+    let ip = super::auth::client_ip(Some(peer), &headers);
+    super::auth::rate_limited_public(&state, &format!("ssox:{ip}"))?;
+
+    let code = body.code.trim();
+    if code.is_empty() {
+        return Err(AppError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid or expired SSO code — please try signing in again",
+        ));
+    }
+    let user_id: Option<Uuid> = sqlx::query_scalar(
+        "DELETE FROM oauth_codes WHERE code_hash = $1 AND expires_at > NOW() RETURNING user_id",
+    )
+    .bind(hash_token(code))
+    .fetch_optional(&state.pool)
+    .await?;
+    let user_id = match user_id {
+        Some(u) => u,
+        None => {
+            return Err(AppError::new(
+                StatusCode::BAD_REQUEST,
+                "invalid or expired SSO code — please try signing in again",
+            ))
+        }
+    };
+    // housekeeping: drop other expired codes
+    sqlx::query("DELETE FROM oauth_codes WHERE expires_at <= NOW()")
+        .execute(&state.pool)
+        .await?;
+
+    // re-check the account at redeem time (may have been disabled/deleted
+    // between callback and exchange).
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String, bool)>(
+        "SELECT id, email, name, role, department, theme, active FROM users WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    let (id, email, name, role, department, theme, active) = match row {
         Some(r) => r,
         None => {
             return Err(AppError::new(
@@ -291,14 +432,14 @@ pub async fn callback(
     .fetch_one(&state.pool)
     .await?;
 
-    // SPA route reads the query, stores the session, navigates home.
-    let dest = format!(
-        "{base}/oauth/callback?token={}&expires_at={}&user={}",
-        token,
-        expires_at.to_rfc3339(),
-        urlencode(&format!("{role}|{name}|{department}|{id}|{email}|{theme}")),
-    );
-    Ok(axum::response::Redirect::temporary(&dest))
+    Ok((
+        set_cookie_headers(super::auth::session_set_cookie(&token))?,
+        Json(json!({
+            "token": token,
+            "expires_at": expires_at,
+            "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme },
+        })),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -433,5 +574,32 @@ mod wave1a_tests {
                 .unwrap_err();
             assert_eq!(err.status, StatusCode::FORBIDDEN, "role={role}");
         }
+    }
+}
+
+#[cfg(test)]
+mod wave2a_tests {
+    use super::*;
+
+    #[test]
+    fn state_cookie_is_httponly_lax_secure_with_ten_min_ttl() {
+        let v = oauth_state_set_cookie("nonce123");
+        assert!(v.starts_with("itms_oauth_state=nonce123;"), "carries nonce: {v}");
+        for flag in ["Path=/", "HttpOnly", "SameSite=Lax", "Secure", "Max-Age=600"] {
+            assert!(v.contains(flag), "missing {flag}: {v}");
+        }
+    }
+
+    #[test]
+    fn state_clear_cookie_empties_with_zero_max_age() {
+        let v = oauth_state_clear_cookie();
+        assert!(v.starts_with("itms_oauth_state=;"), "empties value: {v}");
+        assert!(v.contains("Max-Age=0"), "zero max-age: {v}");
+    }
+
+    #[test]
+    fn exchange_code_ttl_is_five_minutes() {
+        assert_eq!(OAUTH_CODE_TTL_MINUTES, 5);
+        assert_eq!(OAUTH_STATE_COOKIE_MAX_AGE_SECS, STATE_TTL_MINUTES * 60);
     }
 }

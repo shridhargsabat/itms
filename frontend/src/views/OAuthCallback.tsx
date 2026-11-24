@@ -1,28 +1,49 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { clearSession, setSession } from '@/api/client';
+import { clearSession, exchangeOAuthCode, me, setSession } from '@/api/client';
 import { hydrateThemeFromUser } from '@/lib/theme';
 
 /**
- * #53: SSO callback landing page — the backend 302s here with the session
- * token after a successful Google exchange. Stores the session and goes home.
+ * #53 / wave-2a: SSO callback landing page — the backend 302s here with ONLY
+ * a single-use `?code=`. This page POSTs it to /auth/oauth/exchange, stores
+ * the session, strips the code from history (replace:true), then overwrites
+ * the cached user with an authoritative GET /auth/me.
  */
 export default function OAuthCallback() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  // StrictMode double-invokes effects in dev — the code is single-use, so the
+  // second invocation must not re-redeem (it would 400 and bounce to login).
+  const started = useRef(false);
 
   useEffect(() => {
-    const token = params.get('token');
-    const userRaw = params.get('user');
-    if (token && userRaw) {
-      const [role, name, department, id, email = '', theme = ''] = userRaw.split('|');
-      setSession(token, { id, email, name, role, department, theme });
-      hydrateThemeFromUser({ theme });
-      navigate('/', { replace: true });
-    } else {
-      clearSession();
-      navigate('/login?error=sso_failed', { replace: true });
+    if (started.current) return;
+    started.current = true;
+    const code = params.get('code');
+    if (!code) {
+      void clearSession().then(() => {
+        navigate('/login?error=sso_failed', { replace: true });
+      });
+      return;
     }
+    (async () => {
+      try {
+        const res = await exchangeOAuthCode(code);
+        setSession(res.token, res.user);
+        // Strip ?code= from the URL/history BEFORE any further network hop.
+        navigate('/', { replace: true });
+        try {
+          const fresh = await me();
+          setSession(res.token, fresh);
+          hydrateThemeFromUser(fresh);
+        } catch {
+          hydrateThemeFromUser(res.user);
+        }
+      } catch {
+        await clearSession();
+        navigate('/login?error=sso_failed', { replace: true });
+      }
+    })();
   }, [navigate, params]);
 
   return (

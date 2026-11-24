@@ -97,7 +97,9 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         // #53 Google SSO flow — no session needed (pre-login)
         .route("/auth/oauth/status", get(oauth::status))
         .route("/auth/oauth/start", get(oauth::start))
-        .route("/auth/oauth/callback", get(oauth::callback));
+        .route("/auth/oauth/callback", get(oauth::callback))
+        // wave-2a: single-use code redemption (token never in URL)
+        .route("/auth/oauth/exchange", post(oauth::exchange));
 
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
