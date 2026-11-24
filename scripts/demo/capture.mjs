@@ -218,27 +218,50 @@ try {
       }
       await saveVideo(page, context, 'theme-switch.webm');
     }
-    // 3. tickets-flow (dark)
+    // 3. tickets-flow (dark): list → open drawer → Advance status (badge flips).
+    // NOTE: mutates one ticket — re-seed before capture for determinism.
     {
       const { context, page } = await newPage(browser, { theme: 'dark', viewport: DESKTOP, video: true, storageState: AUTH });
       await goto(page, '/tickets');
       await forceTheme(page, 'dark', true);
       await goto(page, '/tickets');
       await page.waitForTimeout(2000);
-      const row = page.locator('tbody tr, [role="row"], main a, main button').first();
+      const row = page.locator('tbody tr').first();
       if ((await row.count()) > 0) await row.click();
-      await page.waitForTimeout(4000);
+      const drawer = page.locator('.animate-slide-in-right').first();
+      try {
+        await drawer.waitFor({ state: 'visible', timeout: 4000 });
+      } catch {
+        if ((await row.count()) > 0) await row.click(); // retry once (React Query refetch can swallow the first)
+        await drawer.waitFor({ state: 'visible', timeout: 4000 }).catch(() => note('WARN ticket drawer never opened'));
+      }
+      await page.waitForTimeout(1200);
+      const advanceBtn = page.locator('button:has-text("Advance to")').first();
+      if ((await advanceBtn.count()) > 0 && await advanceBtn.isVisible()) {
+        await advanceBtn.click();
+        await page.waitForTimeout(3000); // badge flip + list refresh = the payoff
+      } else {
+        note('WARN no Advance button (ticket already terminal?)');
+        await page.waitForTimeout(2500);
+      }
       await saveVideo(page, context, 'tickets-flow.webm');
     }
-    // 4. cmdb-impact (light)
+    // 4. cmdb-impact (light): click the Catalyst switch row → "2 impacted".
+    // NOTE: seed randomizes asset TAGS per run — select by stable NAME.
     {
       const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true, storageState: AUTH });
       await goto(page, '/cmdb');
       await forceTheme(page, 'light', true);
       await goto(page, '/cmdb');
       await page.waitForTimeout(2000);
-      const node = page.locator('main button, main a, svg g, [class*="node" i]').first();
-      if ((await node.count()) > 0) await node.click();
+      const target = page.locator('tbody tr:has-text("Catalyst 9300-48P")').first();
+      if ((await target.count()) > 0) {
+        await target.click();
+      } else {
+        note('WARN Catalyst row missing, clicking first CI row');
+        const fallback = page.locator('tbody tr').first();
+        if ((await fallback.count()) > 0) await fallback.click();
+      }
       await page.waitForTimeout(5000);
       await saveVideo(page, context, 'cmdb-impact.webm');
     }
