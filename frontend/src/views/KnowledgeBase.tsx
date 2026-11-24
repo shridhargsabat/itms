@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, FileText, Plus, Search, Trash2, Zap } from 'lucide-react';
 import {
@@ -9,6 +9,7 @@ import {
 } from '@/api/client';
 import { getCachedUser } from '@/api/client';
 import { cn, formatDate, inputCls } from '@/lib/utils';
+import { formatEnum } from '@/lib/formatEnum';
 import { useServerPagination } from '@/lib/usePagination';
 import EmptyState from '@/components/EmptyState';
 import FilterBar from '@/components/FilterBar';
@@ -93,7 +94,7 @@ export default function KnowledgeBase() {
                 : 'border-edge text-secondary hover:text-primary',
             )}
           >
-            {t === 'ALL' ? 'All types' : t}
+            {t === 'ALL' ? 'All types' : formatEnum(t)}
           </button>
         ))}
         <div className="relative ml-auto">
@@ -172,10 +173,15 @@ export default function KnowledgeBase() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-elevated px-2 py-0.5 text-[10px] font-medium text-secondary">
-                        {a.ticket_type}
+                        {formatEnum(a.ticket_type)}
                       </span>
                       {a.source_ticket_id && (
-                        <span className="text-[10px] text-muted">from ticket</span>
+                        <Link
+                          to={`/tickets?open=${a.source_ticket_id}`}
+                          className="text-[10px] text-accent hover:underline"
+                        >
+                          from ticket
+                        </Link>
                       )}
                       <h3 className="text-sm font-semibold text-primary">{a.title}</h3>
                     </div>
@@ -292,7 +298,7 @@ function ArticleForm({ article, onClose }: { article: KbArticle | null; onClose:
           className="w-48"
           value={type}
           onChange={setType}
-          options={TYPES.map((t) => ({ value: t, label: t }))}
+          options={TYPES.map((t) => ({ value: t, label: formatEnum(t) }))}
         />
         <input className={inputCls} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <textarea
