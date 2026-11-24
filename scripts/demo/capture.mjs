@@ -21,11 +21,12 @@ const note = (m) => { log.push(m); console.log(m); };
 const DESKTOP = { width: 1440, height: 900 };
 const MOBILE = { width: 375, height: 812 };
 
-async function newPage(browser, { theme, viewport, video }) {
+async function newPage(browser, { theme, viewport, video, storageState }) {
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 2,
     recordVideo: video ? { dir: RAW } : undefined,
+    storageState,
   });
   await context.addInitScript((t) => localStorage.setItem('itms_theme', t), theme);
   const page = await context.newPage();
@@ -55,8 +56,10 @@ async function tryLogin(page) {
 }
 
 /** Server theme pref wins on every login — push the wanted theme server-side,
- * then reload so hydration applies it. Must run after tryLogin. */
-async function forceTheme(page, theme) {
+ * then reload so hydration applies it. Must run after tryLogin.
+ * instant=true: skip reload (no white flash mid-recording); flip classes
+ * in place + PUT server pref so later navigations keep it. */
+async function forceTheme(page, theme, instant = false) {
   await page.evaluate(async (t) => {
     const token = localStorage.getItem('itms_token');
     if (token) {
@@ -69,9 +72,19 @@ async function forceTheme(page, theme) {
       } catch {}
     }
     localStorage.setItem('itms_theme', t);
+    // Mirror applyTheme() for the liquid themes (no reload → no white flash).
+    const root = document.documentElement;
+    root.classList.toggle('dark', t === 'dark');
+    root.classList.toggle('ledgerly-dark', false);
+    root.classList.toggle('ledgerly-light', false);
+    window.dispatchEvent(new Event('itms-theme-changed'));
   }, theme);
-  await page.reload({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
-  await page.waitForTimeout(1000);
+  if (!instant) {
+    await page.reload({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+  } else {
+    await page.waitForTimeout(600);
+  }
   const applied = await page.evaluate(() => ({
     stored: localStorage.getItem('itms_theme'),
     dark: document.documentElement.classList.contains('dark'),
@@ -155,27 +168,36 @@ try {
   }
 
   // ---- Videos (WebM raw; convert.sh converts) ----
+  // Clips reuse one login (storageState) so recording starts ON the product,
+  // not on the login form. forceTheme still runs per clip (server pref wins).
   if (only !== 'png') {
-    // 1. hero-dashboard (light): dashboard drift + hover a card
+    const AUTH = join(RAW, 'auth.json');
     {
-      const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true });
+      const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP });
       await goto(page, '/login');
       await tryLogin(page);
-      await forceTheme(page, 'light');
+      await context.storageState({ path: AUTH });
+      await context.close();
+      note('auth state saved');
+    }
+    // 1. hero-dashboard (light): dashboard drift + hover a card
+    {
+      const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true, storageState: AUTH });
+      await goto(page, '/');
+      await forceTheme(page, 'light', true);
       await goto(page, '/');
       await page.waitForTimeout(2500);
       const card = page.locator('main a, main button, [class*="bento" i]').first();
       if ((await card.count()) > 0) await card.hover();
       await page.mouse.move(720, 450, { steps: 20 });
-      await page.waitForTimeout(6000);
+      await page.waitForTimeout(4000);
       await saveVideo(page, context, 'hero-dashboard.webm');
     }
     // 2. theme-switch (starts light, ends dark — THE money clip)
     {
-      const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true });
-      await goto(page, '/login');
-      await tryLogin(page);
-      await forceTheme(page, 'light');
+      const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true, storageState: AUTH });
+      await goto(page, '/');
+      await forceTheme(page, 'light', true);
       await goto(page, '/');
       await page.waitForTimeout(1500);
       // Prefer the full manager (pretty cards); fall back to header toggle.
@@ -186,9 +208,9 @@ try {
         await page.waitForTimeout(800);
         const apply = page.locator('button:has-text("Apply theme")').first();
         if ((await apply.count()) > 0) await apply.click();
-        await page.waitForTimeout(2500); // dark settles in manager view…
+        await page.waitForTimeout(2000); // dark settles in manager view…
         await goto(page, '/'); // …then payoff: dark dashboard + aurora
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(2500);
       } else {
         const toggle = page.locator('button[aria-label^="Theme:"]').first();
         if ((await toggle.count()) > 0) await toggle.click();
@@ -198,10 +220,9 @@ try {
     }
     // 3. tickets-flow (dark)
     {
-      const { context, page } = await newPage(browser, { theme: 'dark', viewport: DESKTOP, video: true });
-      await goto(page, '/login');
-      await tryLogin(page);
-      await forceTheme(page, 'dark');
+      const { context, page } = await newPage(browser, { theme: 'dark', viewport: DESKTOP, video: true, storageState: AUTH });
+      await goto(page, '/tickets');
+      await forceTheme(page, 'dark', true);
       await goto(page, '/tickets');
       await page.waitForTimeout(2000);
       const row = page.locator('tbody tr, [role="row"], main a, main button').first();
@@ -211,10 +232,9 @@ try {
     }
     // 4. cmdb-impact (light)
     {
-      const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true });
-      await goto(page, '/login');
-      await tryLogin(page);
-      await forceTheme(page, 'light');
+      const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true, storageState: AUTH });
+      await goto(page, '/cmdb');
+      await forceTheme(page, 'light', true);
       await goto(page, '/cmdb');
       await page.waitForTimeout(2000);
       const node = page.locator('main button, main a, svg g, [class*="node" i]').first();
@@ -222,22 +242,46 @@ try {
       await page.waitForTimeout(5000);
       await saveVideo(page, context, 'cmdb-impact.webm');
     }
-    // 5. mobile-nav (light, 375px)
+    // 5. mobile-nav (light, 375px): bar primaries are Dashboard/Assets/
+    // Tickets/Licenses; Scan + CMDB live in the More sheet — tap through both.
     {
-      const { context, page } = await newPage(browser, { theme: 'light', viewport: MOBILE, video: true });
-      await goto(page, '/login');
-      await tryLogin(page);
-      await forceTheme(page, 'light');
+      const { context, page } = await newPage(browser, { theme: 'light', viewport: MOBILE, video: true, storageState: AUTH });
+      const BAR = 'nav.fixed.inset-x-0';
       await goto(page, '/');
-      for (const label of ['Tickets', 'Scan', 'CMDB', 'Dashboard']) {
-        const tab = page.locator(`nav a:has-text("${label}"), nav button:has-text("${label}")`).first();
-        if ((await tab.count()) > 0) {
+      await forceTheme(page, 'light', true);
+      await goto(page, '/');
+      await page.waitForTimeout(1200);
+      const barTap = async (label) => {
+        const tab = page.locator(`${BAR} a:has-text("${label}")`).first();
+        if ((await tab.count()) > 0 && await tab.isVisible()) {
           await tab.click();
           await page.waitForTimeout(1400);
-        } else {
-          note(`WARN mobile tab missing: ${label}`);
+          return true;
         }
-      }
+        note(`WARN mobile bar tab missing/hidden: ${label}`);
+        return false;
+      };
+      const sheetTap = async (label) => {
+        const more = page.locator(`${BAR} button[aria-label="More sections"]`).first();
+        if ((await more.count()) === 0 || !(await more.isVisible())) {
+          note('WARN More button missing'); return false;
+        }
+        await more.click();
+        await page.waitForTimeout(700);
+        const item = page.locator(`.animate-sheet-up a:has-text("${label}")`).first();
+        if ((await item.count()) > 0) {
+          await item.click({ force: true }); // sheet scroll container intercepts hit-test; force is fine for a demo tap
+          await page.waitForTimeout(1400);
+          return true;
+        }
+        note(`WARN sheet item missing/hidden: ${label}`);
+        await page.keyboard.press('Escape');
+        return false;
+      };
+      await barTap('Tickets');
+      await sheetTap('Scan');
+      await sheetTap('CMDB');
+      await barTap('Dashboard');
       await saveVideo(page, context, 'mobile-nav.webm');
     }
   }

@@ -4,6 +4,7 @@ backend/target/
 # Node
 frontend/node_modules/
 frontend/dist/
+scripts/demo/node_modules/
 
 # PWA / service worker dev artifacts
 frontend/dev-dist/
@@ -15,6 +16,9 @@ dev-dist/
 
 # Logs
 *.log
+
+# Demo capture session (contains a bearer token — never commit)
+docs/demo/raw/auth.json
 
 # OS
 .DS_Store
