@@ -43,6 +43,6 @@ All captures are scripted and reproducible: `cd scripts/demo && npm install && n
 
 ## Re-shoot checklist
 
-1. Start stack: `podman run -d --name itms-demo-db -e POSTGRES_USER=itms -e POSTGRES_PASSWORD=itmsdemo -e POSTGRES_DB=itms -p 5433:5432 postgres:18-alpine` → backend `DATABASE_URL=postgres://itms:itmsdemo@localhost:5433/itms PORT=8080 ./target/debug/server` → `DATABASE_URL=... ./target/debug/seed` → frontend `npm run dev` (or `docker compose up -d --build` + `docker compose exec backend /usr/local/bin/seed` where compose exists)
-2. `cd scripts/demo && ITMS_BASE_URL=http://localhost:5173 node capture.mjs`
+1. Start stack (any throwaway local password — e.g. `export PGPASS="$(openssl rand -hex 12)"`): `podman run -d --name itms-demo-db -e POSTGRES_USER=itms -e POSTGRES_PASSWORD="$PGPASS" -e POSTGRES_DB=itms -p 5433:5432 postgres:18-alpine` → backend `DATABASE_URL=postgres://itms:"$PGPASS"@localhost:5433/itms PORT=8080 ./target/debug/server` → `DATABASE_URL=... ./target/debug/seed` → frontend `npm run dev` (or `docker compose up -d --build` + `docker compose exec backend /usr/local/bin/seed` where compose exists)
+2. `cd scripts/demo && npm install && npx playwright install chromium && ITMS_BASE_URL=http://localhost:5173 node capture.mjs`
 3. `FFMPEG=<libx264 ffmpeg> ./convert.sh` → budget check (Task 9) → commit.
