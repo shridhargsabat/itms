@@ -5,7 +5,7 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::Json;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -259,15 +259,89 @@ pub fn client_ip_public(headers: &HeaderMap) -> String {
         .unwrap_or_else(|| "unknown".into())
 }
 
-/// Wave-1a: rate-limit key source. The TCP peer address (ConnectInfo,
-/// supplied by `axum::serve`) is authoritative — X-Forwarded-For is
-/// client-spoofable and only a fallback when no peer addr is available
-/// (unix sockets, unit tests).
+/// Wave-1a fix: trusted-proxy-aware rate-limit key source.
+///
+/// Behind Traefik the TCP peer is ALWAYS the proxy container IP, so blindly
+/// preferring peer collapses every client into one shared 10-fail/15min
+/// bucket (10 bad logins lock everyone out — anonymous global login DoS).
+/// `TRUSTED_PROXIES` (comma-separated IPv4 addresses and/or CIDRs, default
+/// empty = trust none) lists the proxies allowed to vouch via X-Forwarded-For:
+/// - peer in trust set → leftmost XFF entry, ONLY if it parses as an IP
+///   (garbage/empty falls back to peer, never to attacker text);
+/// - peer untrusted, or trust set empty → peer (previous safe behavior);
+/// - no peer (unix sockets, unit tests) → existing XFF fallback.
 pub fn client_ip(peer: Option<SocketAddr>, headers: &HeaderMap) -> String {
-    if let Some(addr) = peer {
-        return addr.ip().to_string();
+    let trusted_raw = std::env::var("TRUSTED_PROXIES").unwrap_or_default();
+    client_ip_with_trust(peer, headers, &trusted_raw)
+}
+
+fn client_ip_with_trust(
+    peer: Option<SocketAddr>,
+    headers: &HeaderMap,
+    trusted_raw: &str,
+) -> String {
+    match peer {
+        None => client_ip_public(headers),
+        Some(addr) => {
+            let peer_ip = addr.ip();
+            if !trusted_raw.trim().is_empty() && peer_is_trusted(&peer_ip, trusted_raw) {
+                if let Some(xff_ip) = leftmost_valid_xff_ip(headers) {
+                    return xff_ip;
+                }
+            }
+            peer_ip.to_string()
+        }
     }
-    client_ip_public(headers)
+}
+
+/// Leftmost X-Forwarded-For entry, validated as an IP. Returns None when the
+/// header is missing, empty, or not an IP (spoofed garbage must not become
+/// a rate-limit key).
+fn leftmost_valid_xff_ip(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .and_then(|s| s.parse::<IpAddr>().ok().map(|ip| ip.to_string()))
+}
+
+fn peer_is_trusted(peer_ip: &IpAddr, trusted_raw: &str) -> bool {
+    let peer_v4 = match peer_ip {
+        IpAddr::V4(v4) => *v4,
+        _ => return false, // trust set is IPv4-only; v6 peers never trusted
+    };
+    trusted_raw
+        .split(',')
+        .map(|e| e.trim())
+        .filter(|e| !e.is_empty())
+        .any(|e| trust_entry_matches(peer_v4, e))
+}
+
+fn trust_entry_matches(peer: Ipv4Addr, entry: &str) -> bool {
+    if let Some((net_s, prefix_s)) = entry.split_once('/') {
+        let (Ok(net), Ok(prefix)) = (
+            net_s.trim().parse::<Ipv4Addr>(),
+            prefix_s.trim().parse::<u8>(),
+        ) else {
+            return false; // malformed CIDR entry never matches (fail closed)
+        };
+        if prefix > 32 {
+            return false;
+        }
+        return cidr_contains(net, prefix, peer);
+    }
+    entry.parse::<Ipv4Addr>().is_ok_and(|a| a == peer)
+}
+
+/// Minimal IPv4 CIDR contains — no new dependencies.
+fn cidr_contains(network: Ipv4Addr, prefix: u8, ip: Ipv4Addr) -> bool {
+    if prefix == 0 {
+        return true;
+    }
+    let mask: u32 = u32::MAX << (32 - prefix);
+    (u32::from(network) & mask) == (u32::from(ip) & mask)
 }
 
 pub fn rate_limited_public(state: &AppState, key: &str) -> Result<(), AppError> {
@@ -429,9 +503,14 @@ mod wave1a_tests {
 
     #[test]
     fn client_ip_prefers_peer_over_spoofable_xff() {
+        // Deterministic: empty trust set must ignore XFF even via the
+        // env-reading entry point (clear any leaked TRUSTED_PROXIES first —
+        // no other test touches process env, so this cannot race).
+        std::env::remove_var("TRUSTED_PROXIES");
         let h = headers_with_xff("9.9.9.9");
         let peer: SocketAddr = "198.51.100.7:4321".parse().unwrap();
         assert_eq!(client_ip(Some(peer), &h), "198.51.100.7");
+        assert_eq!(client_ip_with_trust(Some(peer), &h, ""), "198.51.100.7");
     }
 
     #[test]
@@ -485,5 +564,115 @@ mod wave1a_tests {
         assert!(!demo_enabled_value(Some("TRUE")));
         assert!(!demo_enabled_value(Some("1")));
         assert!(demo_enabled_value(Some("true")));
+    }
+
+    #[test]
+    fn trusted_peer_xff_yields_xff_ip() {
+        let peer: SocketAddr = "10.0.0.1:4321".parse().unwrap();
+        // exact-IP trust entry
+        let h = headers_with_xff("203.0.113.9");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.1"),
+            "203.0.113.9"
+        );
+        // leftmost of a chain wins
+        let h = headers_with_xff("203.0.113.9, 10.0.0.1");
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.2, 10.0.0.1"),
+            "203.0.113.9"
+        );
+        // CIDR trust entry
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.0/8"),
+            "203.0.113.9"
+        );
+    }
+
+    #[test]
+    fn untrusted_peer_spoofed_xff_yields_peer() {
+        let h = headers_with_xff("9.9.9.9");
+        let peer: SocketAddr = "198.51.100.7:4321".parse().unwrap();
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.1"),
+            "198.51.100.7"
+        );
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "10.0.0.0/8"),
+            "198.51.100.7"
+        );
+    }
+
+    #[test]
+    fn invalid_xff_yields_peer_even_when_trusted() {
+        let peer: SocketAddr = "10.0.0.1:4321".parse().unwrap();
+        for bad in ["not-an-ip", "999.999.999.999", "", "   ", "203.0.113.9x"] {
+            let h = headers_with_xff(bad);
+            assert_eq!(
+                client_ip_with_trust(Some(peer), &h, "10.0.0.1"),
+                "10.0.0.1",
+                "bad XFF {bad:?} must fall back to peer"
+            );
+        }
+        // missing header entirely
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &HeaderMap::new(), "10.0.0.1"),
+            "10.0.0.1"
+        );
+    }
+
+    #[test]
+    fn empty_trust_set_yields_peer() {
+        let h = headers_with_xff("203.0.113.9");
+        let peer: SocketAddr = "172.18.0.2:4321".parse().unwrap(); // e.g. Traefik
+        for trust in ["", "   ", " , , "] {
+            assert_eq!(
+                client_ip_with_trust(Some(peer), &h, trust),
+                "172.18.0.2",
+                "empty trust {trust:?} must ignore XFF"
+            );
+        }
+        // malformed trust entries fail closed → peer
+        assert_eq!(
+            client_ip_with_trust(Some(peer), &h, "bogus, 10.0.0.0/99, 1.2.3.4/abc"),
+            "172.18.0.2"
+        );
+    }
+
+    #[test]
+    fn cidr_boundary_matches_inside_only() {
+        // 172.20.0.5 ∈ 172.20.0.0/16, 172.21.0.5 ∉
+        let net: Ipv4Addr = "172.20.0.0".parse().unwrap();
+        assert!(cidr_contains(net, 16, "172.20.0.5".parse().unwrap()));
+        assert!(cidr_contains(net, 16, "172.20.255.255".parse().unwrap()));
+        assert!(!cidr_contains(net, 16, "172.21.0.5".parse().unwrap()));
+        assert!(!cidr_contains(net, 16, "172.19.255.255".parse().unwrap()));
+        // /32 = exact host, /0 = everything
+        assert!(cidr_contains(
+            "10.1.2.3".parse().unwrap(),
+            32,
+            "10.1.2.3".parse().unwrap()
+        ));
+        assert!(!cidr_contains(
+            "10.1.2.3".parse().unwrap(),
+            32,
+            "10.1.2.4".parse().unwrap()
+        ));
+        assert!(cidr_contains(
+            "0.0.0.0".parse().unwrap(),
+            0,
+            "192.0.2.1".parse().unwrap()
+        ));
+        // end-to-end through client_ip: inside CIDR → XFF, outside → peer
+        let h = headers_with_xff("203.0.113.9");
+        let inside: SocketAddr = "172.20.0.5:80".parse().unwrap();
+        let outside: SocketAddr = "172.21.0.5:80".parse().unwrap();
+        assert_eq!(
+            client_ip_with_trust(Some(inside), &h, "172.20.0.0/16"),
+            "203.0.113.9"
+        );
+        assert_eq!(
+            client_ip_with_trust(Some(outside), &h, "172.20.0.0/16"),
+            "172.21.0.5"
+        );
     }
 }
