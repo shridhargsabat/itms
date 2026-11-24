@@ -18,6 +18,30 @@ use uuid::Uuid;
 use crate::db::AppState;
 use super::{notifications::notify, AppError};
 
+/// Wave-1a: service-token gate shared by /intake and the SLA cron sweep.
+/// Fail CLOSED — an empty/unset INTAKE_TOKEN denies everything (503) instead
+/// of leaving the endpoint open. Comparison is constant-time (subtle) to
+/// block timing probes. `expected` is a parameter (not read from env here)
+/// so the predicate is unit-testable without env races.
+pub fn check_intake_token(headers: &HeaderMap, expected: &str) -> Result<(), AppError> {
+    if expected.is_empty() {
+        return Err(AppError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "intake not configured",
+        ));
+    }
+    let presented = headers
+        .get("x-intake-token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    use subtle::ConstantTimeEq;
+    let ok: bool = presented.as_bytes().ct_eq(expected.as_bytes()).into();
+    if !ok {
+        return Err(AppError::new(StatusCode::UNAUTHORIZED, "invalid intake token"));
+    }
+    Ok(())
+}
+
 pub fn router() -> Router<AppState> {
     Router::new().route("/email", post(intake_email))
 }
@@ -90,16 +114,9 @@ async fn intake_email(
     }
 
     // service-token gate: the cron must present X-Intake-Token = INTAKE_TOKEN
+    // (fail-closed + constant-time — see check_intake_token).
     let expected = std::env::var("INTAKE_TOKEN").unwrap_or_default();
-    if !expected.is_empty() {
-        let presented = headers
-            .get("x-intake-token")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        if presented != expected {
-            return Err(AppError::new(StatusCode::UNAUTHORIZED, "invalid intake token"));
-        }
-    }
+    check_intake_token(&headers, &expected)?;
 
     // 1. dedupe by Message-ID — idempotent redelivery is a no-op
     let dup: Option<String> = sqlx::query_scalar("SELECT kind FROM email_ingest WHERE message_id = $1")
@@ -326,4 +343,41 @@ async fn intake_email(
     .await?;
 
     Ok(Json(json!({ "kind": "ticket", "ticket_id": ticket.id, "ticket_number": ticket_number })))
+}
+
+#[cfg(test)]
+mod wave1a_tests {
+    use super::*;
+
+    fn headers_with_token(tok: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("x-intake-token", tok.parse().unwrap());
+        h
+    }
+
+    #[test]
+    fn fails_closed_when_token_unconfigured() {
+        // empty expected denies even a matching (empty) presented token
+        let err = check_intake_token(&HeaderMap::new(), "").unwrap_err();
+        assert_eq!(err.status, StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
+    fn rejects_wrong_and_missing_tokens() {
+        let err = check_intake_token(&HeaderMap::new(), "s3cret").unwrap_err();
+        assert_eq!(err.status, StatusCode::UNAUTHORIZED);
+        let h = headers_with_token("wrong");
+        let err = check_intake_token(&h, "s3cret").unwrap_err();
+        assert_eq!(err.status, StatusCode::UNAUTHORIZED);
+        // same-length mismatch must also fail (not just length check)
+        let h = headers_with_token("s3creu");
+        let err = check_intake_token(&h, "s3cret").unwrap_err();
+        assert_eq!(err.status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn accepts_exact_token() {
+        let h = headers_with_token("s3cret-token-value");
+        assert!(check_intake_token(&h, "s3cret-token-value").is_ok());
+    }
 }

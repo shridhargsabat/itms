@@ -3,12 +3,13 @@
 // The reset link travels BOTH channels: pending_emails (fires once SMTP is
 // configured) and an in-app notification (works today, no SMTP needed).
 
-use axum::extract::{Extension, State};
+use axum::extract::{ConnectInfo, Extension, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
 use sqlx::PgPool;
+use std::net::SocketAddr;
 use uuid::Uuid;
 
 use crate::auth::{generate_token, hash_token, verify_password};
@@ -47,12 +48,13 @@ fn validate_password(pw: &str) -> Result<(), AppError> {
 /// POST /auth/forgot-password — always 200 (no enumeration).
 pub async fn forgot_password(
     State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<ForgotPasswordRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // #86: shared per-IP bucket with login (separate key so a forgot-password
     // storm can't lock the account out of login itself)
-    let ip = crate::routes::auth::client_ip_public(&headers);
+    let ip = crate::routes::auth::client_ip(Some(peer), &headers);
     crate::routes::auth::rate_limited_public(&state, &format!("fp:{ip}"))?;
     let email = body.email.trim().to_lowercase();
     let user: Option<(Uuid,)> =
@@ -139,6 +141,12 @@ pub async fn reset_password(
         .bind(&token_hash)
         .execute(&state.pool)
         .await?;
+    // wave-1a: a completed reset proves the old credentials leaked — revoke
+    // ALL of the user's sessions (columns per 0002_auth.sql).
+    sqlx::query("DELETE FROM sessions WHERE user_id = $1")
+        .bind(uid)
+        .execute(&state.pool)
+        .await?;
     sqlx::query(
         "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
          VALUES ($1, 'PASSWORD_RESET_COMPLETED', 'user', $2, '{\"via\":\"reset-token\"}')",
@@ -155,6 +163,7 @@ pub async fn reset_password(
 pub async fn change_password(
     State(state): State<AppState>,
     Extension(uid): Extension<Uuid>,
+    headers: HeaderMap,
     Json(body): Json<ChangePasswordRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     validate_password(&body.new_password)?;
@@ -179,6 +188,23 @@ pub async fn change_password(
         .bind(&new_hash)
         .execute(&state.pool)
         .await?;
+    // wave-1a: revoke every OTHER session (stolen-session containment), keep
+    // only the current one alive. Fail secure: no bearer → revoke all.
+    match crate::routes::auth::bearer_token(&headers).map(|t| hash_token(&t)) {
+        Ok(current) => {
+            sqlx::query("DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2")
+                .bind(uid)
+                .bind(&current)
+                .execute(&state.pool)
+                .await?;
+        }
+        Err(_) => {
+            sqlx::query("DELETE FROM sessions WHERE user_id = $1")
+                .bind(uid)
+                .execute(&state.pool)
+                .await?;
+        }
+    }
     sqlx::query(
         "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
          VALUES ($1, 'PASSWORD_CHANGED', 'user', $2, '{\"via\":\"self-service\"}')",

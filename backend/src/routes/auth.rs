@@ -1,10 +1,11 @@
 //! /auth/* routes + the Bearer-token guard used on every protected route.
 
-use axum::extract::{Extension, Request, State};
+use axum::extract::{ConnectInfo, Extension, Request, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::Json;
+use std::net::SocketAddr;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -39,14 +40,16 @@ pub struct AuthUser {
 /// POST /auth/login — verify credentials, mint an opaque session token.
 pub async fn login(
     State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<LoginRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let ip = client_ip_public(&headers);
+    let ip = client_ip(Some(peer), &headers);
+    let email = body.email.trim().to_lowercase();
     let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String, Option<String>, bool)>(
         "SELECT id, email, name, role, department, theme, password_hash, active FROM users WHERE email = $1",
     )
-    .bind(body.email.trim().to_lowercase())
+    .bind(&email)
     .fetch_optional(&state.pool)
     .await?;
 
@@ -54,8 +57,9 @@ pub async fn login(
         Some(r) => r,
         None => {
             // #95: burn a full argon2 verify so unknown/known emails are
-            // indistinguishable by latency; also count toward the rate bucket
+            // indistinguishable by latency; also count toward the rate buckets
             rate_limited_public(&state, &ip)?;
+            rate_limited_account(&state, &email)?;
             let _ = verify_password(&body.password, DUMMY_HASH);
             return Err(AppError::new(StatusCode::UNAUTHORIZED, "invalid email or password"));
         }
@@ -73,11 +77,14 @@ pub async fn login(
     if !valid {
         // #86: count FAILED attempts per IP; 11th failure within 15 min → 429
         rate_limited_public(&state, &ip)?;
+        // wave-1a: ...plus per-account throttle (6th failure → 429 + backoff)
+        rate_limited_account(&state, &email)?;
         return Err(AppError::new(StatusCode::UNAUTHORIZED, "invalid email or password"));
     }
 
-    // correct credentials always pass and reset the IP bucket
+    // correct credentials always pass and reset both buckets
     clear_rate_public(&state, &ip);
+    clear_rate_public(&state, &account_key(&email));
 
     let token = generate_token();
     let expires_at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(
@@ -187,7 +194,7 @@ pub async fn require_admin(req: Request, next: Next) -> Result<Response, AppErro
     Ok(next.run(req).await)
 }
 
-fn bearer_token(headers: &HeaderMap) -> Result<String, AppError> {
+pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<String, AppError> {
     let value = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -230,6 +237,17 @@ pub fn client_ip_public(headers: &HeaderMap) -> String {
         .unwrap_or_else(|| "unknown".into())
 }
 
+/// Wave-1a: rate-limit key source. The TCP peer address (ConnectInfo,
+/// supplied by `axum::serve`) is authoritative — X-Forwarded-For is
+/// client-spoofable and only a fallback when no peer addr is available
+/// (unix sockets, unit tests).
+pub fn client_ip(peer: Option<SocketAddr>, headers: &HeaderMap) -> String {
+    if let Some(addr) = peer {
+        return addr.ip().to_string();
+    }
+    client_ip_public(headers)
+}
+
 pub fn rate_limited_public(state: &AppState, key: &str) -> Result<(), AppError> {
     let mut m = state.login_attempts.lock().unwrap();
     let now = std::time::Instant::now();
@@ -249,6 +267,35 @@ pub fn clear_rate_public(state: &AppState, key: &str) {
     if let Ok(mut m) = state.login_attempts.lock() {
         m.remove(key);
     }
+}
+
+// ---- wave-1a: per-account email throttle with backoff ----
+
+const AUTH_ACCT_MAX: usize = 5;
+
+fn account_key(email: &str) -> String {
+    format!("acct:{email}")
+}
+
+/// Count a FAILED login toward the per-account bucket: the 6th failure
+/// within 15 min → 429. Attempts past the limit keep pushing timestamps,
+/// extending the sliding window (backoff). Cleared on successful login.
+/// (Record-on-failure only, like the IP bucket — no pre-check, so the #95
+/// unknown/known indistinguishability posture is preserved.)
+pub fn rate_limited_account(state: &AppState, email: &str) -> Result<(), AppError> {
+    let mut m = state.login_attempts.lock().unwrap();
+    let now = std::time::Instant::now();
+    let v = m.entry(account_key(email)).or_default();
+    v.retain(|t| now.duration_since(*t).as_secs() < AUTH_RATE_WINDOW_SECS);
+    if v.len() >= AUTH_ACCT_MAX {
+        v.push(now); // hammering while locked extends the lockout (backoff)
+        return Err(AppError::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "too many login attempts for this account — try again in 15 minutes",
+        ));
+    }
+    v.push(now);
+    Ok(())
 }
 
 async fn issue_session(
@@ -271,15 +318,20 @@ async fn issue_session(
 
 // ---- #87: server-side demo login (no credentials in the JS bundle) ----
 
+/// Wave-1a: pure predicate behind the demo gate — exactly "true" enables.
+fn demo_enabled_value(v: Option<&str>) -> bool {
+    matches!(v, Some("true"))
+}
+
 pub async fn demo_login(
     State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let ip = client_ip_public(&headers);
+    let ip = client_ip(Some(peer), &headers);
     rate_limited_public(&state, &format!("demo:{ip}"))?;
-    let enabled = std::env::var("DEMO_LOGIN_ENABLED")
-        .map(|v| v != "false")
-        .unwrap_or(true);
+    // wave-1a: default-DENY — enabled ONLY when the env var is exactly "true".
+    let enabled = demo_enabled_value(std::env::var("DEMO_LOGIN_ENABLED").ok().as_deref());
     if !enabled {
         return Err(AppError::new(StatusCode::NOT_FOUND, "demo login disabled"));
     }
@@ -316,5 +368,90 @@ mod theme_tests {
         assert!(!is_valid_theme("paper "));
         assert!(!is_valid_theme("DARK"));
         assert!(!is_valid_theme(""));
+    }
+}
+
+#[cfg(test)]
+mod wave1a_tests {
+    use super::*;
+    use crate::db::AppState;
+
+    /// Lazy pool: parses the URL, opens NO connection — DB-free tests.
+    fn test_state() -> AppState {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://localhost/itms_unit_test")
+            .expect("lazy pool");
+        AppState {
+            pool,
+            login_attempts: Default::default(),
+            opencode_api_key: None,
+        }
+    }
+
+    fn headers_with_xff(xff: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("x-forwarded-for", xff.parse().unwrap());
+        h
+    }
+
+    #[test]
+    fn client_ip_prefers_peer_over_spoofable_xff() {
+        let h = headers_with_xff("9.9.9.9");
+        let peer: SocketAddr = "198.51.100.7:4321".parse().unwrap();
+        assert_eq!(client_ip(Some(peer), &h), "198.51.100.7");
+    }
+
+    #[test]
+    fn client_ip_falls_back_to_xff_without_peer() {
+        let h = headers_with_xff("203.0.113.9, 10.0.0.1");
+        assert_eq!(client_ip(None, &h), "203.0.113.9");
+        assert_eq!(client_ip(None, &HeaderMap::new()), "unknown");
+    }
+
+    #[tokio::test]
+    async fn ip_bucket_trips_on_11th_failure() {
+        let s = test_state();
+        for _ in 0..10 {
+            assert!(rate_limited_public(&s, "203.0.113.9").is_ok());
+        }
+        let err = rate_limited_public(&s, "203.0.113.9").unwrap_err();
+        assert_eq!(err.status, StatusCode::TOO_MANY_REQUESTS);
+        clear_rate_public(&s, "203.0.113.9");
+        assert!(rate_limited_public(&s, "203.0.113.9").is_ok());
+    }
+
+    #[tokio::test]
+    async fn account_bucket_trips_on_6th_failure_and_backs_off() {
+        let s = test_state();
+        for _ in 0..5 {
+            assert!(rate_limited_account(&s, "victim@example.com").is_ok());
+        }
+        let err = rate_limited_account(&s, "victim@example.com").unwrap_err();
+        assert_eq!(err.status, StatusCode::TOO_MANY_REQUESTS);
+        // hammering while locked extends the bucket instead of sliding off
+        let len_before = s.login_attempts.lock().unwrap().len();
+        let _ = rate_limited_account(&s, "victim@example.com");
+        let bucket = s.login_attempts.lock().unwrap();
+        assert!(bucket["acct:victim@example.com"].len() > 5);
+        assert_eq!(len_before, 1);
+        // other accounts unaffected
+        drop(bucket);
+        assert!(rate_limited_account(&s, "other@example.com").is_ok());
+        // success-path clear resets
+        clear_rate_public(&s, "acct:victim@example.com");
+        assert!(rate_limited_account(&s, "victim@example.com").is_ok());
+    }
+
+    #[test]
+    fn demo_gate_is_default_deny_exact_true_only() {
+        assert!(!demo_enabled_value(None));
+        assert!(!demo_enabled_value(Some("")));
+        assert!(!demo_enabled_value(Some("false")));
+        assert!(!demo_enabled_value(Some("0")));
+        assert!(!demo_enabled_value(Some("True")));
+        assert!(!demo_enabled_value(Some("TRUE")));
+        assert!(!demo_enabled_value(Some("1")));
+        assert!(demo_enabled_value(Some("true")));
     }
 }
