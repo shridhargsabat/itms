@@ -108,14 +108,20 @@ export default function Licenses() {
     [allItems],
   );
 
+  // Buckets are nested server-side (expiring_30 ⊆ expiring_60 ⊆ expiring_90),
+  // so expiring_90 alone is the full ≤90d set — one definition for KPI,
+  // tab badge, and filtered list.
+  const expiring = alerts.data?.expiring_90 ?? [];
+  const expired = alerts.data?.expired ?? [];
+
   const list =
     tab === 'expiring'
-      ? (alerts.data?.expiring_90 ?? [])
+      ? expiring
       : tab === 'expired'
-        ? (alerts.data?.expired ?? [])
+        ? expired
         : (pageQ.data?.items ?? []);
   const total = tab === 'all' ? (pageQ.data?.total ?? 0) : list.length;
-  const alertCount = (alerts.data?.expired.length ?? 0) + (alerts.data?.expiring_90.length ?? 0);
+  const alertCount = expired.length + expiring.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -136,9 +142,9 @@ export default function Licenses() {
       />
 
       {/* utilization summary */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl glass-card p-3">
-          <p className="text-[10px] uppercase tracking-wide text-muted">Utilization</p>
+          <p className="text-xs uppercase tracking-wide text-muted">Utilization</p>
           <p className={cn('mt-1 text-lg font-bold tabular-nums', utilPct < 70 ? 'text-red-400' : utilPct < 90 ? 'text-amber-400' : 'text-emerald-400')}>
             {utilPct}%
           </p>
@@ -148,27 +154,32 @@ export default function Licenses() {
               style={{ width: `${Math.min(utilPct, 100)}%` }}
             />
           </div>
-          <p className="mt-1 text-[10px] text-muted">{usedSeats}/{totalSeats} seats in use</p>
+          <p className="mt-1 text-xs text-muted">{usedSeats}/{totalSeats} seats in use</p>
         </div>
         <div className="rounded-xl glass-card p-3">
-          <p className="text-[10px] uppercase tracking-wide text-muted">Wasted spend / yr</p>
+          <p className="text-xs uppercase tracking-wide text-muted">Wasted spend / yr</p>
           <p className="mt-1 text-lg font-bold tabular-nums text-amber-400">{fmtMoney(wasted, 'INR')}</p>
-          <p className="mt-1 text-[10px] text-muted">unused seats × cost</p>
+          <p className="mt-1 text-xs text-muted">unused seats × cost</p>
         </div>
         <button onClick={() => setTab('expiring')} className="rounded-xl glass-card p-3 text-left transition hover:border-accent/40">
-          <p className="text-[10px] uppercase tracking-wide text-muted">Expiry alerts</p>
+          <p className="text-xs uppercase tracking-wide text-muted">Expiry alerts</p>
           <p className={cn('mt-1 text-lg font-bold tabular-nums', alertCount > 0 ? 'text-red-400' : 'text-emerald-400')}>{alertCount}</p>
-          <p className="mt-1 text-[10px] text-muted">expired + ≤90 days</p>
+          <p className="mt-1 text-xs text-muted">expired + ≤90 days</p>
         </button>
       </div>
+      {(all.data?.total ?? 0) > allItems.length && (
+        <p className="text-xs text-muted">
+          Showing first 500 of {all.data!.total} licenses
+        </p>
+      )}
 
       {/* tabs */}
       <FilterBar>
         {(
           [
             { id: 'all', label: 'All Licenses' },
-            { id: 'expiring', label: `Expiring ≤90d (${(alerts.data?.expiring_90.length ?? 0) + (alerts.data?.expiring_60.length ?? 0) + (alerts.data?.expiring_30.length ?? 0)})` },
-            { id: 'expired', label: `Expired (${alerts.data?.expired.length ?? 0})` },
+            { id: 'expiring', label: `Expiring ≤90d (${expiring.length})` },
+            { id: 'expired', label: `Expired (${expired.length})` },
           ] as { id: Tab; label: string }[]
         ).map((t) => (
           <button
@@ -281,7 +292,7 @@ function LicenseCard({
   const dl = daysLeft(l.expiry_date);
   const util = l.seats_total > 0 ? Math.min(100, Math.round((l.seats_used / l.seats_total) * 100)) : 0;
   return (
-    <div className="flex flex-col gap-2 rounded-xl glass-card p-4">
+    <div data-testid="license-card" className="flex flex-col gap-2 rounded-xl glass-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button onClick={onOpen} className="flex flex-wrap items-center gap-2 text-left">
           <span className="text-sm font-medium text-primary">{l.name}</span>
@@ -294,7 +305,7 @@ function LicenseCard({
           {l.expiry_date && dl != null && (
             <span
               className={cn(
-                'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold',
+                'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold',
                 dl < 0 ? 'border-red-500/40 bg-red-500/10 text-red-400' : dl <= 30 ? 'border-red-500/30 bg-red-500/10 text-red-400' : dl <= 60 ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : dl <= 90 ? 'border-amber-500/20 bg-amber-500/5 text-amber-300' : 'border-edge2 bg-elevated text-secondary',
               )}
             >
@@ -329,14 +340,14 @@ function LicenseCard({
             style={{ width: `${util}%` }}
           />
         </div>
-        <span className="w-20 text-right text-[10px] tabular-nums text-muted">
+        <span className="shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted">
           {l.seats_used}/{l.seats_total} seats · {util}%
         </span>
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-muted">
         <span>{fmtMoney(l.cost_per_seat, l.currency)}/seat</span>
-        <span>{fmtMoney(l.cost_total, l.currency)} total</span>
+        <span>{fmtMoney((l.seats_total * (l.cost_per_seat ?? 0)) || null, 'INR')} total</span>
         {l.cost_per_seat && l.seats_total > l.seats_used && (
           <span className="font-medium text-amber-400">
             ~{fmtMoney((l.seats_total - l.seats_used) * l.cost_per_seat, l.currency)} unused/yr
@@ -399,21 +410,21 @@ function LicenseDetailModal({
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-lg glass-dense p-2.5">
-            <p className="text-[10px] uppercase text-muted">Vendor</p>
+            <p className="text-xs uppercase text-muted">Vendor</p>
             <p className="mt-0.5 font-medium">{lic.vendor ?? '—'}</p>
           </div>
           <div className="rounded-lg glass-dense p-2.5">
-            <p className="text-[10px] uppercase text-muted">Type</p>
+            <p className="text-xs uppercase text-muted">Type</p>
             <p className="mt-0.5 font-medium">{lic.license_type.replace('_', ' ')}</p>
           </div>
           <div className="rounded-lg glass-dense p-2.5">
-            <p className="text-[10px] uppercase text-muted">Seats</p>
+            <p className="text-xs uppercase text-muted">Seats</p>
             <p className="mt-0.5 font-medium">
               {lic.seats_used}/{lic.seats_total} used
             </p>
           </div>
           <div className="rounded-lg glass-dense p-2.5">
-            <p className="text-[10px] uppercase text-muted">Cost</p>
+            <p className="text-xs uppercase text-muted">Cost</p>
             <p className="mt-0.5 font-medium">
               {fmtMoney(lic.cost_per_seat, lic.currency)}
               {lic.cost_per_seat ? '/seat' : ''}
@@ -421,7 +432,7 @@ function LicenseDetailModal({
           </div>
           {lic.expiry_date && (
             <div className={cn('rounded-lg p-2.5', dl != null && dl <= 30 ? 'border border-red-500/30 bg-red-500/10' : 'glass-dense')}>
-              <p className="text-[10px] uppercase text-muted">Expires</p>
+              <p className="text-xs uppercase text-muted">Expires</p>
               <p className={cn('mt-0.5 font-medium', dl != null && dl <= 30 && 'text-red-400')}>
                 {lic.expiry_date} {dl != null && `(${dl < 0 ? `${-dl}d ago` : `${dl}d left`})`}
               </p>
@@ -429,7 +440,7 @@ function LicenseDetailModal({
           )}
           {lic.renewal_cost != null && (
             <div className="rounded-lg glass-dense p-2.5">
-              <p className="text-[10px] uppercase text-muted">Renewal cost</p>
+              <p className="text-xs uppercase text-muted">Renewal cost</p>
               <p className="mt-0.5 font-medium">{fmtMoney(lic.renewal_cost, lic.currency)}</p>
             </div>
           )}
@@ -480,15 +491,15 @@ function LicenseDetailModal({
               <div key={a.id} className="flex items-center justify-between rounded-lg glass-dense px-3 py-2">
                 <div>
                   <p className="text-xs font-medium">{a.user_name}</p>
-                  <p className="text-[10px] text-muted">{a.user_email}</p>
+                  <p className="text-xs text-muted">{a.user_email}</p>
                 </div>
                 {isAdmin && (confirmRevoke === a.user_id ? (
                   <div className="flex gap-1.5">
-                    <button onClick={() => revoke.mutate(a.user_id)} className="rounded-lg bg-red-500 px-2 py-1 text-[10px] font-semibold text-white">Confirm</button>
-                    <button onClick={() => setConfirmRevoke(null)} className="rounded-lg border border-edge px-2 py-1 text-[10px] text-secondary">No</button>
+                    <button onClick={() => revoke.mutate(a.user_id)} className="rounded-lg bg-red-500 px-2 py-1 text-xs font-semibold text-white">Confirm</button>
+                    <button onClick={() => setConfirmRevoke(null)} className="rounded-lg border border-edge px-2 py-1 text-xs text-secondary">No</button>
                   </div>
                 ) : (
-                  <button onClick={() => setConfirmRevoke(a.user_id)} className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2 py-1 text-[10px] text-red-400 hover:bg-red-500/10">
+                  <button onClick={() => setConfirmRevoke(a.user_id)} className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">
                     <UserMinus className="h-3 w-3" /> Revoke
                   </button>
                 ))}
