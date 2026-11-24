@@ -147,9 +147,9 @@ pub async fn start(
 }
 
 fn generate_state() -> String {
-    use rand::RngCore;
+    use rand::Rng;
     let mut b = [0u8; 24];
-    rand::thread_rng().fill_bytes(&mut b);
+    rand::rng().fill_bytes(&mut b);
     b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
