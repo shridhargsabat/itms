@@ -1,0 +1,54 @@
+# cargo-audit configuration for itms-backend.
+#
+# All ignored advisories affect crates that are present in Cargo.lock (the
+# feature-unified resolve graph) but are NEVER compiled into this workspace:
+# `cargo tree -i <crate>` prints nothing for each of them, even with
+# `--target all`. Each ignore carries a justification and a 6-month expiry in
+# the comment above it; re-validate every entry on or before its expiry.
+#
+# NOTE (discovery): cargo-audit only reads `./.cargo/audit.toml` (or
+# `~/.cargo/audit.toml`), never `./audit.toml`. This file is the committed
+# source of truth; CI and local runs must stage it first:
+#   mkdir -p .cargo && cp audit.toml .cargo/audit.toml && cargo audit
+
+[advisories]
+ignore = [
+    # ── libsqlite3-sys 0.30.1 (pulled only by sqlx-sqlite) ──────────────
+    # Uncompiled: backend enables only the sqlx `postgres` feature, so this
+    # crate is in Cargo.lock yet absent from `cargo tree` on all targets; no
+    # C SQLite is compiled or linked. Re-audit if `sqlite` is ever enabled.
+    # Justification: uncompiled transitive dep (sqlx-sqlite only). Expires: 2027-05-24.
+    "RUSTSEC-2026-0459",
+
+    # ── quinn-proto 0.11.16 (pulled only by quinn <- reqwest http3) ──────
+    # Uncompiled: reqwest is built with default-features=false (json +
+    # rustls-tls only), so the optional http3/QUIC stack is in Cargo.lock yet
+    # absent from `cargo tree` on all targets — never compiled. Re-audit on
+    # any reqwest feature change.
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0341",
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0524",
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0342",
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0338",
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0523",
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0339",
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0340",
+
+    # ── quinn-udp 0.5.15 (pulled only by quinn <- reqwest http3) ─────────
+    # Uncompiled: same as quinn-proto above (reqwest http3 disabled).
+    # Justification: uncompiled transitive dep (reqwest http3 disabled). Expires: 2027-05-24.
+    "RUSTSEC-2026-0538",
+
+    # ── rsa 0.9.10 (pulled only by sqlx-mysql) ───────────────────────────
+    # Uncompiled: backend enables only the sqlx `postgres` feature, so the
+    # MySQL auth stack is in Cargo.lock yet absent from `cargo tree` on all
+    # targets — never compiled. Re-audit if `mysql` is ever enabled.
+    # Justification: uncompiled transitive dep (sqlx-mysql only). Expires: 2027-05-24.
+    "RUSTSEC-2023-0071",
+]
