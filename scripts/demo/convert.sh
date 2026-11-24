@@ -7,6 +7,7 @@ RAW="$(dirname "$0")/../../docs/demo/raw"
 OUT="$(dirname "$0")/../../docs/demo"
 mkdir -p "$OUT"
 export PATH="$PATH:/usr/sbin"
+command -v gifsicle >/dev/null && command -v pngquant >/dev/null || { echo "missing deps: need gifsicle + pngquant (sudo dnf install -y gifsicle pngquant)"; exit 1; }
 FF="${FFMPEG:-ffmpeg}"
 # Fedora's ffmpeg strips libx264 — Hermes' toolchain build has it. Fall back
 # to libopenh264 (still H.264, still plays inline on GitHub).

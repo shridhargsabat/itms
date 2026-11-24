@@ -45,7 +45,7 @@ async function goto(page, path) {
 async function tryLogin(page) {
   // If no password field anywhere, assume authed already.
   if ((await page.locator('input[type="password"]').count()) === 0) return;
-  const email = page.locator('input[type="email"]').first();
+  const email = page.locator('input[type="email"], input[name="email"], input[placeholder*="mail" i]').first();
   const pass = page.locator('input[type="password"]').first();
   if ((await email.count()) === 0) return;
   await email.fill(process.env.ITMS_DEMO_EMAIL || 'admin@itms.local');
