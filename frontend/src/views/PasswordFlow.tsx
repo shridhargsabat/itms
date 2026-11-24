@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { forgotPassword, resetPassword } from '@/api/client';
@@ -84,9 +84,14 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
   const [pw2, setPw2] = useState('');
   const [err, setErr] = useState('');
   const navigate = useNavigate();
+  // Wave 2-C: never leave the new password in memory — cleared on success
+  // and on unmount.
+  useEffect(() => () => { setPw(''); setPw2(''); }, []);
   const mutation = useMutation({
     mutationFn: (p: string) => resetPassword({ token, new_password: p }),
     onSuccess: () => {
+      setPw('');
+      setPw2('');
       onDone();
       setTimeout(() => navigate('/login'), 1800);
     },

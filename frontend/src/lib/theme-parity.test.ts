@@ -11,39 +11,53 @@ describe('fouc parity', () => {
     resolve(dirname(fileURLToPath(import.meta.url)), '../../index.html'),
     'utf8',
   );
+  // Wave 2-C: the pre-paint script is an external same-origin file
+  // (public/theme-init.js) so the deployed CSP `script-src 'self'` holds
+  // with zero inline scripts. Content assertions target it; ordering and
+  // reference assertions target index.html.
+  const initJs = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../../public/theme-init.js'),
+    'utf8',
+  );
   it('defaults to light and maps every slug to its classes', () => {
-    expect(html).toContain(`|| 'light'`);
+    expect(initJs).toContain(`|| 'light'`);
     (Object.keys(THEME_REGISTRY) as ThemeMode[]).forEach((m) => {
       if (m === 'light' || m === 'system') return; // default branch covers these
-      expect(html).toContain(`'${m}'`);
+      expect(initJs).toContain(`'${m}'`);
     });
-    expect(html).toContain(`'theme-console'`);
-    expect(html).toContain(`'theme-terminal'`);
+    expect(initJs).toContain(`'theme-console'`);
+    expect(initJs).toContain(`'theme-terminal'`);
   });
   it('maps all seven theme classes with correct dark pairings', () => {
     // Light themes carry no .dark; dark themes pair theme class with .dark.
-    expect(html).toContain(`d.classList.add('theme-paper')`);
-    expect(html).toContain(`d.classList.add('theme-shell')`);
-    expect(html).toContain(`d.classList.add('theme-clarity')`);
-    expect(html).toContain(`d.classList.add('dark', 'theme-console')`);
-    expect(html).toContain(`d.classList.add('dark', 'theme-bold')`);
-    expect(html).toContain(`d.classList.add('dark', 'theme-terminal')`);
-    expect(html).toContain(`d.classList.add('dark', 'theme-clarity-dark')`);
+    expect(initJs).toContain(`d.classList.add('theme-paper')`);
+    expect(initJs).toContain(`d.classList.add('theme-shell')`);
+    expect(initJs).toContain(`d.classList.add('theme-clarity')`);
+    expect(initJs).toContain(`d.classList.add('dark', 'theme-console')`);
+    expect(initJs).toContain(`d.classList.add('dark', 'theme-bold')`);
+    expect(initJs).toContain(`d.classList.add('dark', 'theme-terminal')`);
+    expect(initJs).toContain(`d.classList.add('dark', 'theme-clarity-dark')`);
   });
   it('falls unknown stored values through to the light branch', () => {
     // Missing values default via `|| 'light'`, but an invalid string (e.g.
     // 'banana') must not land in the unthemed else branch either.
-    expect(html).toContain(`=== -1) m = 'light'`);
+    expect(initJs).toContain(`=== -1) m = 'light'`);
   });
   it('sets meta theme-color per theme before first paint', () => {
     // PWA chrome must match the theme from the first paint, not stay
     // static #ffffff until React mounts.
-    expect(html).toContain(`meta[name="theme-color"]`);
-    expect(html).toContain(`setAttribute('content'`);
+    expect(initJs).toContain(`meta[name="theme-color"]`);
+    expect(initJs).toContain(`setAttribute('content'`);
     ['#f6f5f1', '#09090b', '#0d0716', '#0a0f0d', '#141311', '#020617', '#f6f7f9', '#0b0d10'].forEach((c) =>
-      expect(html).toContain(c));
+      expect(initJs).toContain(c));
     // The meta tag must precede the script — the script queries it during parse.
-    expect(html.indexOf('<meta name="theme-color"')).toBeLessThan(html.indexOf('itms_theme'));
+    expect(html).toContain('<script src="/theme-init.js"></script>');
+    expect(html.indexOf('<meta name="theme-color"')).toBeLessThan(html.indexOf('theme-init.js'));
+  });
+  it('has zero inline scripts (CSP script-src self holds)', () => {
+    // Every <script> in index.html must load an external src: any inline
+    // script would violate the deployed script-src 'self' policy.
+    expect(html).not.toMatch(/<script(?![^>]*\bsrc=)/);
   });
 });
 
