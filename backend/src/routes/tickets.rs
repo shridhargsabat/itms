@@ -4,7 +4,7 @@ use axum::routing::{get, patch};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::json;
-use sqlx::{PgPool, QueryBuilder};
+use sqlx::QueryBuilder;
 use uuid::Uuid;
 
 use crate::db::AppState;
@@ -182,16 +182,35 @@ async fn get_ticket(
     }
 }
 
+/// Non-staff callers always file as themselves; staff (ADMIN/AGENT) may file
+/// on behalf of another requester (portal/phone intake).
+fn resolve_requester_id(role: &str, requested: Option<Uuid>, actor_id: Uuid) -> Uuid {
+    if super::auth::is_staff_role(role) {
+        requested.unwrap_or(actor_id)
+    } else {
+        actor_id
+    }
+}
+
+/// Priority / assignee / status changes are staff-only.
+fn require_staff(role: &str) -> Result<(), AppError> {
+    if !super::auth::is_staff_role(role) {
+        return Err(AppError::new(StatusCode::FORBIDDEN, "agents and admins only"));
+    }
+    Ok(())
+}
+
 /// POST /api/v1/tickets → 201 with auto-generated INC-XXXX tag + audit row.
 async fn create_ticket(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
+    Extension(role): Extension<String>,
     Json(body): Json<CreateTicketRequest>,
 ) -> Result<(StatusCode, Json<Ticket>), AppError> {
     if body.title.trim().is_empty() {
         return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "title is required"));
     }
-    let requester_id = body.requester_id.unwrap_or(actor_id);
+    let requester_id = resolve_requester_id(&role, body.requester_id, actor_id);
 
     let requester_exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
@@ -220,7 +239,9 @@ async fn create_ticket(
         }
     }
 
-    let inserted = insert_ticket_with_number_retry(&state.pool, &body, requester_id, "PORTAL").await?;
+    // Atomic: ticket row + audit row + SLA due-or-nothing.
+    let mut tx = state.pool.begin().await?;
+    let inserted = insert_ticket_with_number_retry(&mut *tx, &body, requester_id, "PORTAL").await?;
 
     sqlx::query(
         "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
@@ -241,11 +262,12 @@ async fn create_ticket(
             "asset_id": inserted.asset_id,
         }
     }))
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?;
 
     // P1-4: SLA deadline from creation time
-    super::sla::set_sla_due(&state.pool, inserted.id, &inserted.priority, "OPEN", inserted.created_at).await?;
+    super::sla::set_sla_due(&mut *tx, inserted.id, &inserted.priority, "OPEN", inserted.created_at).await?;
+    tx.commit().await?;
 
     // Re-fetch the enriched row so names + sla_due_at are populated.
     let ticket: Ticket = sqlx::query_as::<_, Ticket>(&format!("{TICKET_SELECT} WHERE t.id = $1"))
@@ -274,9 +296,11 @@ async fn create_ticket(
 async fn update_ticket_status(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
+    Extension(role): Extension<String>,
     Path(ticket_id): Path<Uuid>,
     Json(body): Json<UpdateTicketStatusRequest>,
 ) -> Result<Json<Ticket>, AppError> {
+    require_staff(&role)?;
     let current: Option<(String, String, chrono::DateTime<chrono::Utc>)> =
         sqlx::query_as("SELECT status, priority, created_at FROM tickets WHERE id = $1")
             .bind(ticket_id)
@@ -358,9 +382,11 @@ async fn update_ticket_status(
 async fn update_ticket(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
+    Extension(role): Extension<String>,
     Path(ticket_id): Path<Uuid>,
     Json(body): Json<UpdateTicketRequest>,
 ) -> Result<Json<Ticket>, AppError> {
+    require_staff(&role)?;
     let current: Option<(
         String,
         String,
@@ -481,17 +507,17 @@ fn allowed_transitions(from: &str) -> &'static [&'static str] {
 
 /// Ticket number generation: MAX(numeric suffix) + 1 → `INC-{:04}`,
 /// retrying on unique-violation races.
-pub async fn allocate_next_ticket_number(pool: &PgPool) -> Result<String, AppError> {
+pub async fn allocate_next_ticket_number(conn: &mut sqlx::PgConnection) -> Result<String, AppError> {
     let next_num: i64 = sqlx::query_scalar(
         "SELECT COALESCE(MAX((substring(ticket_number FROM '([0-9]+)$'))::bigint), COUNT(*)) + 1 FROM tickets",
     )
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(format!("INC-{:04}", next_num))
 }
 
 async fn insert_ticket_with_number_retry(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     body: &CreateTicketRequest,
     requester_id: Uuid,
     source: &str,
@@ -499,8 +525,11 @@ async fn insert_ticket_with_number_retry(
     let ticket_type = normalize_ticket_type(body.ticket_type.as_deref());
     let priority = body.priority.clone().unwrap_or_else(|| "MEDIUM".to_string());
 
+    // NOTE: runs inside the caller's transaction, so number races use
+    // ON CONFLICT DO NOTHING + retry (a unique-violation *error* would poison
+    // the whole tx — Postgres aborts all later statements after any error).
     for attempt in 0..10 {
-        let base = allocate_next_ticket_number(pool).await?;
+        let base = allocate_next_ticket_number(&mut *conn).await?;
         let ticket_number = if attempt > 0 {
             // Re-query already gives the fresh max; add the attempt offset as a
             // belt-and-braces guard against a tight concurrent-alloc race.
@@ -513,10 +542,11 @@ async fn insert_ticket_with_number_retry(
             base
         };
 
-        let result = sqlx::query_as::<_, Ticket>(
+        let row: Option<Ticket> = sqlx::query_as::<_, Ticket>(
             "INSERT INTO tickets (ticket_number, title, description, ticket_type, priority, status, \
                 source, requester_id, assignee_id, asset_id) \
              VALUES ($1, $2, $3, $4, $5, 'OPEN', $6, $7, $8, $9) \
+             ON CONFLICT (ticket_number) DO NOTHING \
              RETURNING id, ticket_number, title, description, ticket_type, priority, status, source, \
                 requester_id, assignee_id, asset_id, created_at, updated_at, \
                 NULL::timestamptz AS sla_due_at, NULL::timestamptz AS sla_escalated_at, \
@@ -532,20 +562,15 @@ async fn insert_ticket_with_number_retry(
         .bind(requester_id)
         .bind(body.assignee_id)
         .bind(body.asset_id)
-        .fetch_one(pool)
-        .await;
+        .fetch_optional(&mut *conn)
+        .await?;
 
-        match result {
-            Ok(ticket) => return Ok(ticket),
-            Err(sqlx::Error::Database(db_err))
-                if db_err.is_unique_violation()
-                    && db_err.constraint() == Some("tickets_ticket_number_key")
-                    && attempt < 9 =>
-            {
+        match row {
+            Some(ticket) => return Ok(ticket),
+            None => {
                 tracing::warn!("ticket number {ticket_number} collided, retrying");
                 continue;
             }
-            Err(err) => return Err(err.into()),
         }
     }
 
@@ -677,4 +702,32 @@ async fn export_tickets(
         ],
         body,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_gate_denies_non_staff() {
+        assert!(require_staff("ADMIN").is_ok());
+        assert!(require_staff("AGENT").is_ok());
+        assert!(require_staff("EMPLOYEE").is_err());
+        assert!(require_staff("").is_err());
+        assert!(require_staff("SUPERADMIN").is_err());
+    }
+
+    #[test]
+    fn non_staff_requester_forced_to_actor() {
+        let actor = Uuid::new_v4();
+        let other = Uuid::new_v4();
+        // Non-staff always file as themselves, even when spoofing requester_id.
+        assert_eq!(resolve_requester_id("EMPLOYEE", Some(other), actor), actor);
+        assert_eq!(resolve_requester_id("EMPLOYEE", None, actor), actor);
+        assert_eq!(resolve_requester_id("BOGUS", Some(other), actor), actor);
+        // Staff may file on behalf of someone else.
+        assert_eq!(resolve_requester_id("AGENT", Some(other), actor), other);
+        assert_eq!(resolve_requester_id("ADMIN", Some(other), actor), other);
+        assert_eq!(resolve_requester_id("ADMIN", None, actor), actor);
+    }
 }

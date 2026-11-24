@@ -48,6 +48,24 @@ fn user_sort(col: &str) -> &'static str {
     }
 }
 
+/// Canonical role values — shared by POST (create) and PATCH (update) so the
+/// whitelist can never drift between the two.
+const ALLOWED_ROLES: &[&str] = &["ADMIN", "AGENT", "EMPLOYEE"];
+
+fn valid_role(role: &str) -> bool {
+    ALLOWED_ROLES.contains(&role)
+}
+
+/// Minimal email shape check shared by POST and PATCH: trim + lowercase, must
+/// contain '@'. Returns the normalized address, or None when invalid.
+fn normalize_email(raw: &str) -> Option<String> {
+    let email = raw.trim().to_lowercase();
+    if email.is_empty() || !email.contains('@') {
+        return None;
+    }
+    Some(email)
+}
+
 #[derive(Deserialize)]
 pub struct CreateUser {
     pub email: String,
@@ -134,15 +152,23 @@ async fn create_user(
     Extension(actor_id): Extension<Uuid>,
     Json(body): Json<CreateUser>,
 ) -> Result<(axum::http::StatusCode, Json<UserRow>), AppError> {
-    let email = body.email.trim().to_lowercase();
-    if !email.contains('@') || body.name.trim().is_empty() {
+    let email = match normalize_email(&body.email) {
+        Some(e) => e,
+        None => {
+            return Err(AppError::new(
+                axum::http::StatusCode::BAD_REQUEST,
+                "valid email and name required",
+            ))
+        }
+    };
+    if body.name.trim().is_empty() {
         return Err(AppError::new(
             axum::http::StatusCode::BAD_REQUEST,
             "valid email and name required",
         ));
     }
     let role = body.role.unwrap_or_else(|| "EMPLOYEE".to_string());
-    if !["ADMIN", "AGENT", "EMPLOYEE"].contains(&role.as_str()) {
+    if !valid_role(&role) {
         return Err(AppError::new(
             axum::http::StatusCode::BAD_REQUEST,
             "role must be ADMIN, AGENT or EMPLOYEE",
@@ -216,6 +242,46 @@ async fn update_user(
         ));
     }
 
+    // PATCH mirrors POST validation: role whitelist + email shape.
+    if let Some(ref r) = body.role {
+        if !valid_role(r) {
+            return Err(AppError::new(
+                axum::http::StatusCode::BAD_REQUEST,
+                "role must be ADMIN, AGENT or EMPLOYEE",
+            ));
+        }
+    }
+    let new_email: Option<String> = match body.email {
+        Some(ref e) => match normalize_email(e) {
+            Some(n) => Some(n),
+            None => {
+                return Err(AppError::new(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "valid email required",
+                ))
+            }
+        },
+        None => None,
+    };
+    // Self-lockout guard: an admin must not demote or disable their own
+    // account (a second admin can still do it).
+    if id == actor_id {
+        if let Some(ref r) = body.role {
+            if r != &existing.role {
+                return Err(AppError::new(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "cannot change your own role",
+                ));
+            }
+        }
+        if body.active == Some(false) {
+            return Err(AppError::new(
+                axum::http::StatusCode::BAD_REQUEST,
+                "cannot deactivate your own account",
+            ));
+        }
+    }
+
     let password_hash = match body.password {
         Some(ref pw) if pw.len() >= 8 => Some(
             hash_password(pw).map_err(|_| {
@@ -245,7 +311,7 @@ async fn update_user(
          WHERE id = $7
          RETURNING id, email, name, role, department, active, created_at",
     )
-    .bind(body.email.as_deref().map(str::trim))
+    .bind(new_email.as_deref())
     .bind(body.name.as_deref().map(str::trim))
     .bind(body.role.as_deref())
     .bind(body.department.as_deref())
@@ -297,4 +363,29 @@ pub async fn role_of(pool: &PgPool, id: Uuid) -> Option<String> {
         .await
         .ok()
         .flatten()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_whitelist_matches_post_validation() {
+        for r in ["ADMIN", "AGENT", "EMPLOYEE"] {
+            assert!(valid_role(r), "missing {r}");
+        }
+        assert!(!valid_role(""));
+        assert!(!valid_role("admin")); // case-sensitive
+        assert!(!valid_role("SUPERADMIN"));
+        assert!(!valid_role(" ADMIN"));
+    }
+
+    #[test]
+    fn email_normalization_trims_lowercases_and_rejects() {
+        assert_eq!(normalize_email("  Admin@Example.COM "), Some("admin@example.com".to_string()));
+        assert_eq!(normalize_email("a@b"), Some("a@b".to_string()));
+        assert_eq!(normalize_email("no-at-sign"), None);
+        assert_eq!(normalize_email("   "), None);
+        assert_eq!(normalize_email(""), None);
+    }
 }

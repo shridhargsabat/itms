@@ -6,7 +6,7 @@
 
 use axum::{
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::HeaderMap,
     response::Json,
     routing::get,
     Router,
@@ -55,16 +55,9 @@ async fn escalate(
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let pool = &state.pool;
+    // wave-1a: same fail-closed + constant-time gate as /intake.
     let expected = std::env::var("INTAKE_TOKEN").unwrap_or_default();
-    if !expected.is_empty() {
-        let presented = headers
-            .get("x-intake-token")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        if presented != expected {
-            return Err(AppError::new(StatusCode::UNAUTHORIZED, "invalid intake token"));
-        }
-    }
+    super::intake::check_intake_token(&headers, &expected)?;
 
     // breached + not yet escalated
     let breached: Vec<(uuid::Uuid, String, String, Option<uuid::Uuid>, String)> = sqlx::query_as(
@@ -138,13 +131,16 @@ async fn escalate(
 
 /// Recompute sla_due_at for a ticket (create / priority change). Returns the
 /// new due time, or None when the ticket is closed (SLA stops).
-pub async fn set_sla_due(
-    pool: &sqlx::PgPool,
+pub async fn set_sla_due<'e, E>(
+    executor: E,
     ticket_id: uuid::Uuid,
     priority: &str,
     status: &str,
     created_at: chrono::DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), sqlx::Error>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+{
     let due = match status {
         "OPEN" | "IN_PROGRESS" => Some(created_at + Duration::hours(sla_hours(priority).unwrap_or(24))),
         _ => None,
@@ -152,7 +148,7 @@ pub async fn set_sla_due(
     sqlx::query("UPDATE tickets SET sla_due_at = $2 WHERE id = $1")
         .bind(ticket_id)
         .bind(due)
-        .execute(pool)
+        .execute(executor)
         .await?;
     Ok(())
 }

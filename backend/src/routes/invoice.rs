@@ -453,15 +453,18 @@ pub async fn list_documents(
 }
 
 /// GET /api/v1/assets/{asset_id}/documents/{doc_id}/download — stream the PDF.
+/// The doc must belong to the asset in the path, otherwise 404 (no cross-asset
+/// reads by guessing document ids).
 pub async fn download_document(
     State(state): State<AppState>,
-    Path((_asset_id, doc_id)): Path<(Uuid, Uuid)>,
+    Path((asset_id, doc_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Response, AppError> {
     let row = sqlx::query_as::<_, AssetDocument>(
         "SELECT id, asset_id, filename, content_type, size_bytes, storage_path, uploaded_by, created_at \
-         FROM asset_documents WHERE id = $1",
+         FROM asset_documents WHERE id = $1 AND asset_id = $2",
     )
     .bind(doc_id)
+    .bind(asset_id)
     .fetch_optional(&state.pool)
     .await?;
     let Some(doc) = row else {
@@ -570,5 +573,26 @@ mod tests {
     fn extract_text_empty_bytes_is_error_not_panic() {
         // Empty bytes should produce a Result::Err (AppError), never panic.
         assert!(extract_text(b"").is_err());
+    }
+
+    #[test]
+    fn asset_document_json_omits_storage_path() {
+        let doc = AssetDocument {
+            id: Uuid::new_v4(),
+            asset_id: Some(Uuid::new_v4()),
+            filename: "invoice.pdf".to_string(),
+            content_type: "application/pdf".to_string(),
+            size_bytes: 1234,
+            storage_path: "/app/uploads/documents/secret.pdf".to_string(),
+            uploaded_by: None,
+            created_at: chrono::Utc::now(),
+        };
+        let v = serde_json::to_value(&doc).unwrap();
+        assert!(v.get("storage_path").is_none());
+        assert!(v.get("storagePath").is_none());
+        assert_eq!(v.get("filename").and_then(|f| f.as_str()), Some("invoice.pdf"));
+        // Deserializing a response-shaped payload (no storage_path) still works.
+        let back: AssetDocument = serde_json::from_value(v).unwrap();
+        assert_eq!(back.filename, "invoice.pdf");
     }
 }

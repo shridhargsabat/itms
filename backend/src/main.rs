@@ -8,6 +8,7 @@ mod routes;
 use axum::http::{HeaderValue, Method};
 use axum::Router;
 use dotenvy::dotenv;
+use std::net::SocketAddr;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
@@ -52,7 +53,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
     tracing::info!("ITMS backend listening on http://0.0.0.0:{port}");
-    axum::serve(listener, app.with_state(state)).await?;
+    // wave-1a: inject ConnectInfo<SocketAddr> (TCP peer addr) so auth rate
+    // limits key on the real peer instead of trusting X-Forwarded-For alone.
+    axum::serve(
+        listener,
+        app.with_state(state)
+            .into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

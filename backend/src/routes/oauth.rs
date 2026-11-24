@@ -315,7 +315,14 @@ pub struct OAuthConfigView {
 }
 
 /// GET /admin/oauth — masked view (secret never leaves the server).
-pub async fn admin_get(State(state): State<super::AppState>) -> Result<Json<OAuthConfigView>, AppError> {
+/// Wave-1a: admin-only, mirroring admin_put (was: any authenticated user).
+pub async fn admin_get(
+    State(state): State<super::AppState>,
+    Extension(role): Extension<String>,
+) -> Result<Json<OAuthConfigView>, AppError> {
+    if role != "ADMIN" {
+        return Err(AppError::new(StatusCode::FORBIDDEN, "admin only"));
+    }
     let cfg = load_config(&state.pool).await?;
     Ok(Json(OAuthConfigView {
         provider: "google",
@@ -384,7 +391,8 @@ pub async fn admin_put(
         binds.push(String::from("__DOMAINS__"));
     }
     if binds.is_empty() {
-        return admin_get(State(state)).await;
+        // role already verified above — forward an ADMIN identity.
+        return admin_get(State(state), Extension("ADMIN".to_string())).await;
     }
     q.push_str(", updated_at = NOW() WHERE id = true");
     let mut qb = sqlx::query(&q);
@@ -396,5 +404,34 @@ pub async fn admin_put(
         }
     }
     qb.execute(&state.pool).await?;
-    admin_get(State(state)).await
+    admin_get(State(state), Extension("ADMIN".to_string())).await
+}
+
+#[cfg(test)]
+mod wave1a_tests {
+    use super::*;
+
+    /// Lazy pool: parses the URL, opens NO connection. The 403 path returns
+    /// before any DB touch, so this test is DB-free.
+    fn test_state() -> super::super::AppState {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://localhost/itms_unit_test")
+            .expect("lazy pool");
+        super::super::AppState {
+            pool,
+            login_attempts: Default::default(),
+            opencode_api_key: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn admin_get_forbids_non_admin_without_touching_db() {
+        for role in ["EMPLOYEE", "AGENT", "", "admin"] {
+            let err = admin_get(State(test_state()), Extension(role.to_string()))
+                .await
+                .unwrap_err();
+            assert_eq!(err.status, StatusCode::FORBIDDEN, "role={role}");
+        }
+    }
 }

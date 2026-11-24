@@ -49,6 +49,12 @@ services:
       # invoice-parse: bearer key for mimo-v2.5 OCR/parsing (OpenCode Go). Must
       # be present in .env or invoice parsing returns "not configured".
       OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY:-}
+      # prod wave-1: demo login is deny-by-default in code; explicit false here
+      # documents intent (the untracked override that carried this is redundant).
+      DEMO_LOGIN_ENABLED: ${DEMO_LOGIN_ENABLED:-false}
+      # prod wave-1: proxies allowed to vouch X-Forwarded-For for rate limiting
+      # (nginx on itms_net + dokploy-traefik). Empty = trust none (peer key).
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       TZ: Asia/Kolkata
     volumes:
       - itms_uploads:/app/uploads
