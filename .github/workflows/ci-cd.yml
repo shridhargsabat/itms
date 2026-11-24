@@ -23,16 +23,22 @@ permissions:
   contents: read
   packages: write
 
+# Supply-chain note: every `uses:` below is pinned to a full commit SHA (with
+# the human-readable tag in a trailing comment) so a moved tag can never
+# change what CI executes. Re-resolve with:
+#   git ls-remote https://github.com/<owner>/<repo>.git 'refs/tags/<tag>'
+# (for annotated tags use the peeled `^{}` commit SHA, not the tag object).
+
 jobs:
   # ── Frontend: install + test + typecheck + production build ──────────────
   frontend-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # Node 22: matches frontend/Dockerfile (node:22-alpine) and local dev.
           # Node 20 breaks vitest workers (undici decompress `.bind` crash).
@@ -62,10 +68,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Cache cargo registry
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: backend
 
@@ -73,6 +79,86 @@ jobs:
         run: |
           cd backend
           cargo check --release
+
+  # ── Frontend: npm audit (high/critical only) ─────────────────────────────
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend - npm audit (high and above)
+        run: |
+          cd frontend
+          npm audit --audit-level=high
+
+  # ── Backend: dependency vulnerability audit ──────────────────────────────
+  # Ignores live in backend/audit.toml (lockfile-only uncompiled crates, each
+  # with justification + expiry). cargo-audit only discovers config at
+  # ./.cargo/audit.toml, so the job stages the committed file there first.
+  cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: backend
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Backend - cargo audit
+        run: |
+          cd backend
+          mkdir -p .cargo
+          cp audit.toml .cargo/audit.toml
+          cargo audit
+
+  # ── Backend: Rust unit tests (no DB required) ────────────────────────────
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: backend
+
+      - name: Backend - cargo test
+        run: |
+          cd backend
+          cargo test
+
+  # ── Backend: clippy lints (warn-level only — warnings never fail) ───────
+  # Deliberately NO `-D warnings`: the tree has pre-existing warnings and the
+  # gate must stay green while they are paid down incrementally.
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: backend
+
+      - name: Backend - cargo clippy (warnings allowed)
+        run: |
+          cd backend
+          cargo clippy --all-targets
 
   # ── Deploy: SSH to the VPS, build+push GHCR images, compose up, smoke ────
   # Only fires on a real push to main (PRs run the two check jobs above, not
@@ -93,7 +179,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     steps:
       - name: Start SSH agent with deploy key
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 

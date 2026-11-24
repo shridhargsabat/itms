@@ -10,7 +10,8 @@ frontend/dev-dist/
 dev-dist/
 
 # Env & secrets
-.env
+.env*
+!.env.example
 
 # Logs
 *.log
