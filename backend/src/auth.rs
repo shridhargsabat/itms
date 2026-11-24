@@ -2,7 +2,7 @@
 
 use argon2::password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
-use rand::RngCore;
+use rand::TryRng;
 use sha2::{Digest, Sha256};
 
 /// Argon2id PHC string, e.g. `$argon2id$v=19$m=19456,t=2,p=1$...`.
@@ -22,7 +22,9 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
 /// 64-char hex bearer token (256 bits of entropy).
 pub fn generate_token() -> String {
     let mut bytes = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    rand::rngs::SysRng
+        .try_fill_bytes(&mut bytes)
+        .expect("OS RNG failure");
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
