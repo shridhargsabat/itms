@@ -59,7 +59,7 @@ export default function Layout() {
 
   const signOut = async () => {
     await logout().catch(() => {});
-    clearSession();
+    await clearSession();
     navigate('/login', { replace: true });
   };
 

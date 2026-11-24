@@ -100,17 +100,19 @@ BACKEND_TAG="$TAG" FRONTEND_TAG="$TAG" \
   up -d --pull always --remove-orphans
 echo "==> Deployed ${PROJECT} with backend+frontend ${TAG}"
 
-# ── 6. Smoke test ───────────────────────────────────────────────────────
+# ── 6. Smoke test (FAIL-CLOSED: any failure exits nonzero) ─────────────────
 echo "==> Waiting for backend health..."
 # /healthz answers HTTP 200 with a PLAIN 'ok' body (text/plain, not JSON).
+HEALTH_OK=""
 for i in $(seq 1 30); do
   if [ "$(docker exec "$PROJECT-backend" wget -qO- http://localhost:8080/api/v1/healthz 2>/dev/null)" = "ok" ]; then
     echo "==> Healthz OK (attempt $i)"
+    HEALTH_OK=1
     break
   fi
-  [ "$i" = 30 ] && { echo "!! healthz never became ready — backend may be unhealthy" >&2; }
   sleep 2
 done
+[ -n "$HEALTH_OK" ] || { echo "FATAL: healthz never became ready after 30 attempts — backend unhealthy, failing deploy" >&2; exit 1; }
 
 echo "==> Smoke: /api/v1/dashboard/metrics ..."
 # No host port is exposed, so probe from inside the backend container. HTTP 200
@@ -119,7 +121,8 @@ METRICS_CODE="$(docker exec "$PROJECT-backend" wget -S -O /dev/null http://local
 if [ "$METRICS_CODE" = "200" ] || [ "$METRICS_CODE" = "401" ]; then
   echo "==> metrics endpoint OK (HTTP ${METRICS_CODE})"
 else
-  echo "!! metrics endpoint smoke failed (HTTP ${METRICS_CODE:-none})" >&2
+  echo "FATAL: metrics endpoint smoke failed (HTTP ${METRICS_CODE:-none}) — failing deploy" >&2
+  exit 1
 fi
 
 # ── 7. Freshness guard (non-blocking, loud warning) ─────────────────────

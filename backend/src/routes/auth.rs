@@ -21,6 +21,63 @@ use crate::routes::AppError;
 
 pub const SESSION_TTL: &str = "7 days";
 
+/// Wave-2a: transitional httpOnly session cookie. Login/demo/SSO-exchange set
+/// it AND still return the Bearer token; the guard accepts either (cookie OR
+/// Bearer) so API clients keep working while browsers migrate to the cookie.
+pub const SESSION_COOKIE: &str = "itms_session";
+/// 7 days in seconds — matches SESSION_TTL.
+pub const SESSION_COOKIE_MAX_AGE_SECS: i64 = 7 * 24 * 3600;
+
+/// `Set-Cookie` value carrying the session token. Always Secure (prod is
+/// https-only; plain-http dev keeps working via the Bearer fallback).
+pub fn session_set_cookie(token: &str) -> String {
+    format!(
+        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age={SESSION_COOKIE_MAX_AGE_SECS}"
+    )
+}
+
+/// `Set-Cookie` value that clears the session cookie (logout).
+pub fn session_clear_cookie() -> String {
+    format!("{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0")
+}
+
+/// Parse a named cookie out of the `Cookie` header(s). No new deps — the
+/// `cookie` crate isn't worth it for one lookup.
+pub(crate) fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    for value in headers.get_all(header::COOKIE) {
+        let s = value.to_str().ok()?;
+        for part in s.split(';') {
+            if let Some(v) = part.trim().strip_prefix(&prefix) {
+                if !v.is_empty() {
+                    // cookies are token-safe here (hex); stop at any comma from
+                    // a joined multi-header value.
+                    let v = v.split(',').next().unwrap_or("").trim();
+                    if !v.is_empty() {
+                        return Some(v.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Build a single-`Set-Cookie` HeaderMap for tuple responses.
+pub(crate) fn set_cookie_headers(value: String) -> Result<HeaderMap, AppError> {
+    let mut h = HeaderMap::new();
+    h.insert(
+        header::SET_COOKIE,
+        axum::http::HeaderValue::from_str(&value).map_err(|_| {
+            AppError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to build session cookie",
+            )
+        })?,
+    );
+    Ok(h)
+}
+
 #[derive(Deserialize)]
 pub struct LoginRequest {
     pub email: String,
@@ -38,12 +95,14 @@ pub struct AuthUser {
 }
 
 /// POST /auth/login — verify credentials, mint an opaque session token.
+/// Wave-2a: also sets the httpOnly `itms_session` cookie (Bearer still
+/// returned for transitional API clients).
 pub async fn login(
     State(state): State<AppState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<LoginRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<(HeaderMap, Json<serde_json::Value>), AppError> {
     let ip = client_ip(Some(peer), &headers);
     let email = body.email.trim().to_lowercase();
     let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String, Option<String>, bool)>(
@@ -98,24 +157,31 @@ pub async fn login(
     .fetch_one(&state.pool)
     .await?;
 
-    Ok(Json(json!({
-        "token": token,
-        "expires_at": expires_at,
-        "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme },
-    })))
+    Ok((
+        set_cookie_headers(session_set_cookie(&token))?,
+        Json(json!({
+            "token": token,
+            "expires_at": expires_at,
+            "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme },
+        })),
+    ))
 }
 
-/// POST /auth/logout — revoke the presented token (server-side, real logout).
+/// POST /auth/logout — revoke the presented session (cookie OR Bearer) and
+/// clear the cookie.
 pub async fn logout(
     State(state): State<AppState>,
     headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let token = bearer_token(&headers)?;
+) -> Result<(HeaderMap, Json<serde_json::Value>), AppError> {
+    let token = session_token(&headers)?;
     sqlx::query("DELETE FROM sessions WHERE token_hash = $1")
         .bind(hash_token(&token))
         .execute(&state.pool)
         .await?;
-    Ok(Json(json!({ "ok": true })))
+    Ok((
+        set_cookie_headers(session_clear_cookie())?,
+        Json(json!({ "ok": true })),
+    ))
 }
 
 /// GET /auth/me — current session user.
@@ -230,8 +296,18 @@ pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<String, AppError> {   
     Ok(token.to_string())
 }
 
+/// Wave-2a transitional session lookup: Bearer first, then the httpOnly
+/// `itms_session` cookie. Keeps API clients working while browsers migrate.
+pub(crate) fn session_token(headers: &HeaderMap) -> Result<String, AppError> {
+    if let Ok(t) = bearer_token(headers) {
+        return Ok(t);
+    }
+    cookie_value(headers, SESSION_COOKIE)
+        .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "authentication required"))
+}
+
 async fn current_user(pool: &PgPool, headers: &HeaderMap) -> Result<AuthUser, AppError> {
-    let token = bearer_token(headers)?;
+    let token = session_token(headers)?;
     sqlx::query_as::<_, AuthUser>(
         "SELECT u.id, u.email, u.name, u.role, u.department, u.theme
          FROM sessions s
@@ -433,7 +509,7 @@ pub async fn demo_login(
     State(state): State<AppState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<(HeaderMap, Json<serde_json::Value>), AppError> {
     let ip = client_ip(Some(peer), &headers);
     rate_limited_public(&state, &format!("demo:{ip}"))?;
     // wave-1a: default-DENY — enabled ONLY when the env var is exactly "true".
@@ -456,11 +532,14 @@ pub async fn demo_login(
         return Err(AppError::new(StatusCode::NOT_FOUND, "demo login disabled"));
     }
     let (token, expires_at) = issue_session(&state.pool, id).await?;
-    Ok(Json(serde_json::json!({
-        "token": token,
-        "expires_at": expires_at,
-        "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme }
-    })))
+    Ok((
+        set_cookie_headers(session_set_cookie(&token))?,
+        Json(serde_json::json!({
+            "token": token,
+            "expires_at": expires_at,
+            "user": { "id": id, "email": email, "name": name, "role": role, "department": department, "theme": theme }
+        })),
+    ))
 }
 
 #[cfg(test)]
@@ -783,5 +862,90 @@ mod wave1a_tests {
             client_ip_with_trust(Some(peer), &h, "10.0.0.0/8"),
             "203.0.113.9"
         );
+    }
+}
+
+#[cfg(test)]
+mod wave2a_tests {
+    use super::*;
+
+    fn headers_with_cookie(cookie: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(header::COOKIE, cookie.parse().unwrap());
+        h
+    }
+
+    fn headers_with_bearer(token: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(
+            header::AUTHORIZATION,
+            format!("Bearer {token}").parse().unwrap(),
+        );
+        h
+    }
+
+    #[test]
+    fn session_cookie_is_httponly_lax_secure_with_path_and_ttl() {
+        let v = session_set_cookie("abc123");
+        assert!(v.starts_with("itms_session=abc123;"), "carries token: {v}");
+        for flag in ["Path=/", "HttpOnly", "SameSite=Lax", "Secure", "Max-Age=604800"] {
+            assert!(v.contains(flag), "missing {flag}: {v}");
+        }
+    }
+
+    #[test]
+    fn session_clear_cookie_empties_with_zero_max_age() {
+        let v = session_clear_cookie();
+        assert!(v.starts_with("itms_session=;"), "empties value: {v}");
+        assert!(v.contains("Max-Age=0"), "zero max-age: {v}");
+        for flag in ["Path=/", "HttpOnly", "SameSite=Lax", "Secure"] {
+            assert!(v.contains(flag), "missing {flag}: {v}");
+        }
+    }
+
+    #[test]
+    fn cookie_value_parses_single_and_multi_cookie_headers() {
+        assert_eq!(
+            cookie_value(&headers_with_cookie("itms_session=tok1"), SESSION_COOKIE),
+            Some("tok1".to_string())
+        );
+        // surrounded by other cookies + whitespace
+        assert_eq!(
+            cookie_value(
+                &headers_with_cookie("a=1; itms_session=tok2; b=3"),
+                SESSION_COOKIE
+            ),
+            Some("tok2".to_string())
+        );
+        // missing / empty → None (empty must not become a session lookup)
+        assert_eq!(cookie_value(&headers_with_cookie("a=1; b=2"), SESSION_COOKIE), None);
+        assert_eq!(cookie_value(&headers_with_cookie("itms_session="), SESSION_COOKIE), None);
+        assert_eq!(cookie_value(&HeaderMap::new(), SESSION_COOKIE), None);
+        // prefix-sibling must not match (itms_session2 ≠ itms_session)
+        assert_eq!(
+            cookie_value(&headers_with_cookie("itms_session2=x"), SESSION_COOKIE),
+            None
+        );
+    }
+
+    #[test]
+    fn session_token_prefers_bearer_then_cookie_then_401() {
+        // bearer wins when both present
+        let mut h = headers_with_bearer("bearer-tok");
+        h.insert(header::COOKIE, "itms_session=cookie-tok".parse().unwrap());
+        assert_eq!(session_token(&h).ok().unwrap(), "bearer-tok");
+        // cookie fallback
+        assert_eq!(
+            session_token(&headers_with_cookie("itms_session=cookie-tok")).ok().unwrap(),
+            "cookie-tok"
+        );
+        // neither → 401
+        let err = session_token(&HeaderMap::new()).unwrap_err();
+        assert_eq!(err.status, StatusCode::UNAUTHORIZED);
+        // malformed Authorization still falls back to a valid cookie
+        let mut h = HeaderMap::new();
+        h.insert(header::AUTHORIZATION, "Basic xyz".parse().unwrap());
+        h.insert(header::COOKIE, "itms_session=cookie-tok".parse().unwrap());
+        assert_eq!(session_token(&h).ok().unwrap(), "cookie-tok");
     }
 }

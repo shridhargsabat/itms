@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { changePassword } from '@/api/client';
 import { inputCls, labelCls } from '@/lib/utils';
@@ -12,6 +12,9 @@ export default function Account() {
   const [pw2, setPw2] = useState('');
   const [err, setErr] = useState('');
   const [ok, setOk] = useState(false);
+  // Wave 2-C: onSuccess already clears all three fields; the unmount cleanup
+  // pins it for every exit path (navigation mid-typing, etc.).
+  useEffect(() => () => { setCur(''); setPw(''); setPw2(''); }, []);
   const mutation = useMutation({
     mutationFn: () => changePassword({ current_password: cur, new_password: pw }),
     onSuccess: () => {

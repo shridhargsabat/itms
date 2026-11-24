@@ -8,7 +8,6 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
-use sqlx::PgPool;
 use std::net::SocketAddr;
 use uuid::Uuid;
 

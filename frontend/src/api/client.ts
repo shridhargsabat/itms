@@ -60,6 +60,46 @@ import type {
 
 const TOKEN_KEY = 'itms_token';
 const USER_KEY = 'itms_user';
+// Wave-2a: client-side session lifetime — 30-min idle timeout + absolute cap.
+// The server TTL (7d) is the backstop; these bound a stolen/forgotten tab.
+const SESSION_STARTED_KEY = 'itms_session_started_at';
+const LAST_ACTIVITY_KEY = 'itms_last_activity';
+export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const ABSOLUTE_SESSION_MS = 12 * 60 * 60 * 1000;
+
+export type SessionFreshness = 'ok' | 'idle' | 'absolute';
+
+/**
+ * Pure session-lifetime evaluator (unit-tested, no storage access).
+ * Missing/unparseable stamps (pre-wave-2a sessions) get grace — the caller
+ * initializes them instead of nuking a live session on upgrade.
+ */
+export function evaluateSessionFreshness(
+  startedAt: number | null,
+  lastActivity: number | null,
+  now: number,
+): SessionFreshness {
+  if (startedAt == null || lastActivity == null) return 'ok';
+  if (now - startedAt > ABSOLUTE_SESSION_MS) return 'absolute';
+  if (now - lastActivity > IDLE_TIMEOUT_MS) return 'idle';
+  return 'ok';
+}
+
+function readTs(key: string): number | null {
+  const raw = localStorage.getItem(key);
+  if (raw == null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function stampSession(now: number) {
+  localStorage.setItem(SESSION_STARTED_KEY, String(now));
+  localStorage.setItem(LAST_ACTIVITY_KEY, String(now));
+}
+
+function touchActivity(now: number) {
+  localStorage.setItem(LAST_ACTIVITY_KEY, String(now));
+}
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -68,19 +108,37 @@ export function getToken(): string | null {
 export function setSession(token: string, user: AuthUser) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  stampSession(Date.now());
 }
 
-export function clearSession() {
+/**
+ * Wave-2a: async so callers can AWAIT the api-* cache purge before navigating.
+ * Storage is cleared synchronously (token gone immediately); only the
+ * CacheStorage purge is awaited, retried once, then warned on failure.
+ */
+export async function clearSession(): Promise<void> {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(SESSION_STARTED_KEY);
+  localStorage.removeItem(LAST_ACTIVITY_KEY);
   // #92: purge cached API responses (api-fresh/api-catalog hold authed data —
   // tickets, assets, CMDB, audits) so nothing sensitive survives logout.
-  // Fire-and-forget; CacheStorage can stall on iOS (see apiFetch note).
   if ('caches' in window) {
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('api-')).map((k) => caches.delete(k))))
-      .catch(() => {});
+    const purge = () =>
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(keys.filter((k) => k.startsWith('api-')).map((k) => caches.delete(k))),
+        );
+    try {
+      await purge();
+    } catch {
+      try {
+        await purge(); // retry once — CacheStorage can stall transiently (iOS)
+      } catch (err) {
+        console.warn('itms: api cache purge failed after retry', err);
+      }
+    }
   }
 }
 
@@ -102,6 +160,54 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Session-establishing / public auth paths: exempt from idle/absolute
+ * enforcement (a stale attached token must not nuke a fresh login, a logout
+ * must still revoke server-side, public reads carry no session to expire).
+ * NOTE: /auth/me is deliberately NOT exempt — it's the RequireAuth gate.
+ */
+function isSessionBootstrapPath(path: string): boolean {
+  return (
+    path.startsWith('/auth/login') ||
+    path.startsWith('/auth/demo') ||
+    path.startsWith('/auth/logout') ||
+    path.startsWith('/auth/oauth') ||
+    path.startsWith('/auth/forgot-password') ||
+    path.startsWith('/auth/reset-password')
+  );
+}
+
+/**
+ * Wave-2a lifetime gate: throws 401 (after awaiting the purge + bouncing to
+ * /login) when the session blew the idle timeout or absolute cap. Happy path
+ * just stamps activity. Missing stamps (pre-wave-2a sessions) initialize
+ * instead of nuking.
+ */
+async function enforceSessionFreshness(): Promise<void> {
+  const now = Date.now();
+  const started = readTs(SESSION_STARTED_KEY);
+  const last = readTs(LAST_ACTIVITY_KEY);
+  if (started == null || last == null) {
+    stampSession(now);
+    return;
+  }
+  const freshness = evaluateSessionFreshness(started, last, now);
+  if (freshness === 'ok') {
+    touchActivity(now);
+    return;
+  }
+  await clearSession();
+  if (!window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login';
+  }
+  throw new ApiError(
+    401,
+    freshness === 'idle'
+      ? 'Session idle too long — please sign in again'
+      : 'Session expired — please sign in again',
+  );
+}
+
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await apiFetchRaw(path, init);
   // 204 No Content (e.g. DELETE) has no body — don't try to parse it.
@@ -119,6 +225,15 @@ async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Respon
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
+  // Wave-2a: did THIS request actually carry credentials? The 401 self-nuke
+  // and the idle/absolute enforcement below apply only to authed requests —
+  // public auth reads (oauth status, forgot-password) must never wipe.
+  const sentAuth = headers.has('Authorization');
+
+  // Wave-2a client-side lifetime: enforce on authed, non-bootstrap requests.
+  if (sentAuth && !isSessionBootstrapPath(path)) {
+    await enforceSessionFreshness();
+  }
 
   // GETs hang forever on iOS when the service worker's CacheStorage stalls
   // (permanent loading skeletons). Never wait longer than 20s: a timeout
@@ -129,10 +244,12 @@ async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Respon
   const signal =
     method === 'GET' ? (init.signal ?? AbortSignal.timeout(20_000)) : init.signal;
 
-  const res = await fetch(`/api/v1${path}`, { ...init, headers, signal });
+  // Wave-2a: always send cookies — the httpOnly itms_session rides along
+  // while the Bearer header keeps transitional API clients working.
+  const res = await fetch(`/api/v1${path}`, { ...init, headers, signal, credentials: 'include' });
 
-  if (res.status === 401 && !path.startsWith('/auth/login')) {
-    clearSession();
+  if (res.status === 401 && sentAuth && !path.startsWith('/auth/login')) {
+    await clearSession();
     if (!window.location.pathname.startsWith('/login')) {
       window.location.href = '/login';
     }
@@ -226,6 +343,16 @@ export const changePassword = (body: { current_password: string; new_password: s
 
 export const logout = () =>
   apiFetch<{ ok: boolean }>('/auth/logout', { method: 'POST' }).catch(() => ({ ok: false }));
+
+/**
+ * Wave-2a full sign-out: revoke server-side, then AWAIT the local api-* cache
+ * purge (retry once, warn on failure) before resolving. Callers navigate
+ * after this resolves so no authed bytes survive the transition.
+ */
+export async function signOut(): Promise<void> {
+  await logout().catch(() => {});
+  await clearSession();
+}
 
 export const me = () => apiFetch<AuthUser>('/auth/me');
 
@@ -353,15 +480,19 @@ export const parseInvoicePdf = async (file: File) => {
   const form = new FormData();
   form.append('file', file);
   const token = getToken();
+  if (token) await enforceSessionFreshness();
   const res = await fetch('/api/v1/assets/parse-invoice', {
     method: 'POST',
     body: form,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
   });
   if (res.status === 401) {
-    clearSession();
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
+    if (token) {
+      await clearSession();
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
     }
     throw new ApiError(401, 'Session expired — please sign in again');
   }
@@ -631,14 +762,18 @@ export const uploadTicketAttachment = async (ticketId: string, file: File) => {
   // FormData needs the browser-set multipart boundary — bypass apiFetchRaw
   // entirely (it forces a JSON Content-Type on any body).
   const token = localStorage.getItem('itms_token');
+  if (token) await enforceSessionFreshness();
   const res = await fetch(`/api/v1/tickets/${ticketId}/attachments`, {
     method: 'POST',
     body: form,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
   });
   if (res.status === 401) {
-    clearSession();
-    if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+    if (token) {
+      await clearSession();
+      if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+    }
     throw new ApiError(401, 'Session expired — please sign in again');
   }
   if (!res.ok) {
@@ -653,12 +788,16 @@ export const deleteTicketAttachment = (ticketId: string, attachmentId: string) =
 
 export const downloadTicketAttachment = async (attachmentId: string) => {
   const token = localStorage.getItem('itms_token');
+  if (token) await enforceSessionFreshness();
   const res = await fetch(`/api/v1/attachments/${attachmentId}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
   });
   if (res.status === 401) {
-    clearSession();
-    if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+    if (token) {
+      await clearSession();
+      if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
+    }
     throw new ApiError(401, 'Session expired — please sign in again');
   }
   if (!res.ok) {
@@ -742,6 +881,12 @@ export const listAssetMoves = (assetId: string) => apiFetch<AssetMove[]>(`/asset
 
 // ── #53 Google SSO ──────────────────────────────────────────────────────────
 export const getOAuthStatus = () => apiFetch<OAuthStatus>('/auth/oauth/status');
+/** Wave-2a: redeem the callback's one-time code for a session (single-use, 5-min TTL). */
+export const exchangeOAuthCode = (code: string) =>
+  apiFetch<LoginResponse>('/auth/oauth/exchange', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 export const getOAuthAdmin = () => apiFetch<OAuthConfig>('/admin/oauth');
 export const updateOAuthAdmin = (input: OAuthConfigUpdate) =>
   apiFetch<OAuthConfig>('/admin/oauth', { method: 'PUT', body: JSON.stringify(input) });

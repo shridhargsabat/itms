@@ -5,15 +5,16 @@ import '@fontsource/jetbrains-mono/500.css';
 import '@fontsource/jetbrains-mono/700.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/space-grotesk/700.css';
-import { lazy, StrictMode, Suspense, type ReactNode } from 'react';
+import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { LoaderCircle } from 'lucide-react';
-import { useEffect } from 'react';
 import './index.css';
 import Layout from '@/components/Layout';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
+import { RequireAuth } from '@/components/RequireAuth';
+import { initGlobalErrorReporting } from '@/lib/errorBeacon';
 // Route-level code splitting: each view is its own chunk, loaded on first
 // navigation (Vite emits per-lazy-import chunks + a vendor chunk below).
 const PasswordFlow = lazy(() => import('@/views/PasswordFlow'));
@@ -38,75 +39,10 @@ const Notifications = lazy(() => import('@/views/Notifications'));
 const Requests = lazy(() => import('@/views/Requests'));
 const Licenses = lazy(() => import('@/views/Licenses'));
 import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
-import { ApiError, clearSession, getCachedUser, getToken, me } from '@/api/client';
-import { hydrateThemeFromUser } from '@/lib/theme';
 
 captureInstallPrompt();
 initSwUpdateHandling();
-
-/**
- * PWA Bug #8 (Scanner P-563): lightweight global client-error sink.
- * Records the last error in sessionStorage (surfaced on the Offline view /
- * diagnostics) and beacons it when VITE_ERROR_BEACON_URL is configured.
- * Chunk-load failures (stale precache after a deploy) trigger a single
- * auto-reload so the fresh SW + bundle take over instead of a white screen.
- */
-function reportClientError(source: string, err: unknown): void {
-  try {
-    const message =
-      err instanceof Error
-        ? err.message
-        : typeof err === 'string'
-          ? err
-          : (() => {
-              try {
-                return JSON.stringify(err) ?? String(err);
-              } catch {
-                return String(err);
-              }
-            })();
-    const entry = JSON.stringify({
-      source,
-      message,
-      at: new Date().toISOString(),
-      url: window.location.href,
-    });
-    try {
-      sessionStorage.setItem('itms_last_error', entry);
-    } catch {
-      /* storage unavailable (private mode) — ignore */
-    }
-    const endpoint = (import.meta.env as Record<string, string | undefined>)[
-      'VITE_ERROR_BEACON_URL'
-    ];
-    if (endpoint && navigator.sendBeacon) {
-      try {
-        navigator.sendBeacon(endpoint, new Blob([entry], { type: 'application/json' }));
-      } catch {
-        /* beacon failed — ignore */
-      }
-    }
-    if (/dynamically imported|dynamic import|Loading chunk|Failed to fetch/i.test(message)) {
-      try {
-        if (!sessionStorage.getItem('itms_chunk_reload')) {
-          sessionStorage.setItem('itms_chunk_reload', '1');
-          window.location.reload();
-        }
-      } catch {
-        /* storage unavailable — ignore */
-      }
-    }
-  } catch {
-    /* never throw from the error sink itself */
-  }
-}
-
-window.addEventListener('error', (event) => {
-  reportClientError('error', event.error ?? event.message);
-});
-window.addEventListener('unhandledrejection', (event) => {
-  reportClientError('unhandledrejection', event.reason);
-});
+initGlobalErrorReporting();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -116,45 +52,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-/** Real auth gate: token present AND valid against /auth/me.
- *  Offline (network failure) falls back to the cached session so the SWR
- *  data cache still renders; only a hard 401 bounces to /login. */
-function RequireAuth({ children }: { children: ReactNode }) {
-  const token = getToken();
-  const cached = getCachedUser();
-  const location = useLocation();
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['me'],
-    queryFn: me,
-    enabled: !!token,
-    retry: false,
-  });
-
-  // Theme manager: the authenticated user's server pref is authoritative —
-  // every app load re-syncs (device B picks up device A's theme change).
-  useEffect(() => {
-    if (data) hydrateThemeFromUser(data);
-  }, [data]);
-
-  if (!token) return <Navigate to="/login" replace />;
-  if (isLoading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-base">
-        <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
-      </div>
-    );
-  }
-  if (isError) {
-    const real401 = error instanceof ApiError && error.status === 401;
-    if (!real401 && cached) {
-      return <>{children}</>; // offline — cached session, cached data
-    }
-    clearSession();
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  }
-  return <>{children}</>;
-}
 
 /** Shown while a lazy route chunk downloads (first visit to a view). */
 function RouteFallback() {

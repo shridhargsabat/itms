@@ -45,7 +45,7 @@ docker compose exec backend /usr/local/bin/seed   # demo data
 
 ## Project management
 
-Issues and milestones live here on GitHub. Live demo: https://itms.ai-automation-hub.tech (seeded demo data, all demo logins use password `demo1234`).
+Issues and milestones live here on GitHub. Live demo: https://itms.ai-automation-hub.tech (seeded demo data, demo logins use credentials that are provisioned out-of-band and rotated).
 
 ## License
 

@@ -35,6 +35,11 @@ export function useLogin(): UseLoginResult {
     if (err === 'sso_failed') setFlash('SSO sign-in failed — try again or use your password.');
   }, []);
 
+  // Wave 2-C: never leave the password in memory — cleared on unmount (the
+  // component is gone after a successful login anyway, but the cleanup pins
+  // it for every exit path) and in onSuccess below.
+  useEffect(() => () => { setPassword(''); }, []);
+
   const navigateHome = () => {
     if ('startViewTransition' in document) {
       document.startViewTransition(() => navigate('/', { replace: true }));
@@ -50,6 +55,7 @@ export function useLogin(): UseLoginResult {
       setSession(res.token, res.user);
       // Server pref wins (cross-device sync)
       hydrateThemeFromUser(res.user);
+      setPassword(''); // Wave 2-C: drop the credential from memory on success
       navigateHome();
     },
   });

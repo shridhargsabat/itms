@@ -22,6 +22,7 @@ pub mod requests;
 pub mod tickets;
 pub mod users;
 
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::middleware;
 use axum::response::{IntoResponse, Response};
@@ -97,16 +98,32 @@ pub fn api_router(state: AppState) -> Router<AppState> {
         // #53 Google SSO flow — no session needed (pre-login)
         .route("/auth/oauth/status", get(oauth::status))
         .route("/auth/oauth/start", get(oauth::start))
-        .route("/auth/oauth/callback", get(oauth::callback));
+        .route("/auth/oauth/callback", get(oauth::callback))
+        // wave-2a: single-use code redemption (token never in URL)
+        .route("/auth/oauth/exchange", post(oauth::exchange));
 
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
+        .route("/readyz", get(readyz))
         .route("/auth/login", post(auth::login))
         .route("/auth/forgot-password", post(password::forgot_password))
         .route("/auth/reset-password", post(password::reset_password))
         .route("/auth/demo", post(auth::demo_login))
         .merge(protected)
         .merge(public)
+}
+
+/// wave-2b: GET /readyz — readiness probe. /healthz stays the cheap liveness
+/// check (no I/O); /readyz additionally proves a live DB connection via
+/// SELECT 1 so the orchestrator only routes traffic to a serving backend.
+async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
+    match sqlx::query("SELECT 1").execute(&state.pool).await {
+        Ok(_) => (StatusCode::OK, "ready"),
+        Err(e) => {
+            tracing::warn!("readyz: db probe failed: {e}");
+            (StatusCode::SERVICE_UNAVAILABLE, "not ready")
+        }
+    }
 }
 
 /// Uniform JSON error for the whole API: `{"error": "..."}`.
