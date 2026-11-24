@@ -104,3 +104,42 @@ describe('liquid glass tokens (task 3)', () => {
     expect(css).toContain('#0066D6');
   });
 });
+
+describe('themed scrollbars (tokens)', () => {
+  const css = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), './index.css'),
+    'utf8',
+  );
+  const SCOPES = [
+    ':root',
+    '.dark',
+    '.ledgerly-dark',
+    '.ledgerly-light',
+    '.theme-light',
+    '.theme-paper',
+    '.theme-console',
+    '.theme-bold',
+    '.theme-shell',
+    '.theme-terminal',
+    '.theme-clarity',
+    '.theme-clarity-dark',
+  ];
+
+  it('defines thumb + hover vars in every theme scope', () => {
+    SCOPES.forEach((s) => {
+      const re = new RegExp(`${s.replace(/[.:]/g, (c) => `\\${c}`)}\\s*{[^}]*--t-scroll-thumb:`, 's');
+      expect(css, `missing --t-scroll-thumb in ${s}`).toMatch(re);
+      const reHover = new RegExp(
+        `${s.replace(/[.:]/g, (c) => `\\${c}`)}\\s*{[^}]*--t-scroll-thumb-hover:`, 's',
+      );
+      expect(css, `missing --t-scroll-thumb-hover in ${s}`).toMatch(reHover);
+    });
+  });
+
+  it('uses translucent glass values for the liquid-glass themes', () => {
+    expect(css).toContain('rgb(15 23 42 / 0.28)');
+    expect(css).toContain('rgb(15 23 42 / 0.45)');
+    expect(css).toContain('rgb(255 255 255 / 0.22)');
+    expect(css).toContain('rgb(255 255 255 / 0.38)');
+  });
+});
