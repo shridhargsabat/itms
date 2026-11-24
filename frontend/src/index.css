@@ -1071,6 +1071,64 @@
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.30);
 }
 
+/* ---------- Themed scrollbars: tokens (additive-only) ----------
+   Separate-rule idiom: legacy blocks above are never edited, so these
+   rules re-declare each scope. Theme classes live on <html> (= :root),
+   so at equal specificity the later rule wins — :root first, overrides
+   after. Glass themes = translucent overlay pills; opaque themes =
+   solid pills sampled from their own edge2/muted tokens.
+   POSITION: must stay BEFORE the Task 6 block below — the R9 invariant
+   tests (GlassPrimitives.test.tsx, CMDBGlass.test.tsx) forbid affirmative
+   .theme-*/.ledgerly-* selectors anywhere past that marker. */
+:root {
+  --t-scroll-thumb: rgb(15 23 42 / 0.28);
+  --t-scroll-thumb-hover: rgb(15 23 42 / 0.45);
+}
+.dark {
+  --t-scroll-thumb: rgb(255 255 255 / 0.22);
+  --t-scroll-thumb-hover: rgb(255 255 255 / 0.38);
+}
+.theme-light {
+  --t-scroll-thumb: rgb(15 23 42 / 0.28);
+  --t-scroll-thumb-hover: rgb(15 23 42 / 0.45);
+}
+.ledgerly-dark {
+  --t-scroll-thumb: #44403a;
+  --t-scroll-thumb-hover: #98938a;
+}
+.ledgerly-light {
+  --t-scroll-thumb: #d8d4c9;
+  --t-scroll-thumb-hover: #6f6a61;
+}
+.theme-paper {
+  --t-scroll-thumb: #cfc9bb;
+  --t-scroll-thumb-hover: #6f6a61;
+}
+.theme-console {
+  --t-scroll-thumb: #35353e;
+  --t-scroll-thumb-hover: #8b8b93;
+}
+.theme-bold {
+  --t-scroll-thumb: #4a3f66;
+  --t-scroll-thumb-hover: #a79fc0;
+}
+.theme-shell {
+  --t-scroll-thumb: #cbd5e1;
+  --t-scroll-thumb-hover: #5b6a82;
+}
+.theme-terminal {
+  --t-scroll-thumb: #2e4439;
+  --t-scroll-thumb-hover: #8ba89a;
+}
+.theme-clarity {
+  --t-scroll-thumb: #cbd3dc;
+  --t-scroll-thumb-hover: #667085;
+}
+.theme-clarity-dark {
+  --t-scroll-thumb: #333d49;
+  --t-scroll-thumb-hover: #929dac;
+}
+
 /* ---------- Task 6: glass badge overrides — Apple semantic tints (appended) --
    Glass scope only: day rules ride the light guard chain, night rules the
    dark guard chain (copied verbatim from the Task 4/5 selectors above). The
@@ -1229,61 +1287,6 @@
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) {
   --t-accent: #0A84FF;
   --t-accent-strong: #409CFF;
-}
-
-/* ---------- Themed scrollbars: tokens (additive-only) ----------
-   Separate-rule idiom: legacy blocks above are never edited, so these
-   rules re-declare each scope. Theme classes live on <html> (= :root),
-   so at equal specificity the later rule wins — :root first, overrides
-   after. Glass themes = translucent overlay pills; opaque themes =
-   solid pills sampled from their own edge2/muted tokens. */
-:root {
-  --t-scroll-thumb: rgb(15 23 42 / 0.28);
-  --t-scroll-thumb-hover: rgb(15 23 42 / 0.45);
-}
-.dark {
-  --t-scroll-thumb: rgb(255 255 255 / 0.22);
-  --t-scroll-thumb-hover: rgb(255 255 255 / 0.38);
-}
-.theme-light {
-  --t-scroll-thumb: rgb(15 23 42 / 0.28);
-  --t-scroll-thumb-hover: rgb(15 23 42 / 0.45);
-}
-.ledgerly-dark {
-  --t-scroll-thumb: #44403a;
-  --t-scroll-thumb-hover: #98938a;
-}
-.ledgerly-light {
-  --t-scroll-thumb: #d8d4c9;
-  --t-scroll-thumb-hover: #6f6a61;
-}
-.theme-paper {
-  --t-scroll-thumb: #cfc9bb;
-  --t-scroll-thumb-hover: #6f6a61;
-}
-.theme-console {
-  --t-scroll-thumb: #35353e;
-  --t-scroll-thumb-hover: #8b8b93;
-}
-.theme-bold {
-  --t-scroll-thumb: #4a3f66;
-  --t-scroll-thumb-hover: #a79fc0;
-}
-.theme-shell {
-  --t-scroll-thumb: #cbd5e1;
-  --t-scroll-thumb-hover: #5b6a82;
-}
-.theme-terminal {
-  --t-scroll-thumb: #2e4439;
-  --t-scroll-thumb-hover: #8ba89a;
-}
-.theme-clarity {
-  --t-scroll-thumb: #cbd3dc;
-  --t-scroll-thumb-hover: #667085;
-}
-.theme-clarity-dark {
-  --t-scroll-thumb: #333d49;
-  --t-scroll-thumb-hover: #929dac;
 }
 
 /* ---------- Themed scrollbars: global rules ----------
