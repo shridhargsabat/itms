@@ -60,6 +60,15 @@ import type {
 
 const TOKEN_KEY = 'itms_token';
 const USER_KEY = 'itms_user';
+// Wave-2b: Bearer token lives in module memory only (CodeQL
+// js/clear-text-storage-of-sensitive-data). The httpOnly `itms_session`
+// cookie (credentials: 'include' on every request) authenticates reloads
+// and new tabs; the memory token covers the Authorization header for the
+// current tab lifetime only.
+let memoryToken: string | null = null;
+
+// One-way purge of pre-wave-2b stored Bearers. Idempotent; harmless forever.
+localStorage.removeItem(TOKEN_KEY);
 // Wave-2a: client-side session lifetime — 30-min idle timeout + absolute cap.
 // The server TTL (7d) is the backstop; these bound a stolen/forgotten tab.
 const SESSION_STARTED_KEY = 'itms_session_started_at';
@@ -102,11 +111,14 @@ function touchActivity(now: number) {
 }
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return memoryToken;
 }
 
 export function setSession(token: string, user: AuthUser) {
-  localStorage.setItem(TOKEN_KEY, token);
+  memoryToken = token;
+  // USER_KEY stays in localStorage: non-secret profile cache for offline
+  // PWA + sync role gating (code-scanning #3, accepted risk).
+  localStorage.removeItem(TOKEN_KEY); // purge legacy copies on every login
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   stampSession(Date.now());
 }
@@ -117,6 +129,7 @@ export function setSession(token: string, user: AuthUser) {
  * CacheStorage purge is awaited, retried once, then warned on failure.
  */
 export async function clearSession(): Promise<void> {
+  memoryToken = null;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(SESSION_STARTED_KEY);
@@ -229,9 +242,13 @@ async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Respon
   // and the idle/absolute enforcement below apply only to authed requests —
   // public auth reads (oauth status, forgot-password) must never wipe.
   const sentAuth = headers.has('Authorization');
+  // Wave-2b: the memory Bearer is gone after reload, but the httpOnly cookie
+  // may still authenticate the request — a cached user means "maybe authed",
+  // keeping 401 handling and lifetime enforcement identical to before.
+  const maybeAuthed = sentAuth || getCachedUser() !== null;
 
   // Wave-2a client-side lifetime: enforce on authed, non-bootstrap requests.
-  if (sentAuth && !isSessionBootstrapPath(path)) {
+  if (maybeAuthed && !isSessionBootstrapPath(path)) {
     await enforceSessionFreshness();
   }
 
@@ -248,7 +265,7 @@ async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Respon
   // while the Bearer header keeps transitional API clients working.
   const res = await fetch(`/api/v1${path}`, { ...init, headers, signal, credentials: 'include' });
 
-  if (res.status === 401 && sentAuth && !path.startsWith('/auth/login')) {
+  if (res.status === 401 && maybeAuthed && !path.startsWith('/auth/login')) {
     await clearSession();
     if (!window.location.pathname.startsWith('/login')) {
       window.location.href = '/login';

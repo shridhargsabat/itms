@@ -1,12 +1,56 @@
-# ITMS — IT Management System Prototype
+# ITMS — IT Management System
 
-Unified IT Management System prototype combining:
+<p align="center">
+  <a href="https://itms.ai-automation-hub.tech"><img src="https://img.shields.io/badge/●_Live_Demo-online-brightgreen?style=for-the-badge" alt="Live demo online"></a>
+  <img src="https://img.shields.io/github/stars/shridhargsabat/itms?style=for-the-badge&label=Stars" alt="GitHub stars">
+  <img src="https://img.shields.io/badge/Rust-axum-orange?style=for-the-badge" alt="Rust axum">
+  <img src="https://img.shields.io/badge/React-19-blue?style=for-the-badge" alt="React 19">
+  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="MIT license">
+</p>
 
-1. **ITAM** — IT Asset Management: hardware inventory, JSONB hardware specs, user assignments, lifecycle tracking
-2. **ITSM** — IT Service Desk: incidents, service requests, priority matrices, requester→asset linkages
-3. **CMDB** — Configuration Management Database: CI dependency mapping with recursive downstream impact analysis
+> **One system for ITAM + ITSM + CMDB** — track assets, resolve tickets, and map blast radius. Liquid Glass UI in light & dark. 👇 Watch it move:
+>
+> 1. **ITAM** — hardware inventory, JSONB specs, user assignments, lifecycle tracking
+> 2. **ITSM** — incidents, service requests, priority matrices, requester→asset linkages
+> 3. **CMDB** — CI dependency mapping with recursive downstream impact analysis
 
-**Live:** https://itms.ai-automation-hub.tech (after deploy)
+<p align="center">
+  <a href="https://itms.ai-automation-hub.tech">
+    <img src="./docs/demo/hero-dashboard.gif" alt="ITMS dashboard animating: KPIs count up over drifting aurora" width="800">
+  </a>
+  <br><em>Live demo (seeded data, password <code>demo1234</code>) — <a href="https://itms.ai-automation-hub.tech">itms.ai-automation-hub.tech →</a></em>
+</p>
+
+## ✨ Liquid Glass — light & dark
+
+<p align="center">
+  <img src="./docs/demo/theme-switch.gif" alt="Switching ITMS from Liquid Glass Light to Dark" width="800">
+  <br><em>One click: Liquid Glass Light → Dark. System-auto mode follows your device.</em>
+</p>
+
+| ☀︎ Liquid Glass Light | ☾ Liquid Glass Dark |
+|---|---|
+| ![Dashboard light](./docs/demo/dashboard-light.png) | ![Dashboard dark](./docs/demo/dashboard-dark.png) |
+| ![Assets light](./docs/demo/assets-light.png) | ![Assets dark](./docs/demo/assets-dark.png) |
+| ![Login light](./docs/demo/login-light.png) | ![Login dark](./docs/demo/login-dark.png) |
+
+<details>
+<summary>🎬 More clips (tickets · CMDB impact · mobile)</summary>
+<br>
+
+| Flow | Preview |
+|---|---|
+| 🎫 Tickets (dark) — list → drawer → Advance status | <img src="./docs/demo/tickets-flow.gif" alt="Ticket drawer opening and status advancing to resolved" width="480"> |
+| 🕸 CMDB blast radius (light) — click switch → 2 impacted | <img src="./docs/demo/cmdb-impact.gif" alt="CMDB impact analysis showing 2 impacted servers" width="480"> |
+| 📱 Mobile bottom-nav (375px) | <img src="./docs/demo/mobile-nav.gif" alt="Mobile navigation across Dashboard, Tickets, Scan, CMDB" width="240"> |
+
+Full-quality MP4s (no GIF dither): [`docs/demo/`](./docs/demo/) — `hero-dashboard.mp4`, `theme-switch.mp4`, `tickets-flow.mp4`, `cmdb-impact.mp4`, `mobile-nav.mp4`.
+
+</details>
+
+📸 Full gallery with MP4s: [`docs/DEMO.md`](./docs/DEMO.md).
+
+---
 
 ## Stack
 
@@ -45,7 +89,7 @@ docker compose exec backend /usr/local/bin/seed   # demo data
 
 ## Project management
 
-Issues and milestones live here on GitHub. Live demo: https://itms.ai-automation-hub.tech (seeded demo data, demo logins use credentials that are provisioned out-of-band and rotated).
+Issues and milestones live here on GitHub. Live demo: https://itms.ai-automation-hub.tech (seeded demo data, all seeded demo logins use password `demo1234`; staff/SSO credentials are provisioned out-of-band and rotated).
 
 ## License
 

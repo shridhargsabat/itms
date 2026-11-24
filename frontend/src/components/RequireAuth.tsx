@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, useLocation } from 'react-router-dom';
 import { LoaderCircle } from 'lucide-react';
-import { clearSession, getCachedUser, getToken, me } from '@/api/client';
+import { clearSession, getCachedUser, me } from '@/api/client';
 import { hydrateThemeFromUser } from '@/lib/theme';
 
 /**
@@ -21,17 +21,18 @@ export function isNetworkFailure(err: unknown): boolean {
   return false;
 }
 
-/** Real auth gate: token present AND valid against /auth/me.
- *  Offline (fetch TypeError/AbortError) falls back to the cached session so
- *  the SWR data cache still renders; 401 AND 403 both bounce to /login. */
+/** Real auth gate: the /auth/me verdict, not token presence.
+ *  Wave-2b: Bearer is memory-only, so reloads/new tabs have no token but DO
+ *  have the httpOnly cookie — `me()` (credentials: 'include') proves the
+ *  session. Offline (fetch TypeError/AbortError) falls back to the cached
+ *  session so the SWR data cache still renders; 401 AND 403 both bounce
+ *  to /login. */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const token = getToken();
   const cached = getCachedUser();
   const location = useLocation();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['me'],
     queryFn: me,
-    enabled: !!token,
     retry: false,
   });
 
@@ -41,7 +42,6 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     if (data) hydrateThemeFromUser(data);
   }, [data]);
 
-  if (!token) return <Navigate to="/login" replace />;
   if (isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-base">
