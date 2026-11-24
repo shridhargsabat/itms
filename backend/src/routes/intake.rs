@@ -132,11 +132,13 @@ async fn intake_email(
     }
 
     if let Some(ticket_id) = target_ticket {
-        // reply → append comment on the linked ticket (attributed to the sender)
+        // reply → append comment on the linked ticket (attributed to the sender).
+        // Atomic: sender user + comment + ingest row + audit, or nothing.
+        let mut tx = pool.begin().await?;
         let sender: Uuid = if let Some(uid) =
             sqlx::query_scalar("SELECT id FROM users WHERE LOWER(email) = $1")
                 .bind(&from_email)
-                .fetch_optional(pool)
+                .fetch_optional(&mut *tx)
                 .await?
         {
             uid
@@ -156,7 +158,7 @@ async fn intake_email(
             .bind(&name)
             .bind(&from_email)
             .bind(&hash)
-            .fetch_one(pool)
+            .fetch_one(&mut *tx)
             .await?
         };
         let comment = sqlx::query_as::<_, crate::models::TicketComment>(
@@ -166,7 +168,7 @@ async fn intake_email(
         .bind(ticket_id)
         .bind(sender)
         .bind(body.body.trim())
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         sqlx::query(
@@ -179,11 +181,11 @@ async fn intake_email(
         .bind(&from_email)
         .bind(&body.from_name)
         .bind(&body.subject)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
         crate::audit::write(
-            pool,
+            &mut *tx,
             Some(sender),
             "TICKET_EMAIL_REPLY",
             "ticket",
@@ -191,6 +193,7 @@ async fn intake_email(
             json!({"message_id": body.message_id, "from": from_email}),
         )
         .await?;
+        tx.commit().await?;
 
         // notify participants (requester + assignee, skip system author)
         let participants: Vec<Uuid> = sqlx::query_scalar(
@@ -219,11 +222,13 @@ async fn intake_email(
         return Ok(Json(json!({ "kind": "reply", "ticket_id": ticket_id, "comment_id": comment.id })));
     }
 
-    // 3. new ticket — sender must map to a user (auto-create EMPLOYEE if unknown)
+    // 3. new ticket — sender must map to a user (auto-create EMPLOYEE if unknown).
+    // Atomic: requester user + ticket + SLA + ingest row + audit, or nothing.
+    let mut tx = pool.begin().await?;
     let requester: Uuid = if let Some(uid) =
         sqlx::query_scalar("SELECT id FROM users WHERE LOWER(email) = $1")
             .bind(&from_email)
-            .fetch_optional(pool)
+            .fetch_optional(&mut *tx)
             .await?
     {
         uid
@@ -243,7 +248,7 @@ async fn intake_email(
         .bind(&name)
         .bind(&from_email)
         .bind(&hash)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
         tracing::info!("intake: auto-created user {from_email} (id {created})");
         created
@@ -253,18 +258,21 @@ async fn intake_email(
 
     let mut ticket_opt: Option<crate::models::Ticket> = None;
     let mut ticket_number = String::new();
+    // NOTE: inside the tx, number races use ON CONFLICT DO NOTHING + retry (a
+    // unique-violation *error* would poison the whole tx).
     for attempt in 0..10 {
         let next_num: i64 = sqlx::query_scalar(
             "SELECT COALESCE(MAX((substring(ticket_number FROM '([0-9]+)$'))::bigint), COUNT(*)) + 1 FROM tickets"
         )
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
         ticket_number = format!("INC-{:04}", next_num + attempt as i64);
 
-        let result = sqlx::query_as::<_, crate::models::Ticket>(
+        let row: Option<crate::models::Ticket> = sqlx::query_as::<_, crate::models::Ticket>(
             "INSERT INTO tickets (ticket_number, title, description, ticket_type, priority, status, \
                 source, requester_id, assignee_id, asset_id) \
              VALUES ($1, $2, $3, 'INCIDENT', 'MEDIUM', 'OPEN', 'EMAIL', $4, NULL, NULL) \
+             ON CONFLICT (ticket_number) DO NOTHING \
              RETURNING id, ticket_number, title, description, ticket_type, priority, status, source, \
                 requester_id, assignee_id, asset_id, created_at, updated_at, \
                 NULL::text AS requester_name, NULL::text AS assignee_name, \
@@ -274,23 +282,18 @@ async fn intake_email(
         .bind(&title)
         .bind(&body.body)
         .bind(requester)
-        .fetch_one(pool)
-        .await;
+        .fetch_optional(&mut *tx)
+        .await?;
 
-        match result {
-            Ok(t) => {
+        match row {
+            Some(t) => {
                 ticket_opt = Some(t);
                 break;
             }
-            Err(sqlx::Error::Database(db_err))
-                if db_err.is_unique_violation()
-                    && db_err.constraint() == Some("tickets_ticket_number_key")
-                    && attempt < 9 =>
-            {
+            None => {
                 tracing::warn!("intake: ticket number {ticket_number} collided, retrying");
                 continue;
             }
-            Err(err) => return Err(err.into()),
         }
     }
     let ticket = ticket_opt.ok_or_else(|| {
@@ -300,7 +303,7 @@ async fn intake_email(
         )
     })?;
 
-    super::sla::set_sla_due(pool, ticket.id, &ticket.priority, "OPEN", ticket.created_at).await?;
+    super::sla::set_sla_due(&mut *tx, ticket.id, &ticket.priority, "OPEN", ticket.created_at).await?;
 
     sqlx::query(
         "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind) \
@@ -312,11 +315,11 @@ async fn intake_email(
     .bind(&from_email)
     .bind(&body.from_name)
     .bind(&body.subject)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
 
     crate::audit::write(
-        pool,
+        &mut *tx,
         Some(requester),
         "TICKET_EMAIL_INTAKE",
         "ticket",
@@ -324,6 +327,7 @@ async fn intake_email(
         json!({"message_id": body.message_id, "from": from_email, "number": ticket_number}),
     )
     .await?;
+    tx.commit().await?;
 
     Ok(Json(json!({ "kind": "ticket", "ticket_id": ticket.id, "ticket_number": ticket_number })))
 }

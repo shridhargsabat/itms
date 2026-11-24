@@ -138,13 +138,16 @@ async fn escalate(
 
 /// Recompute sla_due_at for a ticket (create / priority change). Returns the
 /// new due time, or None when the ticket is closed (SLA stops).
-pub async fn set_sla_due(
-    pool: &sqlx::PgPool,
+pub async fn set_sla_due<'e, E>(
+    executor: E,
     ticket_id: uuid::Uuid,
     priority: &str,
     status: &str,
     created_at: chrono::DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), sqlx::Error>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+{
     let due = match status {
         "OPEN" | "IN_PROGRESS" => Some(created_at + Duration::hours(sla_hours(priority).unwrap_or(24))),
         _ => None,
@@ -152,7 +155,7 @@ pub async fn set_sla_due(
     sqlx::query("UPDATE tickets SET sla_due_at = $2 WHERE id = $1")
         .bind(ticket_id)
         .bind(due)
-        .execute(pool)
+        .execute(executor)
         .await?;
     Ok(())
 }

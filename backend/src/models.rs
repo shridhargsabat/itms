@@ -81,6 +81,8 @@ pub struct AssetDocument {
     pub filename: String,
     pub content_type: String,
     pub size_bytes: i64,
+    // Never serialize: internal filesystem path, not for API consumers.
+    #[serde(skip_serializing, default)]
     pub storage_path: String,
     pub uploaded_by: Option<Uuid>,
     pub created_at: DateTime<Utc>,

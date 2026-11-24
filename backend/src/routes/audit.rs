@@ -9,7 +9,12 @@ use crate::models::AuditLogEntry;
 use super::AppError;
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/log", get(audit_log))
+    Router::new()
+        .route("/log", get(audit_log))
+        // Staff-only: the audit trail exposes actor activity across the tenant.
+        // require_auth already ran on the enclosing router, so the role
+        // extension is populated (same pattern as users::router).
+        .route_layer(axum::middleware::from_fn(crate::routes::auth::require_staff))
 }
 
 #[derive(Debug, Deserialize)]

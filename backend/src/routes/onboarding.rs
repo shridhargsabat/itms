@@ -199,6 +199,28 @@ async fn create_event(
         return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "person_name and person_email are required"));
     }
 
+    // Task list: caller-provided (non-empty) else the standard checklist.
+    let tasks = match body.tasks {
+        Some(t) if !t.is_empty() => t,
+        _ => default_checklist(&body.event_type, body.start_date),
+    };
+
+    // Validate every task BEFORE any write — previously a bad 3rd task left
+    // an event + 2 tasks behind with no rollback.
+    for t in &tasks {
+        if t.title.trim().is_empty() {
+            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "task titles cannot be empty"));
+        }
+        if !matches!(
+            t.category.trim().to_uppercase().as_str(),
+            "ASSET" | "LICENSE" | "ACCESS" | "RETURN" | "DATA_WIPE" | "OTHER"
+        ) {
+            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "invalid task category"));
+        }
+    }
+
+    // Atomic: event + all tasks + audit, or nothing.
+    let mut tx = pool.begin().await?;
     let event = sqlx::query_as::<_, OnboardingEvent>(
         "INSERT INTO onboarding_events (event_type, person_name, person_email, start_date, notes, created_by) \
          VALUES ($1, $2, $3, $4, $5, $6) \
@@ -211,24 +233,12 @@ async fn create_event(
     .bind(body.start_date)
     .bind(body.notes)
     .bind(actor_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
-
-    // Task list: caller-provided (non-empty) else the standard checklist.
-    let tasks = match body.tasks {
-        Some(t) if !t.is_empty() => t,
-        _ => default_checklist(&body.event_type, body.start_date),
-    };
 
     for t in &tasks {
         let title = t.title.trim();
-        if title.is_empty() {
-            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "task titles cannot be empty"));
-        }
         let cat = t.category.trim().to_uppercase();
-        if !matches!(cat.as_str(), "ASSET" | "LICENSE" | "ACCESS" | "RETURN" | "DATA_WIPE" | "OTHER") {
-            return Err(AppError::new(axum::http::StatusCode::BAD_REQUEST, "invalid task category"));
-        }
         sqlx::query(
             "INSERT INTO onboarding_tasks (event_id, title, category, due_date, asset_id, note) \
              VALUES ($1, $2, $3, $4, $5, $6)",
@@ -239,12 +249,12 @@ async fn create_event(
         .bind(t.due_date)
         .bind(t.asset_id)
         .bind(t.note.clone())
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     }
 
     write(
-        pool,
+        &mut *tx,
         Some(actor_id),
         "ONBOARDING_CREATE",
         "onboarding_event",
@@ -252,6 +262,7 @@ async fn create_event(
         json!({"event_type": body.event_type, "person": format!("{name} <{email}>"), "tasks": tasks.len()}),
     )
     .await?;
+    tx.commit().await?;
 
     let mut ev = event;
     ev.total_tasks = tasks.len() as i64;
