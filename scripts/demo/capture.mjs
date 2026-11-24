@@ -54,6 +54,31 @@ async function tryLogin(page) {
   await page.waitForTimeout(1200);
 }
 
+/** Server theme pref wins on every login — push the wanted theme server-side,
+ * then reload so hydration applies it. Must run after tryLogin. */
+async function forceTheme(page, theme) {
+  await page.evaluate(async (t) => {
+    const token = localStorage.getItem('itms_token');
+    if (token) {
+      try {
+        await fetch('/api/v1/auth/theme', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ theme: t }),
+        });
+      } catch {}
+    }
+    localStorage.setItem('itms_theme', t);
+  }, theme);
+  await page.reload({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(1000);
+  const applied = await page.evaluate(() => ({
+    stored: localStorage.getItem('itms_theme'),
+    dark: document.documentElement.classList.contains('dark'),
+  }));
+  note(`theme now: stored=${applied.stored} .dark=${applied.dark} (wanted ${theme})`);
+}
+
 /** Open ThemeManager modal via Settings → "Change theme". Returns true if open. */
 async function openThemeManager(page) {
   await goto(page, '/settings');
@@ -91,6 +116,7 @@ try {
       await goto(page, '/login');
       await shot(page, `login-${theme}.png`);
       await tryLogin(page);
+      await forceTheme(page, theme);
       await goto(page, '/');
       // Seed guard: at least one digit visible (KPI numbers).
       await page.waitForSelector('text=/\\d/', { timeout: 10000 });
@@ -106,6 +132,10 @@ try {
         await shot(page, 'cmdb-light.png');
       }
       if (await openThemeManager(page)) {
+        // Modal body scrolls (5 cards exceed 900px): pin to bottom so the
+        // still shows cards + Cancel/Apply instead of cropped buttons.
+        await page.locator('div.overflow-y-auto').first().evaluate((el) => { el.scrollTop = el.scrollHeight; });
+        await page.waitForTimeout(400);
         await shot(page, `theme-manager-${theme}.png`);
       } else {
         note(`WARN theme-manager opener missing (${theme})`);
@@ -117,6 +147,7 @@ try {
       const { context, page } = await newPage(browser, { theme: 'light', viewport: MOBILE });
       await goto(page, '/login');
       await tryLogin(page);
+      await forceTheme(page, 'light');
       await goto(page, '/');
       await shot(page, 'mobile-dashboard-light.png');
       await context.close();
@@ -130,6 +161,7 @@ try {
       const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true });
       await goto(page, '/login');
       await tryLogin(page);
+      await forceTheme(page, 'light');
       await goto(page, '/');
       await page.waitForTimeout(2500);
       const card = page.locator('main a, main button, [class*="bento" i]').first();
@@ -143,6 +175,7 @@ try {
       const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true });
       await goto(page, '/login');
       await tryLogin(page);
+      await forceTheme(page, 'light');
       await goto(page, '/');
       await page.waitForTimeout(1500);
       // Prefer the full manager (pretty cards); fall back to header toggle.
@@ -168,6 +201,7 @@ try {
       const { context, page } = await newPage(browser, { theme: 'dark', viewport: DESKTOP, video: true });
       await goto(page, '/login');
       await tryLogin(page);
+      await forceTheme(page, 'dark');
       await goto(page, '/tickets');
       await page.waitForTimeout(2000);
       const row = page.locator('tbody tr, [role="row"], main a, main button').first();
@@ -180,6 +214,7 @@ try {
       const { context, page } = await newPage(browser, { theme: 'light', viewport: DESKTOP, video: true });
       await goto(page, '/login');
       await tryLogin(page);
+      await forceTheme(page, 'light');
       await goto(page, '/cmdb');
       await page.waitForTimeout(2000);
       const node = page.locator('main button, main a, svg g, [class*="node" i]').first();
@@ -192,6 +227,7 @@ try {
       const { context, page } = await newPage(browser, { theme: 'light', viewport: MOBILE, video: true });
       await goto(page, '/login');
       await tryLogin(page);
+      await forceTheme(page, 'light');
       await goto(page, '/');
       for (const label of ['Tickets', 'Scan', 'CMDB', 'Dashboard']) {
         const tab = page.locator(`nav a:has-text("${label}"), nav button:has-text("${label}")`).first();
