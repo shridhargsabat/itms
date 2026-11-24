@@ -38,12 +38,32 @@ RUN --mount=type=cache,id=itms-cargo-registry,target=/usr/local/cargo/registry \
     mkdir -p /app/dist && \
     cp /app/target/release/server /app/target/release/seed /app/dist/
 
+# ── Ephemeral one-shot seeder (FRESH/empty databases ONLY — demo data) ──────
+# wave-2b: the prod runtime stage below deliberately does NOT ship the `seed`
+# binary (`seed` TRUNCATEs user-visible tables — it must never be one exec
+# away in prod). Grep-verified 2026-11-24: nothing in compose, CI
+# (.github/workflows/ci-cd.yml) or scripts invokes `seed` in prod, so removal
+# is safe. When a FRESH database needs demo data, build + run THIS target as
+# an ephemeral container on the backend network instead:
+#   docker build --target seeder -f backend/Dockerfile -t itms-seeder backend
+#   docker run --rm --network itms-net \
+#     -e DATABASE_URL='postgres://itms:<pw>@itms-db:5432/itms' itms-seeder
+# (NOTE: this stage MUST stay before the final runtime stage — the default
+# `docker build` target is the LAST stage, which must remain the runtime.)
+FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS seeder
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && groupadd -g 10001 itms && useradd -u 10001 -g itms -d /app -s /usr/sbin/nologin itms \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/dist/seed /usr/local/bin/seed
+USER 10001:10001
+CMD ["seed"]
+
+# ── Prod runtime (default target): `server` ONLY — no `seed` binary ─────────
 FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget poppler-utils \
     && groupadd -g 10001 itms && useradd -u 10001 -g itms -d /app -s /usr/sbin/nologin itms \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/dist/server /usr/local/bin/server
-COPY --from=builder /app/dist/seed /usr/local/bin/seed
 # Uploads volume is mounted here; must be writable by the non-root user (#90).
 RUN mkdir -p /app/uploads && chown -R itms:itms /app
 USER 10001:10001
