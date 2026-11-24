@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { LiquidGlassFilterBank } from '@/components/LiquidGlass';
@@ -23,6 +23,18 @@ import NotificationsBell from '@/components/NotificationsBell';
 import { clearSession, getCachedUser, logout } from '@/api/client';
 import { usePwaInstallable } from '@/lib/pwa';
 
+/**
+ * Pure scroll-end predicate for the bottom fade scrim (unit-tested).
+ * True while the frame can still scroll downward (2px slop for subpixel zoom).
+ */
+export function canScrollDown(el: {
+  scrollHeight: number;
+  scrollTop: number;
+  clientHeight: number;
+}): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight > 2;
+}
+
 export default function Layout() {
   // User's persistent rail choice (collapsed / expanded), remembered across reloads.
   const [collapsed, setCollapsed] = useState(
@@ -34,6 +46,22 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getCachedUser();
+  // Bottom fade scrim: visible only while the frame can scroll further down.
+  // (Mobile has no frame scroller — window scrolls — so this stays false there.)
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [fadeBottom, setFadeBottom] = useState(false);
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const sync = () => setFadeBottom(canScrollDown(el));
+    sync();
+    el.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+    return () => {
+      el.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [location.pathname]);
   const { installable, promptInstall } = usePwaInstallable();
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
@@ -300,7 +328,7 @@ export default function Layout() {
             on an inner wrapper would count against the frame's scrollHeight and
             make it overflow a few px, re-adding a second (page) scrollbar next
             to a table's inner one. */}
-        <div className="w-full flex-1 p-6 lg:min-h-0 lg:overflow-y-auto lg:p-8">
+        <div ref={frameRef} className="w-full flex-1 p-6 lg:min-h-0 lg:overflow-y-auto lg:p-8">
           {/* Centered, width-capped content column (readability width).
               No vertical padding here (see frame comment above).
               keyed by pathname: fresh entrance per route change.
@@ -316,6 +344,18 @@ export default function Layout() {
               <Outlet />
             </div>
           </div>
+          {/* Scroll fade scrim: rows sliced flat at the scrollport bottom edge
+              read as "square" next to the sidebar's finished rounded bottom.
+              A mask/filter on the FRAME is banned (containing block for
+              inline-fixed drawers/sheets — same incident class as transforms),
+              so this is a sticky leaf with its own mask: frosts content
+              passing under it, pointer-transparent, hidden at true bottom. */}
+          {fadeBottom && (
+            <div
+              aria-hidden
+              className="pointer-events-none sticky bottom-0 z-10 -mt-16 h-16 [mask-image:linear-gradient(to_top,black,transparent)] backdrop-blur-lg"
+            />
+          )}
         </div>
       </main>
     </div>
