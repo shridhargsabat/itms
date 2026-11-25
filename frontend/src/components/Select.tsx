@@ -14,6 +14,8 @@ interface SelectProps {
   options: SelectOption[];
   placeholder?: string;
   className?: string;
+  /** Forwarded to the trigger button so a <label htmlFor> can target it. */
+  id?: string;
   /** Classes for the trigger BUTTON (size/typography overrides). The outer
    *  wrapper is styled by `className`; the trigger is otherwise fixed by
    *  inputCls + py-2.5, which is too tall for compact controls (e.g. the
@@ -21,6 +23,8 @@ interface SelectProps {
   triggerClassName?: string;
   /** Accessible name for the trigger button (TFE-33/C3). Applied as aria-label. */
   ariaLabel?: string;
+  /** Accessible label forwarded to the trigger button (e.g. "Rows per page"). Alias of ariaLabel. */
+  'aria-label'?: string;
 }
 
 /**
@@ -34,8 +38,10 @@ export default function Select({
   options,
   placeholder = 'Select…',
   className,
+  id,
   triggerClassName,
   ariaLabel,
+  'aria-label': ariaLabelAttr,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<{ top: number; left: number; width: number; maxWidth: number } | null>(null);
@@ -141,10 +147,11 @@ export default function Select({
     <div ref={ref} className={cn('relative', className)}>
       <button
         type="button"
+        id={id}
         onClick={toggle}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={ariaLabel}
+        aria-label={ariaLabelAttr ?? ariaLabel}
         className={cn(inputCls, 'flex items-center justify-between gap-2 py-2.5 text-left', triggerClassName)}
       >
         <span className={cn('truncate', selected ? 'text-primary' : 'text-muted')}>

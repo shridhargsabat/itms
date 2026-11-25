@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CalendarDays, FileText, History, IndianRupee, MapPin, Pencil, Plus, User, Wrench, X } from 'lucide-react';
-import { assignAsset, assetDocumentUrl, createClaim, getAssetLifecycle, getCachedUser, listAssetDocuments, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
-import type { Asset, AssetDocument, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
+import { assignAsset, assetDocumentUrl, createClaim, getAssetLifecycle, getCachedUser, listAssetDocuments, listAssetMoves, listClaims, listLocations, listUsers, listVendors, updateAsset } from '@/api/client';
+import type { Asset, AssetDocument, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, UserRecord, VendorClaim } from '@/api/types';
 import { ASSET_CATEGORIES } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import Select from '@/components/Select';
@@ -35,7 +36,10 @@ function deprecBasis(asset: Asset): string {
 
 export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) {
   const qc = useQueryClient();
-  const [userId, setUserId] = useState('');
+  const [assignQuery, setAssignQuery] = useState('');
+  const [assignUserId, setAssignUserId] = useState('');
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignActive, setAssignActive] = useState(0);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<UpdateAssetInput>({});
   const [specRows, setSpecRows] = useState<Array<[string, string]>>([]);
@@ -48,7 +52,9 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
       qc.invalidateQueries({ queryKey: ['assets'] });
       qc.invalidateQueries({ queryKey: ['metrics'] });
       qc.invalidateQueries({ queryKey: ['alerts'] });
-      setUserId('');
+      setAssignQuery('');
+      setAssignUserId('');
+      setAssignOpen(false);
     },
   });
 
@@ -73,6 +79,11 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
 
   const vendors = useQuery({ queryKey: ['vendors'], queryFn: () => listVendors() });
   const locations = useQuery({ queryKey: ['locations'], queryFn: () => listLocations() });
+  const users = useQuery({
+    queryKey: ['users', 'assign-picker'],
+    queryFn: () => listUsers({ limit: 500 }),
+    enabled: !!asset && isAdmin,
+  });
   const moves = useQuery({
     queryKey: ['asset-moves', asset?.id],
     queryFn: () => (asset ? listAssetMoves(asset.id) : Promise.resolve([])),
@@ -110,6 +121,20 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
   if (!asset) return null;
 
   const specEntries = Object.entries(asset.specs ?? {});
+
+  // Searchable assignee picker (name + email, filtered as you type).
+  const userList: UserRecord[] = users.data?.items ?? [];
+  const assignFilter = assignQuery.trim().toLowerCase();
+  const assignMatches = assignFilter
+    ? userList.filter(
+        (u) => u.name.toLowerCase().includes(assignFilter) || u.email.toLowerCase().includes(assignFilter),
+      )
+    : userList;
+  const selectAssignUser = (u: UserRecord) => {
+    setAssignUserId(u.id);
+    setAssignQuery(`${u.name} (${u.email})`);
+    setAssignOpen(false);
+  };
   const events: LifecycleEvent[] = lifecycle.data ?? [];
   const warrantyDays = asset.warranty_expiry
     ? Math.ceil((new Date(asset.warranty_expiry).getTime() - Date.now()) / 86400000)
@@ -137,10 +162,15 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
     setEditing(true);
   };
 
-  return (
-    <div className="fixed inset-0 z-[60]">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
-      <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
+  return createPortal(
+    <div className="fixed inset-0 z-[70]">
+      <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Asset details"
+        className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-edge bg-surface shadow-2xl"
+      >
         <div className="flex items-start justify-between border-b border-edge px-5 py-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -163,7 +193,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
             )}
             <Button
               type="button"
-              onClick={onClose}
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
               variant="ghost"
               className="rounded-md p-1"
               aria-label="Close"
@@ -407,7 +437,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                   <p className="mt-1 text-primary">{fmtCost(asset.current_value)}</p>
                   <p className="mt-0.5 text-[10px] text-muted">{deprecBasis(asset)}</p>
                 </div>
-                <div className="col-span-2 rounded-lg border border-edge bg-base p-3">
+                <div className="rounded-lg border border-edge bg-base p-3">
                   <p className="text-xs uppercase tracking-wide text-muted">Expected EOL</p>
                   <p className="mt-1 text-primary">{formatDateOnly(asset.expected_eol) || '—'}</p>
                 </div>
@@ -468,6 +498,10 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                 </h3>
                 {documents.isLoading ? (
                   <p className="animate-pulse rounded-lg border border-edge p-3 text-xs text-muted">Loading…</p>
+                ) : documents.isError ? (
+                  <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+                    Failed to load documents{documents.error instanceof Error ? `: ${documents.error.message}` : '.'}
+                  </p>
                 ) : !documents.data || documents.data.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-edge p-4 text-center text-xs text-muted">
                     No documents attached.
@@ -572,39 +606,128 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
           <div className="border-t border-edge px-5 py-4">
             <p className={labelCls}>Assign / Unassign</p>
             <form
-              className="flex gap-2"
+              className="flex flex-wrap gap-2"
               onSubmit={(ev) => {
                 ev.preventDefault();
-                assign.mutate({ id: asset.id, uid: userId.trim() || null });
+                if (!assignUserId || assign.isPending) return;
+                assign.mutate({ id: asset.id, uid: assignUserId });
               }}
             >
-              <input
-                className={inputCls}
-                placeholder="User ID (empty to unassign)"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-              />
+              <div className="relative min-w-[200px] flex-1 basis-full sm:basis-auto">
+                <input
+                  id="asset-assign-user"
+                  role="combobox"
+                  aria-label="Assign user"
+                  aria-expanded={assignOpen}
+                  aria-controls="asset-assign-listbox"
+                  aria-activedescendant={
+                    assignOpen && assignMatches.length > 0
+                      ? `asset-assign-opt-${assignMatches[Math.min(assignActive, assignMatches.length - 1)].id}`
+                      : undefined
+                  }
+                  autoComplete="off"
+                  className={inputCls}
+                  placeholder="Search users…"
+                  value={assignQuery}
+                  onFocus={() => {
+                    // A selection leaves "Name (email)" in the input, which
+                    // would match nothing — reset the query so reopening the
+                    // picker shows the full directory (pending selection kept).
+                    if (assignUserId) setAssignQuery('');
+                    setAssignOpen(true);
+                    setAssignActive(0);
+                  }}
+                  onChange={(e) => {
+                    setAssignQuery(e.target.value);
+                    setAssignUserId('');
+                    setAssignOpen(true);
+                    setAssignActive(0);
+                  }}
+                  onBlur={() => setAssignOpen(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown' && assignMatches.length > 0) {
+                      e.preventDefault();
+                      setAssignOpen(true);
+                      setAssignActive((a) => (a + 1) % assignMatches.length);
+                    } else if (e.key === 'ArrowUp' && assignMatches.length > 0) {
+                      e.preventDefault();
+                      setAssignOpen(true);
+                      setAssignActive((a) => (a - 1 + assignMatches.length) % assignMatches.length);
+                    } else if (e.key === 'Enter' && assignOpen && assignMatches.length > 0) {
+                      e.preventDefault();
+                      selectAssignUser(assignMatches[Math.min(assignActive, assignMatches.length - 1)]);
+                    } else if (e.key === 'Escape') {
+                      // Don't let the modal's window-level Escape handler
+                      // close the whole dialog when just dismissing the list.
+                      e.stopPropagation();
+                      setAssignOpen(false);
+                    }
+                  }}
+                />
+                {assignOpen && (
+                  // Opens UPWARD: the picker lives in the sheet footer at the
+                  // viewport bottom, so a downward menu would render off-screen.
+                  <div
+                    id="asset-assign-listbox"
+                    role="listbox"
+                    aria-label="Matching users"
+                    className="absolute inset-x-0 bottom-full z-50 mb-1 max-h-56 overflow-auto rounded-lg border border-edge bg-surface p-1 shadow-xl"
+                  >
+                    {users.isLoading ? (
+                      <p className="px-3 py-2 text-sm text-muted">Loading users…</p>
+                    ) : assignMatches.length === 0 ? (
+                      <p className="px-3 py-2 text-sm text-muted">No users match “{assignQuery.trim()}”.</p>
+                    ) : (
+                      assignMatches.map((u, i) => (
+                        <div
+                          key={u.id}
+                          id={`asset-assign-opt-${u.id}`}
+                          role="option"
+                          tabIndex={-1}
+                          aria-selected={u.id === assignUserId}
+                          title={`${u.name} (${u.email})`}
+                          onMouseDown={(e) => {
+                            // Select on mousedown: blur would close the list
+                            // before click fires.
+                            e.preventDefault();
+                            selectAssignUser(u);
+                          }}
+                          onMouseMove={() => setAssignActive(i)}
+                          className={
+                            i === Math.min(assignActive, assignMatches.length - 1)
+                              ? 'flex w-full cursor-pointer items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md bg-elevated2/70 px-3 py-2 text-left text-sm text-primary'
+                              : 'flex w-full cursor-pointer items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-secondary hover:bg-elevated2/40 hover:text-primary'
+                          }
+                        >
+                          <span className="min-w-0 truncate">
+                            {u.name} ({u.email})
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <Button
                 type="submit"
-                disabled={assign.isPending}
+                disabled={assign.isPending || !assignUserId}
                 loading={assign.isPending}
                 variant="primary"
                 className="shrink-0"
               >
                 {asset.assigned_to_user_id ? 'Reassign' : 'Assign'}
               </Button>
-            </form>
-            {asset.assigned_to_user_id && (
               <Button
                 type="button"
                 onClick={() => assign.mutate({ id: asset.id, uid: null })}
-                disabled={assign.isPending}
-                variant="text"
-                className="mt-2 text-xs text-muted hover:text-red-400"
+                disabled={assign.isPending || !asset.assigned_to_user_id}
+                variant="secondary"
+                className="shrink-0"
+                title={asset.assigned_to_user_id ? `Unassign ${asset.assigned_user_name ?? 'current user'}` : 'Asset is not assigned'}
               >
-                Unassign current user
+                Unassign
               </Button>
-            )}
+            </form>
             {assign.isError && (
               <p className="mt-2 text-xs text-red-400">
                 {assign.error instanceof Error ? assign.error.message : 'Assignment failed.'}
@@ -613,6 +736,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

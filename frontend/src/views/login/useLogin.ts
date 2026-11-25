@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { demoLogin as apiDemoLogin, getOAuthStatus, login, setSession } from '@/api/client';
-import { hydrateThemeFromUser } from '@/lib/theme';
+import { syncThemeAfterLogin } from '@/lib/theme';
 
 export interface UseLoginResult {
   email: string;
@@ -51,10 +51,11 @@ export function useLogin(): UseLoginResult {
   const mutation = useMutation({
     mutationFn: ({ email: e, password: p }: { email: string; password: string }) =>
       login(e, p),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       setSession(res.token, res.user);
-      // Server pref wins (cross-device sync)
-      hydrateThemeFromUser(res.user);
+      // Task 16: an explicit login-screen theme choice wins (kept locally +
+      // pushed up so it sticks); otherwise the server pref wins (cross-device sync).
+      await syncThemeAfterLogin(res.user);
       setPassword(''); // Wave 2-C: drop the credential from memory on success
       navigateHome();
     },
@@ -69,10 +70,11 @@ export function useLogin(): UseLoginResult {
   // credentials in the JS bundle)
   const demoMutation = useMutation({
     mutationFn: () => apiDemoLogin(),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       setSession(res.token, res.user);
-      // Server pref wins (cross-device sync)
-      hydrateThemeFromUser(res.user);
+      // Task 16: an explicit login-screen theme choice wins (kept locally +
+      // pushed up so it sticks); otherwise the server pref wins (cross-device sync).
+      await syncThemeAfterLogin(res.user);
       navigateHome();
     },
   });
@@ -88,11 +90,9 @@ export function useLogin(): UseLoginResult {
     submit,
     onDemoClick,
     loginPending: mutation.isPending,
-    loginError: mutation.isError
-      ? mutation.error instanceof Error
-        ? mutation.error.message
-        : 'Sign-in failed. Try again.'
-      : null,
+    // Task 18 (UI-18): every auth failure shows the same generic sentence —
+    // never leak raw server codes (invalid_credentials) or network details.
+    loginError: mutation.isError ? 'Invalid email or password.' : null,
     demoPending: demoMutation.isPending,
   };
 }

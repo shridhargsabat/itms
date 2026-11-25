@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LoaderCircle } from 'lucide-react';
+import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { useLogin } from '../useLogin';
 
 /**
@@ -96,8 +96,9 @@ export default function PaperLogin() {
           {loginError && (
             <div
               role="alert"
-              className="mb-4 rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-3 text-[13.5px] text-red-800"
+              className="mb-4 flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-3 text-[13.5px] text-red-800"
             >
+              <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
               {loginError}
             </div>
           )}
@@ -213,11 +214,6 @@ export default function PaperLogin() {
           </button>
           <p className="mt-2.5 text-center text-xs text-muted">
             One-click showcase account — no password needed
-          </p>
-
-          <p className="mt-[26px] text-center text-xs text-muted">
-            Real auth — argon2 hashes + revocable sessions · build{' '}
-            {__BUILD_SHA__}
           </p>
         </div>
       </main>

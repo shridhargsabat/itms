@@ -121,11 +121,13 @@ export default function NotificationsBell({ className }: { className?: string })
       <Button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Notifications"
+        aria-label={`Notifications${count ? ` (${count} unread)` : ''}`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
         variant="ghost"
         className="relative h-11 w-11 shrink-0 hover:text-accent"
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-5 w-5" aria-hidden="true" />
         {count > 0 && (
           <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
             {count > 99 ? '99+' : count}
@@ -169,9 +171,23 @@ export default function NotificationsBell({ className }: { className?: string })
               </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
-              {items.data?.items.length === 0 && (
-                <p className="px-4 py-8 text-center text-xs text-muted">No notifications yet.</p>
-              )}
+              {items.isError ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-xs text-muted">Couldn't load notifications.</p>
+                  <Button
+                    type="button"
+                    onClick={() => items.refetch()}
+                    variant="ghost"
+                    className="mt-2 px-2 py-0.5 text-[11px] text-accent"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {items.data?.items.length === 0 && (
+                    <p className="px-4 py-8 text-center text-xs text-muted">No new notifications.</p>
+                  )}
               {(items.data?.items ?? []).map((n) => (
                 <button
                   key={n.id}
@@ -193,6 +209,8 @@ export default function NotificationsBell({ className }: { className?: string })
                   {!n.read_at && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />}
                 </button>
               ))}
+                </>
+              )}
             </div>
             <Button
               type="button"

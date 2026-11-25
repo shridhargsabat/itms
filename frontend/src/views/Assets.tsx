@@ -205,7 +205,7 @@ export default function Assets() {
       header: 'Tag',
       sortable: true,
       sortKey: 'tag',
-      render: (a) => <span className="font-mono text-xs text-accent">{a.asset_tag}</span>,
+      render: (a) => <span className="whitespace-nowrap font-mono text-xs text-accent">{a.asset_tag}</span>,
     },
     {
       key: 'name',
@@ -230,7 +230,7 @@ export default function Assets() {
       header: 'Serial',
       sortable: true,
       render: (a) => (
-        <span className="font-mono text-xs text-secondary">{a.serial_number ?? '—'}</span>
+        <span className="whitespace-nowrap font-mono text-xs text-secondary">{a.serial_number ?? '—'}</span>
       ),
     },
     {

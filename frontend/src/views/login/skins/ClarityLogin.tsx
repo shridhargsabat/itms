@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CircleAlert, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/Button';
-import { inputCls, labelCls } from '@/lib/utils';
+import { cn, inputCls, labelCls } from '@/lib/utils';
 import { useLogin } from '../useLogin';
 
 /**
@@ -23,6 +25,7 @@ export default function ClarityLogin() {
     loginError,
     demoPending,
   } = useLogin();
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-base px-4 py-12">
@@ -42,8 +45,9 @@ export default function ClarityLogin() {
           {loginError && (
             <div
               role="alert"
-              className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-700 dark:text-red-400"
+              className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-700 dark:text-red-400"
             >
+              <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
               {loginError}
             </div>
           )}
@@ -68,16 +72,31 @@ export default function ClarityLogin() {
               <label htmlFor="clarity-password" className={labelCls}>
                 Password
               </label>
-              <input
-                id="clarity-password"
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className={inputCls}
-              />
+              <div className="relative">
+                <input
+                  id="clarity-password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className={cn(inputCls, 'pr-11')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted transition-colors hover:text-primary"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="flex items-center justify-end">
               <Link
@@ -119,7 +138,7 @@ export default function ClarityLogin() {
 
           <div className="my-4 flex items-center gap-2 text-xs text-muted">
             <span className="h-px flex-1 bg-edge" />
-            demo
+            Demo
             <span className="h-px flex-1 bg-edge" />
           </div>
           <Button
@@ -132,10 +151,6 @@ export default function ClarityLogin() {
             Use demo account
           </Button>
         </div>
-
-        <p className="mt-6 text-center text-xs text-muted">
-          Real authentication · Argon2 password hashing · Revocable sessions
-        </p>
       </div>
     </div>
   );

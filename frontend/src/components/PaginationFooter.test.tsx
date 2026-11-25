@@ -32,4 +32,32 @@ describe('pagination footer ghost nav (task-15 sweep)', () => {
     expect(prev.className).not.toMatch(/bg-accent(?!\/)/);
     expect(prev.className).toContain('border-edge2');
   });
+  it('static variant renders in normal flow without sticky classes', () => {
+    const { container } = render(
+      <PaginationFooter page={1} pageSize={20} total={45} rowsLength={20} variant="static" />,
+    );
+    const footer = container.firstChild as HTMLElement;
+    expect(footer.className).not.toMatch(/sticky/);
+    expect(footer.className).toMatch(/mt-4/);
+  });
+  it('sticky variant (default) keeps TABLE_SPEC.footer classes', () => {
+    const { container } = render(
+      <PaginationFooter page={1} pageSize={20} total={45} rowsLength={20} />,
+    );
+    // Tables-audit de-stickied TABLE_SPEC.footer (sticky was dead outside the
+    // scroll container), so pin the footer-spec marker classes instead.
+    const cls = (container.firstChild as HTMLElement).className;
+    expect(cls).toContain('rounded-b-2xl');
+    expect(cls).not.toContain('mt-4');
+  });
+  it('renders nothing when total is 0', () => {
+    const { container } = render(
+      <PaginationFooter page={1} pageSize={20} total={0} rowsLength={0} />,
+    );
+    expect(container.innerHTML).toBe('');
+  });
+  it('page-size select has an accessible label', () => {
+    render(<PaginationFooter page={1} pageSize={20} total={45} rowsLength={20} />);
+    expect(screen.getByLabelText('Rows per page')).toBeInTheDocument();
+  });
 });

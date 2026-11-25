@@ -104,14 +104,17 @@ export default function Notifications() {
         ))}
       </div>
 
-      <PaginationFooter
-        page={page}
-        pageSize={pageSize}
-        total={data?.total}
-        rowsLength={items.length}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      {!isLoading && (data?.total ?? 0) > 0 && (
+        <PaginationFooter
+          variant="static"
+          page={page}
+          pageSize={pageSize}
+          total={data?.total}
+          rowsLength={items.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
     </div>
   );
 }

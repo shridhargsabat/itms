@@ -137,7 +137,7 @@ describe('Masters forms validation (FORM-02B, FORM-04)', () => {
     renderMasters();
     await screen.findByText('Aarav Gupta');
 
-    fireEvent.click(screen.getByRole('button', { name: /^vendors$/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^vendors$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /add vendor/i }));
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 

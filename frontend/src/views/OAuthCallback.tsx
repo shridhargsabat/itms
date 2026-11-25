@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { clearSession, exchangeOAuthCode, me, setSession } from '@/api/client';
-import { hydrateThemeFromUser } from '@/lib/theme';
+import { syncThemeAfterLogin } from '@/lib/theme';
 
 /**
  * #53 / wave-2a: SSO callback landing page — the backend 302s here with ONLY
  * a single-use `?code=`. This page POSTs it to /auth/oauth/exchange, stores
- * the session, strips the code from history (replace:true), then overwrites
- * the cached user with an authoritative GET /auth/me.
+ * the session, strips the code from the URL via a synchronous
+ * history.replaceState (same entry replaced — the code never survives in
+ * history), then overwrites the cached user with an authoritative GET
+ * /auth/me, syncs the theme, and only then navigates to '/'.
  */
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -30,15 +32,25 @@ export default function OAuthCallback() {
       try {
         const res = await exchangeOAuthCode(code);
         setSession(res.token, res.user);
-        // Strip ?code= from the URL/history BEFORE any further network hop.
-        navigate('/', { replace: true });
+        // Strip the single-use ?code= from the URL/history BEFORE any further
+        // network hop — WITHOUT navigating: mounting '/' here would mount
+        // RequireAuth, whose /auth/me hydrate races syncThemeAfterLogin below
+        // and can clobber a login-screen theme choice (or get the stale value
+        // pushed back up). replaceState is synchronous and replaces the same
+        // history entry, preserving the original strip intent.
+        window.history.replaceState(null, '', '/oauth/callback');
         try {
           const fresh = await me();
           setSession(res.token, fresh);
-          hydrateThemeFromUser(fresh);
+          // Task 16: a login-screen theme choice (session flag survives the
+          // SSO round-trip) wins and is pushed up; else the server pref wins.
+          await syncThemeAfterLogin(fresh);
         } catch {
-          hydrateThemeFromUser(res.user);
+          await syncThemeAfterLogin(res.user);
         }
+        // Theme settled (choice pushed or server pref hydrated) before the
+        // app mounts — RequireAuth's hydrate then reads the same value back.
+        navigate('/', { replace: true });
       } catch {
         await clearSession();
         navigate('/login?error=sso_failed', { replace: true });
