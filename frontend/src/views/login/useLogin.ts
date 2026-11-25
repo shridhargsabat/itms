@@ -21,8 +21,8 @@ export interface UseLoginResult {
 /**
  * Shared login logic for all login skins (Tasks 6–11).
  * Extracted verbatim from the legacy Login page: state,
- * oauth-status query, both mutations, flash effect, and the
- * view-transition navigate. No JSX — skins render from this API.
+ * oauth-status query, both mutations, flash effect, and plain navigate-home.
+ * No JSX — skins render from this API.
  */
 export function useLogin(): UseLoginResult {
   const navigate = useNavigate();
@@ -41,11 +41,7 @@ export function useLogin(): UseLoginResult {
   useEffect(() => () => { setPassword(''); }, []);
 
   const navigateHome = () => {
-    if ('startViewTransition' in document) {
-      document.startViewTransition(() => navigate('/', { replace: true }));
-    } else {
-      navigate('/', { replace: true });
-    }
+    navigate('/', { replace: true });
   };
 
   const mutation = useMutation({

@@ -679,28 +679,6 @@
   animation: list-in 0.24s ease-out;
 }
 
-/* ---------- page transitions (View Transitions API) ----------
-   Task 18 (UI-19): sequential crossfade — the old route fades out fully
-   BEFORE the new one fades in (no mid-transition overlap), plus a
-   reduced-motion guard that disables the crossfade entirely. */
-::view-transition-old(root) {
-  animation: fade-out 0.12s ease-in both;
-}
-::view-transition-new(root) {
-  animation: fade-in 0.22s ease-out 0.12s both;
-}
-@keyframes fade-out {
-  to {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none;
-  }
-}
-
 /* ---------- UI animations (reduced-motion guarded below) ---------- */
 @keyframes fade-up {
   from {
