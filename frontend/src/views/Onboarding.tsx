@@ -72,6 +72,9 @@ const DEFAULT_OFFBOARDING: CreateTaskInput[] = [
 
 function Progress({ ev }: { ev: OnboardingEvent }) {
   const pct = ev.total_tasks > 0 ? Math.round((ev.done_tasks / ev.total_tasks) * 100) : 0;
+  // Backend allows closing with tasks outstanding (no completion gate in
+  // PATCH /onboarding/{id}), so CLOSED + incomplete means "closed early".
+  const closedEarly = ev.status === 'CLOSED' && ev.done_tasks < ev.total_tasks;
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-elevated">
@@ -84,7 +87,7 @@ function Progress({ ev }: { ev: OnboardingEvent }) {
         />
       </div>
       <span className="text-xs tabular-nums text-secondary">
-        {ev.done_tasks}/{ev.total_tasks}
+        {closedEarly ? `Closed early · ${ev.done_tasks}/${ev.total_tasks} tasks done` : `${ev.done_tasks}/${ev.total_tasks}`}
       </span>
     </div>
   );
@@ -102,16 +105,17 @@ export default function Onboarding() {
 
   const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
 
-  const events = useQuery({
-    queryKey: ['onboarding', tab, page, pageSize],
-    queryFn: () => getOnboardingEvents({ type: tab, limit: pageSize, offset }),
+  // One query per tab (same pagination): each tab badge counts the same
+  // filtered array its list renders — never the raw server total.
+  const eventsOn = useQuery({
+    queryKey: ['onboarding', 'ONBOARDING', page, pageSize],
+    queryFn: () => getOnboardingEvents({ type: 'ONBOARDING', limit: pageSize, offset }),
   });
-
-  // Full list in the background — overdue badge must not depend on the page.
-  const summary = useQuery({
-    queryKey: ['onboarding-summary', tab],
-    queryFn: () => getOnboardingEvents({ type: tab, limit: 500 }),
+  const eventsOff = useQuery({
+    queryKey: ['onboarding', 'OFFBOARDING', page, pageSize],
+    queryFn: () => getOnboardingEvents({ type: 'OFFBOARDING', limit: pageSize, offset }),
   });
+  const events = tab === 'OFFBOARDING' ? eventsOff : eventsOn;
 
   const detail = useQuery({
     queryKey: ['onboarding-detail', selectedId],
@@ -160,10 +164,8 @@ export default function Onboarding() {
   });
 
   const list = useMemo(() => events.data?.items ?? [], [events.data]);
-  const overdueTotal = useMemo(
-    () => (summary.data?.items ?? []).reduce((s, e) => s + e.overdue_tasks, 0),
-    [summary.data],
-  );
+  const onCount = eventsOn.data?.items.length ?? 0;
+  const offCount = eventsOff.data?.items.length ?? 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -187,24 +189,36 @@ export default function Onboarding() {
 
       {/* Type tabs */}
       <FilterBar>
-        {(['ONBOARDING', 'OFFBOARDING'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              tab === t ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
-            )}
-          >
-            {t === 'ONBOARDING' ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
-            {t === 'ONBOARDING' ? 'Onboarding' : 'Offboarding'}
-            {overdueTotal > 0 && tab === t && (
-              <span className="rounded-full bg-red-500/90 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
-                {overdueTotal}
-              </span>
-            )}
-          </button>
-        ))}
+        <div role="tablist" aria-label="Onboarding views" className="flex flex-1 flex-wrap items-center gap-2">
+          {(['ONBOARDING', 'OFFBOARDING'] as const).map((t) => {
+            const active = tab === t;
+            const count = t === 'ONBOARDING' ? onCount : offCount;
+            return (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t)}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  active ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
+                )}
+              >
+                {t === 'ONBOARDING' ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
+                {t === 'ONBOARDING' ? 'Onboarding' : 'Offboarding'}
+                <span
+                  data-testid="tab-badge"
+                  className={cn(
+                    'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+                    active ? 'bg-accent/20 text-accent' : 'bg-elevated text-secondary opacity-70',
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </FilterBar>
 
       {/* Event cards */}
@@ -244,6 +258,7 @@ export default function Onboarding() {
         {list.map((ev) => (
           <button
             key={ev.id}
+            data-testid="onboarding-card"
             onClick={() => setSelectedId(ev.id)}
             className="flex flex-col gap-2 rounded-xl glass-card p-4 text-left transition hover:border-edge2"
           >
@@ -276,7 +291,9 @@ export default function Onboarding() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Progress ev={ev} />
               <span className="text-xs text-muted">
-                {ev.start_date ? `Start ${formatDateOnly(ev.start_date)}` : 'No start date'} · {ev.event_type === 'ONBOARDING' ? 'joins' : 'leaves'}
+                {ev.event_type === 'OFFBOARDING'
+                  ? (ev.start_date ? `Last day ${formatDateOnly(ev.start_date)}` : 'No last day set')
+                  : (ev.start_date ? `Start date ${formatDateOnly(ev.start_date)}` : 'No start date')}
               </span>
             </div>
           </button>
