@@ -173,6 +173,20 @@ pub fn validate_ticket_type(raw: Option<&str>) -> Result<String, AppError> {
     }
 }
 
+/// R2-BE-11 (#144): ticket-type on UPDATE — None stays unchanged, but a
+/// present-but-blank value is 422 (normalize maps '' → INCIDENT, which used
+/// to silently reset e.g. CHANGE tickets to INCIDENT on PATCH).
+pub fn validate_ticket_type_update(raw: Option<&str>) -> Result<Option<String>, AppError> {
+    match raw {
+        None => Ok(None),
+        Some(t) if t.trim().is_empty() => Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "ticket_type must not be empty",
+        )),
+        Some(t) => Ok(Some(validate_ticket_type(Some(t))?)),
+    }
+}
+
 /// Single status value: trim + uppercase, then strict → 422.
 pub fn validate_status_value(raw: &str) -> Result<String, AppError> {
     let upper = raw.trim().to_uppercase();
@@ -773,11 +787,9 @@ async fn update_ticket(
         }
     };
     let new_description = body.description.as_deref().map(|d| d.trim().to_string());
-    let new_ticket_type = body
-        .ticket_type
-        .as_deref()
-        .map(|t| validate_ticket_type(Some(t)))
-        .transpose()?;
+    // R2-BE-11 (#144): blank ticket_type is 422 on update (like title);
+    // absent stays unchanged.
+    let new_ticket_type = validate_ticket_type_update(body.ticket_type.as_deref())?;
     let new_priority_opt = body.priority.as_deref().map(validate_priority).transpose()?;
 
     let mut tx = state.pool.begin().await?;
@@ -1205,6 +1217,27 @@ mod tests {
     }
 
     #[test]
+    fn update_rejects_blank_ticket_type_but_ignores_absent() {
+        // R2-BE-11 (#144): None stays unchanged; blank is 422 (never a
+        // silent reset to INCIDENT); valid values still normalize.
+        assert_eq!(validate_ticket_type_update(None).unwrap(), None);
+        for bad in ["", "   ", "\t"] {
+            let err = validate_ticket_type_update(Some(bad)).unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "for {bad:?}");
+        }
+        assert_eq!(
+            validate_ticket_type_update(Some("change")).unwrap(),
+            Some("CHANGE".to_string())
+        );
+        assert_eq!(
+            validate_ticket_type_update(Some("REQUEST")).unwrap(),
+            Some("SERVICE_REQUEST".to_string())
+        );
+        let err = validate_ticket_type_update(Some("bogus")).unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
     fn multi_status_filter_validates_each_entry() {
         assert_eq!(
             parse_status_filter("OPEN,IN_PROGRESS").unwrap(),
@@ -1276,5 +1309,150 @@ mod tests {
         assert!(!allowed_transitions("OPEN").contains(&"RESOLVED"));
         assert!(!allowed_transitions("IN_PROGRESS").contains(&"CLOSED"));
         assert!(allowed_transitions("CLOSED").contains(&"OPEN"));
+    }
+}
+
+/// R2 P2 regression tests (issue #144 R2-BE-11): DB-backed PATCH handler
+/// tests. Same TEST_DATABASE_URL-with-skip pattern as
+/// routes::intake::r2_regression_tests.
+#[cfg(test)]
+mod r2_p2_regression_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+
+    const DEFAULT_TEST_DB_URL: &str = "postgres://itms_test:itms_test_pw@127.0.0.1:55434/itms_test";
+
+    async fn test_pool() -> Option<sqlx::PgPool> {
+        let url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| DEFAULT_TEST_DB_URL.to_string());
+        match PgPoolOptions::new().max_connections(5).connect(&url).await {
+            Ok(pool) => {
+                sqlx::migrate!("./migrations")
+                    .run(&pool)
+                    .await
+                    .expect("test DB migrations must apply");
+                Some(pool)
+            }
+            Err(e) => {
+                eprintln!("r2_p2_regression_tests: skipping — no test DB at {url} ({e})");
+                None
+            }
+        }
+    }
+
+    fn test_state(pool: sqlx::PgPool) -> AppState {
+        AppState { pool, login_attempts: Default::default(), opencode_api_key: None }
+    }
+
+    async fn staff_actor(pool: &sqlx::PgPool) -> Uuid {
+        let email = format!("r2-p2-staff-{}@example.com", Uuid::new_v4().simple());
+        sqlx::query_scalar(
+            "INSERT INTO users (name, email, role, department, password_hash) \
+             VALUES ('R2 Staff', $1, 'ADMIN', 'IT', 'test-hash') RETURNING id",
+        )
+        .bind(&email)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn make_ticket(pool: &sqlx::PgPool, requester: Uuid, ticket_type: &str) -> Uuid {
+        let number = format!("INC-7{:09}", rand::random::<u32>() % 1_000_000_000);
+        sqlx::query_scalar(
+            "INSERT INTO tickets (ticket_number, title, description, ticket_type, requester_id) \
+             VALUES ($1, 't', 'd', $2, $3) RETURNING id",
+        )
+        .bind(&number)
+        .bind(ticket_type)
+        .bind(requester)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    fn patch_body(ticket_type: Option<&str>) -> UpdateTicketRequest {
+        UpdateTicketRequest {
+            title: None,
+            description: None,
+            ticket_type: ticket_type.map(|s| s.to_string()),
+            priority: None,
+            assignee_id: None,
+            asset_id: None,
+        }
+    }
+
+    async fn stored_type(pool: &sqlx::PgPool, id: Uuid) -> String {
+        sqlx::query_scalar("SELECT ticket_type FROM tickets WHERE id = $1")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn patch_blank_ticket_type_rejected_on_change_ticket() {
+        let Some(pool) = test_pool().await else { return };
+        let actor = staff_actor(&pool).await;
+        for raw in ["", "   "] {
+            let tid = make_ticket(&pool, actor, "CHANGE").await;
+            let err = update_ticket(
+                State(test_state(pool.clone())),
+                Extension(actor),
+                Extension("ADMIN".to_string()),
+                UuidPath(tid),
+                Json(patch_body(Some(raw))),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "for {raw:?}");
+            assert!(err.message.contains("ticket_type"), "message: {}", err.message);
+            // The CHANGE type survives — no silent reset to INCIDENT.
+            assert_eq!("CHANGE", stored_type(&pool, tid).await);
+        }
+    }
+
+    #[tokio::test]
+    async fn patch_without_ticket_type_leaves_type_unchanged() {
+        let Some(pool) = test_pool().await else { return };
+        let actor = staff_actor(&pool).await;
+        let tid = make_ticket(&pool, actor, "CHANGE").await;
+        let body = UpdateTicketRequest {
+            title: Some("renamed title".to_string()),
+            description: None,
+            ticket_type: None,
+            priority: None,
+            assignee_id: None,
+            asset_id: None,
+        };
+        let out = update_ticket(
+            State(test_state(pool.clone())),
+            Extension(actor),
+            Extension("ADMIN".to_string()),
+            UuidPath(tid),
+            Json(body),
+        )
+        .await
+        .unwrap();
+        assert_eq!("CHANGE", out.0.ticket_type);
+        assert_eq!("renamed title", out.0.title);
+        assert_eq!("CHANGE", stored_type(&pool, tid).await);
+    }
+
+    #[tokio::test]
+    async fn patch_valid_ticket_type_still_applies() {
+        // Guard against over-rejection: real type changes keep working.
+        let Some(pool) = test_pool().await else { return };
+        let actor = staff_actor(&pool).await;
+        let tid = make_ticket(&pool, actor, "CHANGE").await;
+        let out = update_ticket(
+            State(test_state(pool.clone())),
+            Extension(actor),
+            Extension("ADMIN".to_string()),
+            UuidPath(tid),
+            Json(patch_body(Some("problem"))),
+        )
+        .await
+        .unwrap();
+        assert_eq!("PROBLEM", out.0.ticket_type);
+        assert_eq!("PROBLEM", stored_type(&pool, tid).await);
     }
 }

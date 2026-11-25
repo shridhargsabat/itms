@@ -228,6 +228,13 @@ pub fn truncate_with_marker(s: &str, max_chars: usize) -> String {
     out
 }
 
+/// R2-BE-10 (#143): thread_key normalization — trim, and treat
+/// empty/whitespace-only as None. Applied to both the thread-key lookup and
+/// every email_ingest insert so blank keys neither link nor persist.
+fn normalize_thread_key(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim).filter(|s| !s.is_empty()).map(|s| s.to_string())
+}
+
 /// TBE-10: VARCHAR pre-checks → 422 (never Postgres length-violation 500s).
 /// TBE-22: 422, consistent with the rest of the ticket API.
 fn validate_intake_lengths(body: &EmailIntakeInput) -> Result<(), AppError> {
@@ -287,16 +294,41 @@ async fn resolve_or_create_sender(
     let password = format!("ep-{}", Uuid::new_v4().simple());
     let hash = crate::auth::hash_password(&password)
         .map_err(|_| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, "password hash failed"))?;
-    let created: Uuid = sqlx::query_scalar(
+    let created: Option<Uuid> = sqlx::query_scalar(
         "INSERT INTO users (name, email, role, department, password_hash) \
-         VALUES ($1, $2, 'EMPLOYEE', $3, $4) RETURNING id",
+         VALUES ($1, $2, 'EMPLOYEE', $3, $4) \
+         ON CONFLICT (email) DO NOTHING RETURNING id",
     )
     .bind(&name)
     .bind(from_email)
     .bind(AUTO_USER_DEPARTMENT)
     .bind(&hash)
-    .fetch_one(&mut *conn)
+    .fetch_optional(&mut *conn)
     .await?;
+    // R2-BE-06 (#139): ON CONFLICT keeps a concurrent same-sender delivery
+    // from 500ing on 23505 (and never poisons this tx) — reselect the winner.
+    let Some(created) = created else {
+        let row: Option<(Uuid, bool)> =
+            sqlx::query_as("SELECT id, active FROM users WHERE LOWER(email) = $1")
+                .bind(from_email)
+                .fetch_optional(&mut *conn)
+                .await?;
+        match row {
+            Some((uid, true)) => return Ok(uid),
+            Some((_, false)) => {
+                return Err(AppError::new(
+                    StatusCode::FORBIDDEN,
+                    "sender account is inactive",
+                ));
+            }
+            None => {
+                return Err(AppError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "sender creation raced",
+                ));
+            }
+        }
+    };
     crate::audit::write(
         &mut *conn,
         None,
@@ -310,10 +342,56 @@ async fn resolve_or_create_sender(
     Ok(created)
 }
 
+/// R2-BE-06 (#139): claim the Message-ID idempotently. `Ok(true)` = this
+/// delivery owns the message; `Ok(false)` = a concurrent delivery won the
+/// race (ON CONFLICT DO NOTHING raises no 23505 and leaves the tx usable —
+/// the caller rolls back and reports duplicate:true).
+async fn try_insert_ingest(
+    conn: &mut sqlx::PgConnection,
+    body: &EmailIntakeInput,
+    ticket_id: Option<Uuid>,
+    from_email: &str,
+    kind: &str,
+) -> Result<bool, AppError> {
+    let claimed: Option<String> = sqlx::query_scalar(
+        "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind, body) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+         ON CONFLICT (message_id) DO NOTHING RETURNING kind",
+    )
+    .bind(&body.message_id)
+    .bind(&body.thread_key)
+    .bind(ticket_id)
+    .bind(from_email)
+    .bind(&body.from_name)
+    .bind(&body.subject)
+    .bind(kind)
+    .bind(&body.body)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(claimed.is_some())
+}
+
+/// Duplicate receipt for a lost Message-ID race: same shape as the pre-check
+/// fast path ({duplicate:true, kind}) so a raced redelivery is
+/// indistinguishable from an idempotent retry.
+async fn duplicate_response(pool: &sqlx::PgPool, message_id: &str) -> Json<serde_json::Value> {
+    let kind: Option<String> = sqlx::query_scalar("SELECT kind FROM email_ingest WHERE message_id = $1")
+        .bind(message_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    match kind {
+        Some(k) => Json(json!({ "duplicate": true, "kind": k })),
+        None => Json(json!({ "duplicate": true })),
+    }
+}
+
 /// Shared new-ticket insert for the intake paths (genuinely-new mail AND
 /// quarantined replies): number alloc + ticket + SLA + ingest row + audit.
 /// `quarantined_from` carries the cited reference when this ticket is a
 /// TBE-15 quarantine (else None). Runs inside the caller's transaction.
+/// Returns `Ok(None)` when a concurrent delivery claimed the Message-ID
+/// first (R2-BE-06) — the caller rolls back and reports duplicate:true.
 #[allow(clippy::too_many_arguments)]
 async fn create_intake_ticket(
     conn: &mut sqlx::PgConnection,
@@ -323,7 +401,7 @@ async fn create_intake_ticket(
     body: &EmailIntakeInput,
     from_email: &str,
     quarantined_from: Option<&str>,
-) -> Result<(Uuid, String), AppError> {
+) -> Result<Option<(Uuid, String)>, AppError> {
     // NOTE: inside the tx, number races use ON CONFLICT DO NOTHING + retry (a
     // unique-violation *error* would poison the whole tx).
     for attempt in 0..10 {
@@ -359,19 +437,11 @@ async fn create_intake_ticket(
 
         super::sla::set_sla_due(&mut *conn, ticket.id, &ticket.priority, "OPEN", ticket.created_at, false).await?;
 
-        sqlx::query(
-            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind, body) \
-             VALUES ($1, $2, $3, $4, $5, $6, 'TICKET', $7)",
-        )
-        .bind(&body.message_id)
-        .bind(&body.thread_key)
-        .bind(ticket.id)
-        .bind(from_email)
-        .bind(&body.from_name)
-        .bind(&body.subject)
-        .bind(&body.body)
-        .execute(&mut *conn)
-        .await?;
+        // R2-BE-06 (#139): Message-ID claim — a lost race returns None and the
+        // caller rolls back (no 23505, tx stays usable).
+        if !try_insert_ingest(&mut *conn, body, Some(ticket.id), from_email, "TICKET").await? {
+            return Ok(None);
+        }
 
         let mut diff = json!({"message_id": body.message_id, "from": from_email, "number": ticket_number});
         if let Some(q) = quarantined_from {
@@ -387,7 +457,7 @@ async fn create_intake_ticket(
             diff,
         )
         .await?;
-        return Ok((ticket.id, ticket_number));
+        return Ok(Some((ticket.id, ticket_number)));
     }
     Err(AppError::new(
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -417,7 +487,7 @@ async fn is_ticket_participant(
 async fn intake_email(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(body): Json<EmailIntakeInput>,
+    Json(mut body): Json<EmailIntakeInput>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // ── TBE-15 trust boundary ─────────────────────────────────────────────
     // This endpoint authenticates the CRON (shared X-Intake-Token) AND enforces
@@ -440,6 +510,15 @@ async fn intake_email(
     if from_email.is_empty() || !from_email.contains('@') {
         return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "from_email is required"));
     }
+    // R2-BE-10 (#143): blank message_id is 422 (an empty key must never reach
+    // the dedupe/insert path); blank thread_key normalizes to None for both
+    // the thread lookup and every email_ingest insert below.
+    let message_id = body.message_id.trim().to_string();
+    if message_id.is_empty() {
+        return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "message_id is required"));
+    }
+    body.message_id = message_id;
+    body.thread_key = normalize_thread_key(body.thread_key.as_deref());
     validate_intake_lengths(&body)?;
 
     // service-token gate: the cron must present X-Intake-Token = INTAKE_TOKEN
@@ -510,18 +589,12 @@ async fn intake_email(
             tx.rollback().await?;
             return quarantine_as_new_ticket(pool, &body, &from_email, &subject_clean, &request_number).await;
         }
-        sqlx::query(
-            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind, body) \
-             VALUES ($1, $2, NULL, $3, $4, $5, 'REPLY', $6)",
-        )
-        .bind(&body.message_id)
-        .bind(&body.thread_key)
-        .bind(&from_email)
-        .bind(&body.from_name)
-        .bind(&body.subject)
-        .bind(&body.body)
-        .execute(&mut *tx)
-        .await?;
+        // R2-BE-06 (#139): Message-ID claim — a concurrent same-message
+        // delivery loses here and reports duplicate:true (no 23505).
+        if !try_insert_ingest(&mut tx, &body, None, &from_email, "REPLY").await? {
+            tx.rollback().await?;
+            return Ok(duplicate_response(pool, &body.message_id).await);
+        }
         crate::audit::write(
             &mut *tx,
             Some(sender),
@@ -586,19 +659,13 @@ async fn intake_email(
         .fetch_one(&mut *tx)
         .await?;
 
-        sqlx::query(
-            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind, body) \
-             VALUES ($1, $2, $3, $4, $5, $6, 'REPLY', $7)",
-        )
-        .bind(&body.message_id)
-        .bind(&body.thread_key)
-        .bind(ticket_id)
-        .bind(&from_email)
-        .bind(&body.from_name)
-        .bind(&body.subject)
-        .bind(&body.body)
-        .execute(&mut *tx)
-        .await?;
+        // R2-BE-06 (#139): Message-ID claim — a concurrent same-message
+        // delivery loses here and reports duplicate:true (rollback drops the
+        // comment row above; no 23505).
+        if !try_insert_ingest(&mut tx, &body, Some(ticket_id), &from_email, "REPLY").await? {
+            tx.rollback().await?;
+            return Ok(duplicate_response(pool, &body.message_id).await);
+        }
 
         crate::audit::write(
             &mut *tx,
@@ -646,8 +713,13 @@ async fn intake_email(
     let requester = resolve_or_create_sender(&mut tx, &from_email, body.from_name.as_deref()).await?;
 
     let title = if subject_clean.is_empty() { "Email request".to_string() } else { subject_clean };
-    let (ticket_id, ticket_number) =
+    // R2-BE-06 (#139): None = a concurrent delivery claimed the Message-ID.
+    let claimed =
         create_intake_ticket(&mut tx, requester, &title, body.body.trim(), &body, &from_email, None).await?;
+    let Some((ticket_id, ticket_number)) = claimed else {
+        tx.rollback().await?;
+        return Ok(duplicate_response(pool, &body.message_id).await);
+    };
     tx.commit().await?;
 
     Ok(Json(json!({ "kind": "ticket", "ticket_id": ticket_id, "ticket_number": ticket_number })))
@@ -668,8 +740,13 @@ async fn quarantine_as_new_ticket(
     let base_title = if subject_clean.is_empty() { "Email request".to_string() } else { subject_clean.to_string() };
     let full_title = format!("[Quarantined reply to {cited_ref}] {base_title}");
     let title: String = full_title.chars().take(MAX_TITLE_CHARS).collect();
-    let (ticket_id, ticket_number) =
+    // R2-BE-06 (#139): None = a concurrent delivery claimed the Message-ID.
+    let claimed =
         create_intake_ticket(&mut tx, requester, &title, body.body.trim(), body, from_email, Some(cited_ref)).await?;
+    let Some((ticket_id, ticket_number)) = claimed else {
+        tx.rollback().await?;
+        return Ok(duplicate_response(pool, &body.message_id).await);
+    };
     tx.commit().await?;
     tracing::info!("intake: quarantined reply citing {cited_ref} as {ticket_number}");
     Ok(Json(json!({
@@ -786,6 +863,17 @@ mod tickets_audit_tests {
             validate_intake_lengths(&bad).unwrap_err().status,
             StatusCode::UNPROCESSABLE_ENTITY
         );
+    }
+
+    #[test]
+    fn thread_key_normalizes_blank_to_none() {
+        // R2-BE-10 (#143): trim + empty-as-None for lookup and insert.
+        assert_eq!(None, normalize_thread_key(None));
+        assert_eq!(None, normalize_thread_key(Some("")));
+        assert_eq!(None, normalize_thread_key(Some("   ")));
+        assert_eq!(None, normalize_thread_key(Some("\t\n ")));
+        assert_eq!(Some("k".to_string()), normalize_thread_key(Some("  k  ")));
+        assert_eq!(Some("a b".to_string()), normalize_thread_key(Some("a b")));
     }
 }
 
@@ -1145,5 +1233,167 @@ mod r2_regression_tests {
                 .await
                 .unwrap();
         assert!(created_active);
+    }
+
+    // ── R2-BE-06 (#139): concurrent duplicate deliveries never 500 ─────────
+
+    #[tokio::test]
+    async fn sequential_double_delivery_returns_duplicate() {
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("dup-seq");
+        let input = intake_input(&email, "double delivery", "help please");
+        let mid = input.message_id.clone();
+        let out1 = intake_email(State(test_state(pool.clone())), test_headers(), Json(input)).await.unwrap();
+        assert_eq!(out1.0["kind"], "ticket");
+        let retry = EmailIntakeInput {
+            message_id: mid.clone(),
+            thread_key: None,
+            from_email: email.clone(),
+            from_name: Some("R2 Tester".to_string()),
+            subject: "double delivery".to_string(),
+            body: "help please".to_string(),
+        };
+        let out2 = intake_email(State(test_state(pool.clone())), test_headers(), Json(retry)).await.unwrap();
+        assert_eq!(out2.0["duplicate"], true);
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_ingest WHERE message_id = $1")
+            .bind(&mid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(1, n);
+    }
+
+    #[tokio::test]
+    async fn concurrent_duplicate_deliveries_single_winner_no_500() {
+        let Some(pool) = test_pool().await else { return };
+        // Brand-new sender + brand-new message: both deliveries race through
+        // the pre-check, user creation, and the Message-ID claim together.
+        let email = unique_email("dup-race");
+        let mid = format!("r2-race-{}", Uuid::new_v4().simple());
+        let mk = || EmailIntakeInput {
+            message_id: mid.clone(),
+            thread_key: None,
+            from_email: email.clone(),
+            from_name: Some("R2 Tester".to_string()),
+            subject: "race me".to_string(),
+            body: "race body".to_string(),
+        };
+        let (r1, r2) = tokio::join!(
+            intake_email(State(test_state(pool.clone())), test_headers(), Json(mk())),
+            intake_email(State(test_state(pool.clone())), test_headers(), Json(mk())),
+        );
+        // Neither delivery may error (in particular, no 23505 → 500): exactly
+        // one wins with a ticket, the other reports duplicate:true — whether
+        // the loser finds the row via the pre-check or the ON CONFLICT claim.
+        let o1 = r1.unwrap_or_else(|e| panic!("delivery 1 errored: {} {}", e.status, e.message));
+        let o2 = r2.unwrap_or_else(|e| panic!("delivery 2 errored: {} {}", e.status, e.message));
+        let is_dup = |o: &Json<serde_json::Value>| o.0.get("duplicate").and_then(|v| v.as_bool()) == Some(true);
+        assert_eq!([is_dup(&o1), is_dup(&o2)].into_iter().filter(|d| *d).count(), 1);
+        for o in [&o1, &o2] {
+            if is_dup(o) {
+                assert!(o.0.get("kind").is_some(), "duplicate receipt keeps kind: {o:?}");
+            } else {
+                assert_eq!(o.0["kind"], "ticket");
+            }
+        }
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_ingest WHERE message_id = $1")
+            .bind(&mid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(1, n);
+        let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE LOWER(email) = $1")
+            .bind(email.to_lowercase())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(1, users);
+    }
+
+    #[tokio::test]
+    async fn ingest_claim_is_idempotent_under_conflict() {
+        // Deterministic ON CONFLICT unit coverage (no threads): the second
+        // claim of the same Message-ID reports false instead of erroring.
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("claim");
+        let input = intake_input(&email, "s", "b");
+        let mut tx = pool.begin().await.unwrap();
+        assert!(try_insert_ingest(&mut tx, &input, None, &email, "TICKET").await.unwrap());
+        assert!(!try_insert_ingest(&mut tx, &input, None, &email, "TICKET").await.unwrap());
+        tx.rollback().await.unwrap();
+    }
+
+    // ── R2-BE-10 (#143): blank message_id/thread_key ───────────────────────
+
+    #[tokio::test]
+    async fn empty_message_id_rejected() {
+        let Some(pool) = test_pool().await else { return };
+        for mid in ["", "   ", "\t\n "] {
+            let email = unique_email("emptymid");
+            let mut input = intake_input(&email, "s", "b");
+            input.message_id = mid.to_string();
+            let err = intake_email(State(test_state(pool.clone())), test_headers(), Json(input))
+                .await
+                .unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "mid={mid:?}");
+            assert!(err.message.contains("message_id"), "message: {}", err.message);
+        }
+        // Nothing ingested for the blank keys.
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_ingest WHERE message_id = ''")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(0, n);
+    }
+
+    #[tokio::test]
+    async fn blank_thread_key_stored_as_null() {
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("emptytk");
+        let mut input = intake_input(&email, "thread test", "b");
+        input.thread_key = Some("   ".to_string());
+        let mid = input.message_id.clone();
+        let out = intake_email(State(test_state(pool.clone())), test_headers(), Json(input)).await.unwrap();
+        assert_eq!(out.0["kind"], "ticket");
+        let stored: Option<String> =
+            sqlx::query_scalar("SELECT thread_key FROM email_ingest WHERE message_id = $1")
+                .bind(&mid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(None, stored);
+
+        // Padded keys are trimmed on insert.
+        let email2 = unique_email("trimtk");
+        let mut input2 = intake_input(&email2, "thread test 2", "b");
+        input2.thread_key = Some("  tk-trim-target  ".to_string());
+        let mid2 = input2.message_id.clone();
+        let out2 = intake_email(State(test_state(pool.clone())), test_headers(), Json(input2)).await.unwrap();
+        assert_eq!(out2.0["kind"], "ticket");
+        let stored2: Option<String> =
+            sqlx::query_scalar("SELECT thread_key FROM email_ingest WHERE message_id = $1")
+                .bind(&mid2)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(Some("tk-trim-target".to_string()), stored2);
+    }
+
+    #[tokio::test]
+    async fn blank_thread_key_does_not_link_threads() {
+        // Two deliveries with blank thread_keys must NOT thread together:
+        // blank normalizes to None on lookup, so the second is a new ticket.
+        // (Before the fix both stored "   " and the second became a reply.)
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("nolink");
+        let mut first = intake_input(&email, "original subject", "b");
+        first.thread_key = Some("   ".to_string());
+        let out1 = intake_email(State(test_state(pool.clone())), test_headers(), Json(first)).await.unwrap();
+        assert_eq!(out1.0["kind"], "ticket");
+        let mut second = intake_input(&email, "unrelated subject", "b2");
+        second.thread_key = Some("".to_string());
+        let out2 = intake_email(State(test_state(pool.clone())), test_headers(), Json(second)).await.unwrap();
+        assert_eq!(out2.0["kind"], "ticket");
+        assert_ne!(out1.0["ticket_id"], out2.0["ticket_id"]);
     }
 }
