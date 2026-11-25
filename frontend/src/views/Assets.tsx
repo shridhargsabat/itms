@@ -228,6 +228,7 @@ export default function Assets() {
     {
       key: 'serial_number',
       header: 'Serial',
+      sortable: true,
       render: (a) => (
         <span className="font-mono text-xs text-secondary">{a.serial_number ?? '—'}</span>
       ),
@@ -414,6 +415,8 @@ export default function Assets() {
           onSortChange={onSortChange}
           loading={isLoading}
           emptyMessage="No assets match the current filters."
+          caption="Assets"
+          highlightId={selected?.id}
           onRowClick={(a) => setSelected(a)}
           selectedIds={isAdmin ? selectedIds : undefined}
           onSelectionChange={isAdmin ? setSelectedIds : undefined}

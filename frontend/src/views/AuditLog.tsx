@@ -118,6 +118,7 @@ export default function AuditLog() {
           }}
           loading={isLoading}
           emptyMessage="No audit entries yet."
+          caption="Audit log"
           renderExpanded={(e) => (
             <pre className="max-h-72 overflow-auto rounded-lg glass-dense p-3 font-mono text-xs leading-relaxed text-secondary">
               {JSON.stringify(e.diff, null, 2)}

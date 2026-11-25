@@ -110,13 +110,10 @@ export default function Licenses() {
     [allItems],
   );
 
-  const list =
-    tab === 'expiring'
-      ? (alerts.data?.expiring_90 ?? [])
-      : tab === 'expired'
-        ? (alerts.data?.expired ?? [])
-        : (pageQ.data?.items ?? []);
-  const total = tab === 'all' ? (pageQ.data?.total ?? 0) : list.length;
+  // All tabs are server-paginated via pageQ (backend scope param); the
+  // alerts query only feeds tab counts + the expiry-alerts summary card.
+  const list = pageQ.data?.items ?? [];
+  const total = pageQ.data?.total ?? 0;
   const alertCount = (alerts.data?.expired.length ?? 0) + (alerts.data?.expiring_90.length ?? 0);
 
   return (

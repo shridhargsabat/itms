@@ -8,16 +8,29 @@ interface ScrollXProps {
   innerClassName?: string;
   /** Inline styles forwarded to the scrolling element (e.g. a fill-height max-height). */
   style?: CSSProperties;
+  /** Accessible label for the scrollable region (DataTable passes its caption through). */
+  'aria-label'?: string;
+  /** Alias for `aria-label`. */
+  ariaLabel?: string;
 }
 
 /**
  * Horizontally scrollable container with a right-edge fade affordance.
  * The fade appears only when content actually overflows (ResizeObserver),
  * so wide tables/boards signal "swipe for more" without permanent decoration.
+ * The scroller is a focusable region so keyboard users can scroll it.
  */
-export default function ScrollX({ children, className, innerClassName, style }: ScrollXProps) {
+export default function ScrollX({
+  children,
+  className,
+  innerClassName,
+  style,
+  'aria-label': ariaLabelProp,
+  ariaLabel: ariaLabelAlias,
+}: ScrollXProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [canScroll, setCanScroll] = useState(false);
+  const ariaLabel = ariaLabelAlias ?? ariaLabelProp;
 
   useEffect(() => {
     const el = ref.current;
@@ -31,7 +44,14 @@ export default function ScrollX({ children, className, innerClassName, style }: 
 
   return (
     <div className={cn('relative', className)}>
-      <div ref={ref} style={style} className={cn('overflow-x-auto', innerClassName)}>
+      <div
+        ref={ref}
+        style={style}
+        role={ariaLabel ? 'region' : undefined}
+        tabIndex={ariaLabel ? 0 : undefined}
+        aria-label={ariaLabel}
+        className={cn('overflow-x-auto', innerClassName)}
+      >
         {children}
       </div>
       <div

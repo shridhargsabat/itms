@@ -53,7 +53,7 @@ export default function CMDB() {
       key: 'asset_tag',
       header: 'Tag',
       sortable: true,
-      sortKey: 'tag',
+      sortKey: 'asset_tag',
       render: (n) => <span className="font-mono text-xs text-accent">{n.asset_tag}</span>,
     },
     {
@@ -132,6 +132,8 @@ export default function CMDB() {
                 loading={topology.isLoading}
                 emptyMessage="No configuration items found."
                 minWidth={CI_TABLE_MIN_WIDTH}
+                caption="Configuration items"
+                highlightId={selectedId ?? undefined}
                 onRowClick={(n) => setSelectedId(n.id)}
               />
             </div>

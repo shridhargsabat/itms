@@ -307,6 +307,7 @@ export default function Tickets() {
     {
       key: 'ticket_type',
       header: 'Type',
+      sortable: true,
       render: (t) => <span className="text-xs text-secondary">{t.ticket_type.replace('_', ' ')}</span>,
     },
     {
@@ -497,6 +498,8 @@ export default function Tickets() {
               onSortChange={onSortChange}
               loading={isLoading}
               emptyMessage="No tickets match the current filters."
+              caption="Tickets"
+              highlightId={selectedId ?? undefined}
               onRowClick={(t) => selectTicket(t.id)}
             />
           ) : isLoading ? (
