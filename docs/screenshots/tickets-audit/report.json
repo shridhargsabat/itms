@@ -1,0 +1,57 @@
+[
+  {
+    "shot": "tickets-list",
+    "file": "/root/itms-wt-tickets-audit/frontend/docs-screenshots/tickets-audit/tickets-list.png",
+    "htmlClass": "",
+    "pathname": "/tickets",
+    "overflowX": 0,
+    "text": "ITMS\nDashboard\nAssets\nAssets\nWarranty\nLicenses\nService Desk\nTickets\nRequests\nKnowledge\nOperations\nJoin/Leave\nScan\nLabels\nInsights\nCMDB\nReports\nAudit Log\nAdministration\nMasters\nSettings\nQuick Capture\nInvoice\nScan\nIT\n\nIT Admin\n\nADMIN\n\nCollapse\nSign out\nChange password\nLiquid Glass Light\n\nbuild local\n\nTickets\n\n3 tickets matching filters\n\nExport\nNew Ticket\nTable\nKanban\nAll Statuses\nAll Priorities\nAll ",
+    "assertion": "n/a",
+    "pageErrors": [],
+    "failedReqs": []
+  },
+  {
+    "shot": "ticket-drawer",
+    "file": "/root/itms-wt-tickets-audit/frontend/docs-screenshots/tickets-audit/ticket-drawer.png",
+    "htmlClass": "",
+    "pathname": "/tickets",
+    "overflowX": 0,
+    "text": "ITMS\nDashboard\nAssets\nAssets\nWarranty\nLicenses\nService Desk\nTickets\nRequests\nKnowledge\nOperations\nJoin/Leave\nScan\nLabels\nInsights\nCMDB\nReports\nAudit Log\nAdministration\nMasters\nSettings\nQuick Capture\nInvoice\nScan\nIT\n\nIT Admin\n\nADMIN\n\nCollapse\nSign out\nChange password\nLiquid Glass Light\n\nbuild local\n\nTickets\n\n3 tickets matching filters\n\nExport\nNew Ticket\nTable\nKanban\nAll Statuses\nAll Priorities\nAll ",
+    "assertion": "n/a",
+    "pageErrors": [],
+    "failedReqs": []
+  },
+  {
+    "shot": "new-ticket-modal",
+    "file": "/root/itms-wt-tickets-audit/frontend/docs-screenshots/tickets-audit/new-ticket-modal.png",
+    "htmlClass": "dark",
+    "pathname": "/tickets",
+    "overflowX": 0,
+    "text": "ITMS\nDashboard\nAssets\nAssets\nWarranty\nLicenses\nService Desk\nTickets\nRequests\nKnowledge\nOperations\nJoin/Leave\nScan\nLabels\nInsights\nCMDB\nReports\nAudit Log\nAdministration\nMasters\nSettings\nQuick Capture\nInvoice\nScan\nIT\n\nIT Admin\n\nADMIN\n\nCollapse\nSign out\nChange password\nLiquid Glass Dark\n\nbuild local\n\nTickets\n\n3 tickets matching filters\n\nExport\nNew Ticket\nTable\nKanban\nAll Statuses\nAll Priorities\nAll T",
+    "assertion": "n/a",
+    "pageErrors": [],
+    "failedReqs": []
+  },
+  {
+    "shot": "service-queue",
+    "file": "/root/itms-wt-tickets-audit/frontend/docs-screenshots/tickets-audit/service-queue.png",
+    "htmlClass": "",
+    "pathname": "/",
+    "overflowX": 0,
+    "text": "Dashboard\nAssets\nTickets\nLicenses\nMore\nITMS\nIT Admin\nbuild local\nInventory, tickets and recent activity at a glance.\nDashboard\nDay Glass\nNight Glass\nAdd Asset\nNew Ticket\nTotal Assets\n10\n4 in stock\nOpen Tickets\n2\n1 high priority\nSLA Escalated\n1\nBreach monitor\nWarranty & License\n0\nExpiring ≤ 45d\nOnboarding Overdue\n0\nOpen Requests\n0\nService Velocity & Resolution\n\nIncidents vs resolved throughput\n\n7d\n",
+    "assertion": "n/a",
+    "pageErrors": [],
+    "failedReqs": []
+  },
+  {
+    "shot": "employee-drawer-readonly",
+    "file": "/root/itms-wt-tickets-audit/frontend/docs-screenshots/tickets-audit/employee-drawer-readonly.png",
+    "htmlClass": "",
+    "pathname": "/tickets",
+    "overflowX": 0,
+    "text": "ITMS\nDashboard\nAssets\nAssets\nWarranty\nService Desk\nTickets\nRequests\nKnowledge\nOperations\nJoin/Leave\nScan\nLabels\nInsights\nCMDB\nReports\nAudit Log\nQuick Capture\nScan\nAA\n\nAarav Gupta\n\nEMPLOYEE\n\nCollapse\nSign out\nChange password\nLiquid Glass Light\n\nbuild local\n\nTickets\n\n3 tickets matching filters\n\nExport\nNew Ticket\nTable\nKanban\nAll Statuses\nAll Priorities\nAll Types\nTicket\n\tPriority\n\tStatus\n\tSLA\tTYPE\tRE",
+    "assertion": "prioritySelect=0 transitionBtns=0 priorityVisible=true -> READONLY-OK",
+    "pageErrors": [],
+    "failedReqs": []
+  }
+]

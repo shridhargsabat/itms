@@ -350,6 +350,11 @@ pub struct UpdateTicketStatusRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateTicketRequest {
+    // C1 (TFE-29): title/description/type are staff-editable like the other
+    // fields; None = unchanged, validated exactly like create when present.
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub ticket_type: Option<String>,
     pub priority: Option<String>,
     #[serde(default, deserialize_with = "double_option_uuid")]
     pub assignee_id: Option<Option<Uuid>>,

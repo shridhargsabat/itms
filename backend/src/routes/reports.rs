@@ -48,7 +48,14 @@ pub async fn repeat_incidents(
         .push(")")
         .push(" AND btrim(title) <> ''");
     if let Some(tt) = params.ticket_type.as_deref().map(str::trim).filter(|s| !s.is_empty() && *s != "ALL") {
-        qb.push(" AND t.ticket_type = ").push_bind(tt);
+        // TBE-34: normalize like the ticket list (was case-sensitive exact).
+        let normalized = super::tickets::normalize_ticket_type(Some(tt));
+        if normalized == "SERVICE_REQUEST" {
+            // Match historical 'REQUEST' rows too.
+            qb.push(" AND t.ticket_type IN ('SERVICE_REQUEST', 'REQUEST')");
+        } else {
+            qb.push(" AND t.ticket_type = ").push_bind(normalized);
+        }
     }
     qb.push(" GROUP BY lower(btrim(title)), t.asset_id, a.asset_tag \
              HAVING COUNT(*) >= ")

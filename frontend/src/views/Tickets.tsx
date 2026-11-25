@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -23,6 +23,7 @@ import {
   convertTicketToArticle,
   createTicketComment,
   getCachedUser,
+  getSlaPolicy,
   getTicket,
   deleteTicketAttachment,
   deleteTicketComment,
@@ -40,6 +41,7 @@ import { ALLOWED_TICKET_TRANSITIONS, PRIORITIES, TICKET_STATUSES, TICKET_TYPES }
 import type { Priority, Ticket, TicketStatus, UpdateTicketInput } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
+import { FieldError } from '@/components/FieldError';
 import FilterBar from '@/components/FilterBar';
 import Modal from '@/components/Modal';
 import NewTicketForm from '@/components/NewTicketForm';
@@ -52,9 +54,15 @@ import { Button } from '@/components/Button';
 import { cn, formatDate, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 
+// Fallback when GET /sla/policy is unreachable (TFE-28) — mirrors the server policy today.
 const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
 const KANBAN_LIMIT = 200;
+
+// Mirrors backend MAX_ATTACHMENT_BYTES (10 MB) and ALLOWED_CONTENT_TYPES
+// (comments.rs) as picker extensions (TFE-25).
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_ACCEPT = '.pdf,.json,.zip,.doc,.docx,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.md';
 
 export default function Tickets() {
   const qc = useQueryClient();
@@ -65,24 +73,53 @@ export default function Tickets() {
   const [newOpen, setNewOpen] = useState(false);
   const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
 
+  // TFE-03: EMPLOYEE is read-only — staff-only editing UI is gated on this.
+  const user = getCachedUser();
+  const isStaff = user?.role !== 'EMPLOYEE';
+
   const status = params.get('status') ?? '';
   const priority = params.get('priority') ?? '';
   const type = params.get('type') ?? '';
   const search = params.get('search') ?? '';
   const sort = params.get('sort') ?? null;
   const order = (params.get('order') as 'asc' | 'desc' | null) ?? null;
+  const overdueOnly = params.get('overdue') === 'true';
 
+  // TFE-05: debounced search — the box is local state; the param (and the API
+  // call) follows ~300ms after the user stops typing.
+  const [searchInput, setSearchInput] = useState(search);
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+  useEffect(() => {
+    if (searchInput === search) return;
+    const t = setTimeout(() => {
+      const next = new URLSearchParams(params);
+      if (searchInput) {
+        next.set('search', searchInput);
+      } else {
+        next.delete('search');
+      }
+      setParams(next, { replace: true });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, search, params, setParams]);
+
+  // TFE-09: two-way ?open= sync — opening writes the param (reload-safe,
+  // Back-closes-the-drawer), closing clears it.
   const selectTicket = (id: string | null) => {
     setSelectedId(id);
-    if (!id && params.has('open')) {
-      const next = new URLSearchParams(params);
+    const next = new URLSearchParams(params);
+    if (id) {
+      next.set('open', id);
+    } else {
       next.delete('open');
-      setParams(next, { replace: true });
     }
+    setParams(next, { replace: true });
   };
 
   useEffect(() => {
-    if (openParam) setSelectedId(openParam);
+    setSelectedId(openParam);
   }, [openParam]);
 
   const filters = {
@@ -94,7 +131,8 @@ export default function Tickets() {
     sort: sort ?? undefined,
     order: order ?? undefined,
   };
-  const { data, isLoading } = useQuery({
+  // TFE-01: capture the list error — a failed fetch must not render as "No tickets found".
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tickets', filters, view === 'table' ? { page, pageSize } : 'all'],
     queryFn: () =>
       view === 'table'
@@ -109,7 +147,28 @@ export default function Tickets() {
     enabled: Boolean(selectedId && !rowMatch),
   });
   const selected = rowMatch ?? singleTicket.data ?? null;
+  // TFE-08: deep link to a missing/inaccessible ticket — surfaced as a notice, not a silent no-op.
+  const badOpen = Boolean(selectedId && !rowMatch && singleTicket.isError);
   const users = useQuery({ queryKey: ['users', 'picker'], queryFn: () => listUsers({ limit: 200 }) });
+  // TFE-28: live SLA policy with the const as fallback (values match the server today).
+  const slaPolicy = useQuery({ queryKey: ['sla-policy'], queryFn: getSlaPolicy, staleTime: Infinity, retry: false });
+  const slaHours = (p: string) => slaPolicy.data?.[p]?.hours ?? SLA_HOURS[p] ?? 24;
+
+  // TFE-29: staff can fix title/description/type (C1 — PATCH accepts them).
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [detailsDraft, setDetailsDraft] = useState({ title: '', description: '', ticket_type: '' });
+  useEffect(() => {
+    setEditingDetails(false);
+  }, [selectedId]);
+  const openDetailsEditor = () => {
+    if (!selected) return;
+    setDetailsDraft({
+      title: selected.title,
+      description: selected.description ?? '',
+      ticket_type: selected.ticket_type,
+    });
+    setEditingDetails(true);
+  };
 
   useEffect(() => {
     if (!selected) return;
@@ -145,7 +204,7 @@ export default function Tickets() {
       qc.invalidateQueries({ queryKey: ['ticket-timeline', t.id] });
       qc.invalidateQueries({ queryKey: ['metrics'] });
       qc.invalidateQueries({ queryKey: ['service-queue'] });
-      setSelectedId(t.id);
+      selectTicket(t.id);
     },
   });
 
@@ -161,6 +220,55 @@ export default function Tickets() {
       qc.invalidateQueries({ queryKey: ['service-queue'] });
     },
   });
+
+  const saveDetails = useMutation({
+    mutationFn: (input: { title: string; description: string; ticket_type: string }) =>
+      updateTicket(selected!.id, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      if (selected) {
+        qc.invalidateQueries({ queryKey: ['ticket', selected.id] });
+        qc.invalidateQueries({ queryKey: ['ticket-timeline', selected.id] });
+      }
+      qc.invalidateQueries({ queryKey: ['metrics'] });
+      qc.invalidateQueries({ queryKey: ['service-queue'] });
+      setEditingDetails(false);
+    },
+  });
+
+  // TFE-13: export with pending state and a caught error (no unhandled rejection offline).
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      await exportTicketsCsv({
+        status: status || undefined,
+        priority: priority || undefined,
+        type: type || undefined,
+        overdue: filters.overdue,
+        search: filters.search,
+        sort: sort ?? undefined,
+        order: order ?? undefined,
+      });
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // C4: NewTicketForm calls this via onNewTicket(id) — reset to a clean
+  // list and open the new ticket.
+  const handleNewTicket = (id: string) => {
+    reset();
+    setNewOpen(false);
+    setSelectedId(id);
+    const next = new URLSearchParams();
+    next.set('open', id);
+    setParams(next, { replace: true });
+  };
 
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -195,7 +303,7 @@ export default function Tickets() {
         )}
       </span>
     ) },
-    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <SlaChip dueAt={t.sla_due_at} policyHours={SLA_HOURS[t.priority]} /> },
+    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} /> },
     {
       key: 'ticket_type',
       header: 'Type',
@@ -230,28 +338,24 @@ export default function Tickets() {
       <PageHeader
         title="Tickets"
         description={
-          kanbanTruncated
-            ? `Showing newest ${rows.length} of ${data?.total} tickets`
-            : `${matchCount} ticket${matchCount === 1 ? '' : 's'} matching filters`
+          isLoading
+            ? 'Loading…'
+            : kanbanTruncated
+              ? sort
+                ? `Showing ${rows.length} of ${data?.total} tickets`
+                : `Showing newest ${rows.length} of ${data?.total} tickets`
+              : `${matchCount} ticket${matchCount === 1 ? '' : 's'} matching filters`
         }
         actions={
           <>
             <Button
               type="button"
-              onClick={() =>
-                exportTicketsCsv({
-                  status: status || undefined,
-                  priority: priority || undefined,
-                  type: type || undefined,
-                  overdue: filters.overdue,
-                  search: filters.search,
-                  sort: sort ?? undefined,
-                  order: order ?? undefined,
-                })
-              }
+              onClick={handleExport}
+              disabled={exporting}
+              loading={exporting}
               variant="secondary"
               size="lg"
-              leftIcon={<Download className="h-4 w-4" />}
+              leftIcon={!exporting ? <Download className="h-4 w-4" /> : undefined}
             >
               Export
             </Button>
@@ -268,7 +372,7 @@ export default function Tickets() {
       />
 
       <FilterBar>
-        <div className="relative min-w-0 flex-1 basis-full sm:basis-56"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={search} type="search" inputMode="search" onChange={(e) => update('search', e.target.value)} placeholder="Search tickets..." aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-56"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={searchInput} type="search" inputMode="search" onChange={(e) => setSearchInput(e.target.value)} placeholder="Search tickets..." aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
         <div className="grid w-full grid-cols-2 gap-2 sm:contents">
         <div className="flex w-full justify-center overflow-hidden rounded-lg glass-dense sm:w-auto">
           <button
@@ -293,6 +397,7 @@ export default function Tickets() {
           </button>
         </div>
         <Select
+          ariaLabel="Filter tickets by status"
           className="w-full sm:w-auto sm:min-w-[130px]"
           value={status}
           onChange={(v) => update('status', v)}
@@ -302,12 +407,14 @@ export default function Tickets() {
           ]}
         />
         <Select
+          ariaLabel="Filter tickets by priority"
           className="w-full sm:w-auto sm:min-w-[130px]"
           value={priority}
           onChange={(v) => update('priority', v)}
           options={[{ value: '', label: 'All Priorities' }, ...PRIORITIES.map((p) => ({ value: p, label: p }))]}
         />
         <Select
+          ariaLabel="Filter tickets by type"
           className="w-full sm:w-auto sm:min-w-[130px]"
           value={type}
           onChange={(v) => update('type', v)}
@@ -319,8 +426,49 @@ export default function Tickets() {
         </div>
       </FilterBar>
 
+      {(overdueOnly || exportError) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {overdueOnly && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 py-1 pl-3 pr-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+              Overdue only
+              <button
+                type="button"
+                onClick={() => update('overdue', '')}
+                aria-label="Clear overdue filter"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-amber-500/25"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          )}
+          {exportError && <FieldError id="tickets-export-error" error={`Export failed: ${exportError}`} />}
+        </div>
+      )}
+
+      {badOpen && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl glass-card liquid-glass-subcard px-4 py-3">
+          <p className="text-sm text-secondary">
+            <span className="font-medium text-primary">Ticket not found.</span>{' '}
+            It may have been deleted, or the link is wrong.
+          </p>
+          <Button type="button" variant="secondary" size="sm" onClick={() => selectTicket(null)}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+
       <div className="min-w-0">
-        {!isLoading && rows.length === 0 ? (
+        {isError ? (
+          <div role="alert" className="rounded-xl glass-card liquid-glass-subcard px-6 py-10 text-center">
+            <p className="text-sm font-semibold text-primary">Couldn&apos;t load tickets</p>
+            <p className="mt-1 text-xs text-muted">
+              {error instanceof Error ? error.message : 'Something went wrong while fetching the ticket list.'}
+            </p>
+            <Button type="button" variant="secondary" size="sm" onClick={() => refetch()} className="mt-4">
+              Retry
+            </Button>
+          </div>
+        ) : !isLoading && rows.length === 0 ? (
           <EmptyState
             icon={TicketIcon}
             title="No tickets found"
@@ -349,8 +497,31 @@ export default function Tickets() {
               onSortChange={onSortChange}
               loading={isLoading}
               emptyMessage="No tickets match the current filters."
-              onRowClick={(t) => setSelectedId(t.id)}
+              onRowClick={(t) => selectTicket(t.id)}
             />
+          ) : isLoading ? (
+            <ScrollX innerClassName="pb-2">
+              <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4" aria-busy="true" aria-label="Loading tickets">
+                {TICKET_STATUSES.map((st) => (
+                  <div key={st} className="min-w-[240px] snap-start rounded-xl glass-dense liquid-glass-panel p-3 md:min-w-0">
+                    <div className="mb-3 flex items-center justify-between px-1">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                        {st.replace('_', ' ')}
+                      </span>
+                      <span className="h-5 w-8 animate-pulse rounded-full bg-elevated" />
+                    </div>
+                    <div className="space-y-2">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="animate-pulse rounded-lg glass-card liquid-glass-subcard p-3">
+                          <div className="h-3 w-2/3 rounded bg-elevated" />
+                          <div className="mt-2 h-3 w-1/2 rounded bg-elevated" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollX>
           ) : (
             <ScrollX innerClassName="pb-2">
               <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4">
@@ -362,7 +533,10 @@ export default function Tickets() {
                         <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
                           {st.replace('_', ' ')}
                         </span>
-                        <span className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary">
+                        <span
+                          className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary"
+                          title={kanbanTruncated ? `First ${rows.length} of ${data?.total} tickets loaded` : undefined}
+                        >
                           {items.length}
                         </span>
                       </div>
@@ -371,9 +545,9 @@ export default function Tickets() {
                           <button
                             key={t.id}
                             type="button"
-                            onClick={() => setSelectedId(t.id)}
+                            onClick={() => selectTicket(t.id)}
                             className={cn(
-                              'animate-list-in w-full rounded-lg glass-card liquid-glass-subcard p-3 text-left transition-colors',
+                              'animate-list-in w-full rounded-lg glass-card liquid-glass-subcard p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
                               selectedId === t.id && 'border-accent/60',
                             )}
                             style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
@@ -408,10 +582,16 @@ export default function Tickets() {
           createPortal(
             <div className="fixed inset-0 z-[60]">
             <div
+              aria-hidden="true"
               className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => selectTicket(null)}
             />
-            <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Ticket ${selected.ticket_number}`}
+              className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome"
+            >
               <div className="flex items-start justify-between border-b border-edge px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -442,23 +622,93 @@ export default function Tickets() {
             <div className="mt-3 rounded-lg glass-card liquid-glass-subcard p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                  SLA · {SLA_HOURS[selected.priority] ?? 24}h policy
+                  SLA · {slaHours(selected.priority)}h policy
                 </span>
-                <SlaChip dueAt={selected.sla_due_at} policyHours={SLA_HOURS[selected.priority]} />
+                <SlaChip dueAt={selected.sla_due_at} policyHours={slaHours(selected.priority)} />
               </div>
               <div className="mt-2">
-                <SlaBar dueAt={selected.sla_due_at} policyHours={SLA_HOURS[selected.priority]} />
+                <SlaBar dueAt={selected.sla_due_at} policyHours={slaHours(selected.priority)} />
               </div>
               <p className="mt-1.5 text-[10px] text-muted">
                 {selected.sla_due_at
                   ? `Due ${new Date(selected.sla_due_at).toLocaleString()}${selected.sla_escalated_at ? ' · escalated' : ''}`
-                  : 'No SLA (closed)'}
+                  : 'No active SLA'}
               </p>
             </div>
 
             <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-secondary">
               {selected.description || 'No description provided.'}
             </p>
+
+            {isStaff && !editingDetails && (
+              <div className="mt-2">
+                <Button type="button" variant="ghost" size="sm" onClick={openDetailsEditor} className="px-2 text-xs">
+                  Edit title, type & description
+                </Button>
+              </div>
+            )}
+            {isStaff && editingDetails && (
+              <div className="mt-3 space-y-3 rounded-lg glass-card liquid-glass-subcard p-3">
+                <div>
+                  <label className={labelCls} htmlFor="ticket-edit-title">Title</label>
+                  <input
+                    id="ticket-edit-title"
+                    className={inputCls}
+                    value={detailsDraft.title}
+                    maxLength={200}
+                    onChange={(e) => setDetailsDraft((d) => ({ ...d, title: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Type</label>
+                  <Select
+                    ariaLabel="Ticket type"
+                    className="w-full"
+                    value={detailsDraft.ticket_type}
+                    onChange={(v) => setDetailsDraft((d) => ({ ...d, ticket_type: v }))}
+                    options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls} htmlFor="ticket-edit-description">Description</label>
+                  <textarea
+                    id="ticket-edit-description"
+                    className={cn(inputCls, 'min-h-[80px] resize-y')}
+                    rows={3}
+                    maxLength={4000}
+                    value={detailsDraft.description}
+                    onChange={(e) => setDetailsDraft((d) => ({ ...d, description: e.target.value }))}
+                  />
+                </div>
+                {saveDetails.isError && (
+                  <FieldError
+                    id="ticket-details-error"
+                    error={saveDetails.error instanceof Error ? saveDetails.error.message : 'Failed to save changes.'}
+                  />
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setEditingDetails(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={!detailsDraft.title.trim() || saveDetails.isPending}
+                    loading={saveDetails.isPending}
+                    onClick={() =>
+                      saveDetails.mutate({
+                        title: detailsDraft.title.trim(),
+                        description: detailsDraft.description,
+                        ticket_type: detailsDraft.ticket_type,
+                      })
+                    }
+                  >
+                    Save changes
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex items-center gap-2 text-secondary">
@@ -487,76 +737,105 @@ export default function Tickets() {
 
             <TicketThread ticketId={selected.id} isAdmin={getCachedUser()?.role === 'ADMIN'} />
 
-            <div className="mt-5 grid grid-cols-1 gap-3 border-t border-edge pt-4 sm:grid-cols-2">
-              <div>
-                <label className={labelCls}>Priority</label>
-                <Select
-                  className="w-full"
-                  value={selected.priority}
-                  onChange={(v) => editTicket.mutate({ priority: v as Priority })}
-                  options={PRIORITIES.map((p) => ({ value: p, label: p }))}
-                />
+            {isStaff ? (
+              <>
+                <div className="mt-5 grid grid-cols-1 gap-3 border-t border-edge pt-4 sm:grid-cols-2">
+                  <div>
+                    <label className={labelCls}>Priority</label>
+                    <div className={cn(editTicket.isPending && 'pointer-events-none opacity-60')} aria-disabled={editTicket.isPending}>
+                      <Select
+                        ariaLabel="Ticket priority"
+                        className="w-full"
+                        value={selected.priority}
+                        onChange={(v) => editTicket.mutate({ priority: v as Priority })}
+                        options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Assignee</label>
+                    <div className={cn(editTicket.isPending && 'pointer-events-none opacity-60')} aria-disabled={editTicket.isPending}>
+                      <Select
+                        ariaLabel="Ticket assignee"
+                        className="w-full"
+                        value={selected.assignee_id ?? ''}
+                        onChange={(v) => editTicket.mutate({ assignee_id: v || null })}
+                        options={[
+                          { value: '', label: 'Unassigned' },
+                          ...(users.data?.items ?? []).map((u) => ({
+                            value: u.id,
+                            label: `${u.name} (${u.department})`,
+                          })),
+                        ]}
+                      />
+                    </div>
+                    {users.data && users.data.total > users.data.items.length && (
+                      <p className="mt-1 text-[10px] text-muted">
+                        Showing first 200 of {users.data.total} users
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {editTicket.isError && (
+                  <FieldError
+                    id="ticket-edit-error"
+                    error={editTicket.error instanceof Error ? editTicket.error.message : 'Ticket update failed.'}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="mt-5 grid grid-cols-2 gap-3 border-t border-edge pt-4">
+                <div>
+                  <p className={labelCls}>Priority</p>
+                  <PriorityBadge priority={selected.priority} />
+                </div>
+                <div>
+                  <p className={labelCls}>Assignee</p>
+                  <p className="text-sm text-secondary">{selected.assignee_name ?? 'Unassigned'}</p>
+                </div>
               </div>
-              <div>
-                <label className={labelCls}>Assignee</label>
-                <Select
-                  className="w-full"
-                  value={selected.assignee_id ?? ''}
-                  onChange={(v) => editTicket.mutate({ assignee_id: v || null })}
-                  options={[
-                    { value: '', label: 'Unassigned' },
-                    ...(users.data?.items ?? []).map((u) => ({
-                      value: u.id,
-                      label: `${u.name} (${u.department})`,
-                    })),
-                  ]}
-                />
-              </div>
-            </div>
-            {editTicket.isError && (
-              <p className="mt-2 text-xs text-red-400">
-                {editTicket.error instanceof Error ? editTicket.error.message : 'Ticket update failed.'}
-              </p>
             )}
 
-            <div className="mt-5 border-t border-edge pt-4">
-              {nextStatuses.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => advance.mutate({ id: selected.id, st: nextStatuses[0] })}
-                    disabled={advance.isPending}
-                    loading={advance.isPending}
-                    fullWidth
-                    variant="primary"
-                    rightIcon={!advance.isPending ? <ArrowRight className="h-4 w-4" /> : undefined}
-                  >
-                    Advance to {nextStatuses[0].replace('_', ' ')}
-                  </Button>
-                  {nextStatuses.slice(1).map((st) => (
+            {isStaff && (
+              <div className="mt-5 border-t border-edge pt-4">
+                {nextStatuses.length > 0 ? (
+                  <div className="flex flex-col gap-2">
                     <Button
-                      key={st}
                       type="button"
-                      onClick={() => advance.mutate({ id: selected.id, st })}
+                      onClick={() => advance.mutate({ id: selected.id, st: nextStatuses[0] })}
                       disabled={advance.isPending}
+                      loading={advance.isPending}
                       fullWidth
-                      variant="secondary"
+                      variant="primary"
+                      rightIcon={!advance.isPending ? <ArrowRight className="h-4 w-4" /> : undefined}
                     >
-                      {st === 'OPEN' ? 'Reopen to OPEN' : st === 'CLOSED' ? 'Close' : `Move to ${st.replace('_', ' ')}`}
+                      Advance to {nextStatuses[0].replace('_', ' ')}
                     </Button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-xs text-muted">
-                  No further status transition.
-                </p>
-              )}
-              {advance.isError && (
-                <p className="mt-2 text-xs text-red-400">
-                  {advance.error instanceof Error ? advance.error.message : 'Status update failed.'}
-                </p>
-              )}
-            </div>
+                    {nextStatuses.slice(1).map((st) => (
+                      <Button
+                        key={st}
+                        type="button"
+                        onClick={() => advance.mutate({ id: selected.id, st })}
+                        disabled={advance.isPending}
+                        fullWidth
+                        variant="secondary"
+                      >
+                        {st === 'OPEN' ? 'Reopen to OPEN' : st === 'CLOSED' ? 'Close' : `Move to ${st.replace('_', ' ')}`}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-xs text-muted">
+                    No further status transition.
+                  </p>
+                )}
+                {advance.isError && (
+                  <p className="mt-2 text-xs text-red-400">
+                    {advance.error instanceof Error ? advance.error.message : 'Status update failed.'}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="mt-3">
               <ConvertButton ticket={selected} />
@@ -569,7 +848,10 @@ export default function Tickets() {
 
       {newOpen && (
         <Modal title="New Ticket" onClose={() => setNewOpen(false)}>
-          <NewTicketForm onDone={() => setNewOpen(false)} />
+          <NewTicketForm
+            onDone={() => setNewOpen(false)}
+            onNewTicket={handleNewTicket}
+          />
         </Modal>
       )}
     </div>
@@ -601,10 +883,11 @@ const CHANGE_LABEL: Record<string, string> = {
 
 function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolean }) {
   const qc = useQueryClient();
-  const me = useMemo(() => JSON.parse(localStorage.getItem('itms_user') || 'null'), []);
+  const me = getCachedUser();
   const [draft, setDraft] = useState('');
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [confirmAttDel, setConfirmAttDel] = useState<string | null>(null);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadErr, setUploadErr] = useState('');
 
@@ -621,7 +904,12 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
     mutationFn: (id: string) => deleteTicketComment(ticketId, id),
     onSuccess: () => {
       setConfirmDel(null);
+      setDeleteErr(null);
       qc.invalidateQueries({ queryKey: ['ticket-timeline', ticketId] });
+    },
+    onError: (e) => {
+      setConfirmDel(null);
+      setDeleteErr((e as Error).message || 'Failed to delete comment.');
     },
   });
   const upload = useMutation({
@@ -636,7 +924,12 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
     mutationFn: (id: string) => deleteTicketAttachment(ticketId, id),
     onSuccess: () => {
       setConfirmAttDel(null);
+      setDeleteErr(null);
       qc.invalidateQueries({ queryKey: ['ticket-timeline', ticketId] });
+    },
+    onError: (e) => {
+      setConfirmAttDel(null);
+      setDeleteErr((e as Error).message || 'Failed to delete attachment.');
     },
   });
 
@@ -656,6 +949,8 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
         <span className="ml-auto font-mono text-[10px] text-muted">{comments.length}</span>
       </p>
 
+      {deleteErr && <FieldError id="ticket-delete-error" error={deleteErr} />}
+
       {/* attachments */}
       {attachments.length > 0 && (
         <div className="mb-3 flex flex-col gap-1.5">
@@ -665,11 +960,16 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
               <Button
                 type="button"
                 onClick={() => downloadTicketAttachment(a.id).then((blob) => {
+                  // TFE-24: downloadBlob pattern (client.ts) — the anchor must be
+                  // attached to the DOM before click() or the download can abort
+                  // in Safari/Firefox.
                   const url = URL.createObjectURL(blob);
                   const el = document.createElement('a');
                   el.href = url;
                   el.download = a.file_name;
+                  document.body.appendChild(el);
                   el.click();
+                  el.remove();
                   URL.revokeObjectURL(url);
                 }).catch((e: unknown) => setUploadErr((e as Error).message || 'download failed'))}
                 variant="text"
@@ -682,11 +982,11 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
               {(isAdmin || me?.id === a.uploader_id) &&
                 (confirmAttDel === a.id ? (
                   <span className="flex gap-1">
-                    <button type="button" onClick={() => delAtt.mutate(a.id)} className="rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">Confirm</button>
-                    <button type="button" onClick={() => setConfirmAttDel(null)} className="rounded border border-edge px-1.5 py-0.5 text-[10px] text-secondary">No</button>
+                    <button type="button" onClick={() => delAtt.mutate(a.id)} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">Confirm</button>
+                    <button type="button" onClick={() => setConfirmAttDel(null)} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5 text-[10px] text-secondary">No</button>
                   </span>
                 ) : (
-                  <button type="button" onClick={() => setConfirmAttDel(a.id)} className="text-red-400 hover:opacity-80" title="Delete attachment">
+                  <button type="button" onClick={() => setConfirmAttDel(a.id)} aria-label="Delete attachment" className="inline-flex h-6 w-6 items-center justify-center text-red-400 hover:opacity-80" title="Delete attachment">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 ))}
@@ -709,11 +1009,11 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
                   {(isAdmin || me?.id === c.author_id) &&
                     (confirmDel === c.id ? (
                       <span className="ml-auto flex gap-1">
-                        <button type="button" onClick={() => delComment.mutate(c.id)} className="rounded bg-red-500 px-1.5 py-0.5 font-semibold text-white">Confirm</button>
-                        <button type="button" onClick={() => setConfirmDel(null)} className="rounded border border-edge px-1.5 py-0.5">No</button>
+                        <button type="button" onClick={() => delComment.mutate(c.id)} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 font-semibold text-white">Confirm</button>
+                        <button type="button" onClick={() => setConfirmDel(null)} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5">No</button>
                       </span>
                     ) : (
-                      <button type="button" onClick={() => setConfirmDel(c.id)} className="ml-auto text-red-400 hover:opacity-80" title="Delete comment">
+                      <button type="button" onClick={() => setConfirmDel(c.id)} aria-label="Delete comment" className="ml-auto inline-flex h-6 w-6 items-center justify-center text-red-400 hover:opacity-80" title="Delete comment">
                         <Trash2 className="h-3 w-3" />
                       </button>
                     ))}
@@ -746,10 +1046,17 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Add a comment…"
+          aria-label="Add a comment"
           rows={2}
           maxLength={4000}
           className={cn(inputCls, 'min-h-[60px] resize-y text-xs')}
         />
+        {post.isError && (
+          <FieldError
+            id="ticket-comment-error"
+            error={post.error instanceof Error ? post.error.message : 'Failed to post comment.'}
+          />
+        )}
         {uploadErr && <p className="text-[10px] text-red-400">{uploadErr}</p>}
         <div className="flex items-center gap-2">
           <Button
@@ -768,9 +1075,17 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
             ref={fileRef}
             type="file"
             className="hidden"
+            accept={ATTACHMENT_ACCEPT}
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) upload.mutate(f);
+              if (f) {
+                if (f.size > MAX_ATTACHMENT_BYTES) {
+                  setUploadErr('File exceeds the 10 MB limit.');
+                } else {
+                  setUploadErr('');
+                  upload.mutate(f);
+                }
+              }
               e.target.value = '';
             }}
           />
@@ -799,39 +1114,93 @@ function ConvertButton({ ticket }: { ticket: Ticket }) {
   const qc = useQueryClient();
   const user = getCachedUser();
   const navigate = useNavigate();
+  const [confirming, setConfirming] = useState(false);
   const convert = useMutation({
     mutationFn: () => convertTicketToArticle(ticket.id, {}),
     onSuccess: (a) => {
       qc.invalidateQueries({ queryKey: ['tickets'] });
+      qc.invalidateQueries({ queryKey: ['kb-articles'] });
+      setConfirming(false);
       navigate(`/kb?open=${a.id}`);
     },
   });
   if (user?.role === 'EMPLOYEE') return null;
   if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') return null;
   return (
-    <Button
-      type="button"
-      disabled={convert.isPending}
-      loading={convert.isPending}
-      fullWidth
-      variant="secondary"
-      onClick={() => convert.mutate()}
-      leftIcon={!convert.isPending ? <BookOpen className="h-4 w-4" /> : undefined}
-      title="Capture this resolution as a knowledge-base article"
-    >
-      Convert to KB article
-    </Button>
+    <>
+      <Button
+        type="button"
+        disabled={convert.isPending}
+        fullWidth
+        variant="secondary"
+        onClick={() => setConfirming(true)}
+        leftIcon={<BookOpen className="h-4 w-4" />}
+        title="Capture this resolution as a knowledge-base article"
+      >
+        Convert to KB article
+      </Button>
+      {convert.isError && (
+        <FieldError
+          id="ticket-convert-error"
+          error={convert.error instanceof Error ? convert.error.message : 'Conversion failed.'}
+        />
+      )}
+      {confirming && (
+        <Modal title="Convert to KB article" onClose={() => setConfirming(false)}>
+          <p className="text-sm text-secondary">
+            Capture <span className="font-mono text-accent">{ticket.ticket_number}</span> as a
+            knowledge-base article? You&apos;ll be taken to the new article.
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={convert.isPending}
+              loading={convert.isPending}
+              onClick={() => convert.mutate()}
+            >
+              Convert
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 
 function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
   const user = getCachedUser();
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const canned = useQuery({ queryKey: ['kb-canned'], queryFn: () => listCanned(), enabled: user?.role !== 'EMPLOYEE' });
+  // TFE-21: dismiss on outside-click / Escape. Capture-phase + preventDefault so
+  // the drawer's own Escape handler (which yields on defaultPrevented) stays shut.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open ]);
   if (user?.role === 'EMPLOYEE') return null;
   if (!canned.data?.length) return null;
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -860,4 +1229,3 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
     </div>
   );
 }
-
