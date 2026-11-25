@@ -19,9 +19,9 @@ describe('Responsive & table layout polish', () => {
     expect(src).toContain('sticky right-0 w-28 border-l border-edge/60 bg-surface');
   });
 
-  it('CMDB desktop grid gives the CI table column 420px so min-w-[380px] plus panel padding fits without permanent horizontal scroll', () => {
+  it('CMDB desktop grid gives the CI table column 480px so the tightened table (min-w-[320px], px-2 cells, capped name) fits without permanent horizontal scroll', () => {
     const src = read('./CMDB.tsx');
-    expect(src).toContain('lg:grid-cols-[420px_1fr]');
+    expect(src).toContain('lg:grid-cols-[480px_1fr]');
   });
 
   it('Labels embeds the 38x21mm specification in PageHeader so no trailing paragraph overflows the desktop viewport below DataTable', () => {

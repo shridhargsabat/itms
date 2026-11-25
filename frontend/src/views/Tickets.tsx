@@ -179,7 +179,7 @@ export default function Tickets() {
       sortable: true,
       render: (t) => (
         <div>
-          <span className="font-mono text-xs text-accent">{t.ticket_number}</span>
+          <span className="whitespace-nowrap font-mono text-xs text-accent">{t.ticket_number}</span>
           <p className="max-w-[220px] truncate font-medium text-primary">{t.title}</p>
         </div>
       ),
@@ -195,7 +195,7 @@ export default function Tickets() {
         )}
       </span>
     ) },
-    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <SlaChip dueAt={t.sla_due_at} policyHours={SLA_HOURS[t.priority]} /> },
+    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <span className="whitespace-nowrap"><SlaChip dueAt={t.sla_due_at} policyHours={SLA_HOURS[t.priority]} /></span> },
     {
       key: 'ticket_type',
       header: 'Type',
@@ -215,7 +215,7 @@ export default function Tickets() {
       key: 'asset_tag',
       header: 'Asset',
       render: (t) => (
-        <span className="font-mono text-xs text-secondary">{t.asset_tag ?? '—'}</span>
+        <span className="whitespace-nowrap font-mono text-xs text-secondary">{t.asset_tag ?? '—'}</span>
       ),
     },
   ];
