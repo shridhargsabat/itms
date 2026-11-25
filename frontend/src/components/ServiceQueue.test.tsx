@@ -193,4 +193,65 @@ describe('ServiceQueue (task 9)', () => {
     renderQueue();
     expect(await screen.findByText('Queue is clear')).toBeInTheDocument();
   });
+
+  it('stale banner uses light-readable text with dark-mode fallback (#118)', async () => {
+    const client = queryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/']}>
+          <ServiceQueue />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+
+    // T1 leaves the live queue (resolved elsewhere) → snapshot banner appears.
+    vi.mocked(listTickets).mockResolvedValue({ items: [T2], total: 1 });
+    await client.refetchQueries({ queryKey: ['service-queue'] });
+    const stale = await within(drawer).findByText(/no longer in the queue/);
+    expect(stale.className).toContain('text-amber-700');
+    expect(stale.className).toContain('dark:text-amber-400');
+  });
+
+  it('load error uses light-readable text with dark-mode fallback (#118)', async () => {
+    vi.mocked(listTickets).mockRejectedValue(new Error('boom'));
+    renderQueue();
+    const err = await screen.findByText('Failed to load the service queue.');
+    expect(err.className).toContain('text-red-700');
+    expect(err.className).toContain('dark:text-red-400');
+  });
+
+  it('status confirm uses light-readable text with dark-mode fallback (#118)', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+
+    const ok = await within(drawer).findByText('Status updated to IN_PROGRESS');
+    expect(ok.className).toContain('text-emerald-700');
+    expect(ok.className).toContain('dark:text-emerald-400');
+  });
+
+  it('status update error uses light-readable text with dark-mode fallback (#118)', async () => {
+    vi.mocked(patchTicketStatus).mockRejectedValue(new Error('update failed'));
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+
+    const err = await within(drawer).findByText('update failed');
+    expect(err.className).toContain('text-red-700');
+    expect(err.className).toContain('dark:text-red-400');
+  });
 });
