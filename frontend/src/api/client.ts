@@ -174,6 +174,35 @@ export class ApiError extends Error {
 }
 
 /**
+ * Task 6 (UI-05): offline signals for `useOnline`. A real API response
+ * succeeding is ground truth for "online" — stronger than a stale window
+ * offline event (captive portals, blips). Dispatched only on `res.ok`;
+ * HTTP 4xx/5xx throw ApiError below without touching online state.
+ */
+function notifyRequestSuccess() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('itms:request-success'));
+  }
+}
+
+/**
+ * Network-layer failure (fetch TypeError — DNS, refused, offline). Only
+ * signal offline when the browser agrees (`navigator.onLine === false`);
+ * a TypeError with the browser online (CORS, aborted, timeout) is not
+ * an offline state. `useOnline` re-checks this guard on receipt.
+ */
+function notifyRequestOfflineIfBrowserAgrees(err: unknown) {
+  if (
+    err instanceof TypeError &&
+    typeof window !== 'undefined' &&
+    typeof navigator !== 'undefined' &&
+    navigator.onLine === false
+  ) {
+    window.dispatchEvent(new CustomEvent('itms:request-offline'));
+  }
+}
+
+/**
  * Session-establishing / public auth paths: exempt from idle/absolute
  * enforcement (a stale attached token must not nuke a fresh login, a logout
  * must still revoke server-side, public reads carry no session to expire).
@@ -263,7 +292,13 @@ async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Respon
 
   // Wave-2a: always send cookies — the httpOnly itms_session rides along
   // while the Bearer header keeps transitional API clients working.
-  const res = await fetch(`/api/v1${path}`, { ...init, headers, signal, credentials: 'include' });
+  let res: Response;
+  try {
+    res = await fetch(`/api/v1${path}`, { ...init, headers, signal, credentials: 'include' });
+  } catch (err) {
+    notifyRequestOfflineIfBrowserAgrees(err);
+    throw err;
+  }
 
   if (res.status === 401 && maybeAuthed && !path.startsWith('/auth/login')) {
     await clearSession();
@@ -282,6 +317,7 @@ async function apiFetchRaw(path: string, init: RequestInit = {}): Promise<Respon
     }
     throw new ApiError(res.status, detail);
   }
+  notifyRequestSuccess();
   return res;
 }
 
@@ -518,6 +554,7 @@ export const parseInvoicePdf = async (file: File) => {
     const err = await res.json().catch(() => null);
     throw new Error(err?.error || `parse failed: ${res.status}`);
   }
+  notifyRequestSuccess();
   return res.json() as Promise<InvoiceParseResult>;
 };
 
@@ -799,6 +836,7 @@ export const uploadTicketAttachment = async (ticketId: string, file: File) => {
     const err = await res.json().catch(() => null);
     throw new Error(err?.error || `upload failed: ${res.status}`);
   }
+  notifyRequestSuccess();
   return res.json() as Promise<TicketAttachment>;
 };
 
@@ -823,6 +861,7 @@ export const downloadTicketAttachment = async (attachmentId: string) => {
     const err = await res.json().catch(() => null) as { error?: string } | null;
     throw new ApiError(res.status, err?.error || `download failed: ${res.status}`);
   }
+  notifyRequestSuccess();
   return res.blob();
 };
 

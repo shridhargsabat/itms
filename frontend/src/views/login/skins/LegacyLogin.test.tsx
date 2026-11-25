@@ -21,7 +21,8 @@ describe('legacy login freeze + Apple Liquid Glass upgrade', () => {
     expect(screen.getByPlaceholderText('you@company.com')).toBeInTheDocument();
     expect(container.querySelector('.glass-card')).not.toBeNull();
     expect(container.querySelector('.animate-pulse-ring')).not.toBeNull();
-    expect(screen.getByText(/argon2 hashes/)).toBeInTheDocument();
+    // Task 18 (UI-18): internal auth details (argon2, build hash) stay off the public card.
+    expect(container.textContent).not.toMatch(/argon2/i);
   });
 
   it('activates rdev/liquid-glass-react SVG filter bank and specular surface when in Liquid Glass theme', () => {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Eye, EyeOff, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getOAuthAdmin, updateOAuthAdmin } from '@/api/client';
 import type { OAuthConfig } from '@/api/types';
@@ -42,6 +42,8 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [themeOpen, setThemeOpen] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const save = useMutation({
     mutationFn: (input: Parameters<typeof updateOAuthAdmin>[0]) => updateOAuthAdmin(input),
@@ -58,6 +60,28 @@ export default function Settings() {
 
   const cfg: OAuthConfig = data ?? { provider: 'google', enabled: false, client_id: '', has_secret: false, allowed_domains: [] };
   const redirectUri = `${window.location.origin}/api/v1/auth/oauth/callback`;
+
+  const copyRedirectUri = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(redirectUri);
+      } else {
+        // Fallback for non-secure contexts (plain http, older browsers).
+        const ta = document.createElement('textarea');
+        ta.value = redirectUri;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable — leave the URI selectable instead of failing loudly.
+    }
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -120,8 +144,9 @@ export default function Settings() {
 
         <div className="mt-5 space-y-4">
           <div>
-            <label className={labelCls}>OAuth Client ID</label>
+            <label className={labelCls} htmlFor="oauth-client-id">OAuth Client ID</label>
             <input
+              id="oauth-client-id"
               value={clientId ?? cfg.client_id}
               onChange={(e) => setClientId(e.target.value)}
               placeholder="1234567890-xxxx.apps.googleusercontent.com"
@@ -129,23 +154,38 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className={labelCls}>OAuth Client Secret</label>
-            <input
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              placeholder={cfg.has_secret ? '•••••••• (leave blank to keep)' : 'GOCSPX-…'}
-              type="password"
-              className={cn(inputCls, 'font-mono text-xs')}
-            />
+            <label className={labelCls} htmlFor="oauth-client-secret">OAuth Client Secret</label>
+            <div className="relative">
+              <input
+                id="oauth-client-secret"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                placeholder={cfg.has_secret ? '•••••••• (leave blank to keep)' : 'GOCSPX-…'}
+                type={showSecret ? 'text' : 'password'}
+                autoComplete="new-password"
+                className={cn(inputCls, 'pr-11 font-mono text-xs')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((v) => !v)}
+                aria-pressed={showSecret}
+                aria-label={showSecret ? 'Hide secret' : 'Show secret'}
+                title={showSecret ? 'Hide secret' : 'Show secret'}
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <div>
-            <label className={labelCls}>
+            <label className={labelCls} htmlFor="oauth-allowed-domains">
               Allowed domains <span className="normal-case text-muted">(comma-separated; empty = any existing account)</span>
             </label>
             <input
+              id="oauth-allowed-domains"
               value={domains ?? cfg.allowed_domains.join(', ')}
               onChange={(e) => setDomains(e.target.value)}
-              placeholder="e.g. sonalapparels.in, itms.local"
+              placeholder="example.com"
               className={cn(inputCls, 'font-mono text-xs')}
             />
             <p className="mt-1 text-[11px] text-muted">
@@ -155,8 +195,28 @@ export default function Settings() {
           </div>
 
           <div className="rounded-lg glass-dense p-3">
-            <p className={labelCls}>Authorized redirect URI (Google Cloud → OAuth client → add this)</p>
-            <p className="mt-1 select-all break-all font-mono text-[11px] text-accent">{redirectUri}</p>
+            <label className={labelCls} htmlFor="oauth-redirect-uri">Authorized redirect URI (Google Cloud → OAuth client → add this)</label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                id="oauth-redirect-uri"
+                value={redirectUri}
+                readOnly
+                onFocus={(e) => e.target.select()}
+                className={cn(inputCls, 'select-all break-all font-mono text-[11px] text-accent')}
+              />
+              <Button
+                type="button"
+                onClick={copyRedirectUri}
+                variant="secondary"
+                size="sm"
+                aria-label="Copy redirect URI"
+                title="Copy redirect URI"
+                leftIcon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                className="shrink-0"
+              >
+                <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
+              </Button>
+            </div>
           </div>
 
           {error && (

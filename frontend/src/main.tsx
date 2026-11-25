@@ -38,6 +38,7 @@ const Onboarding = lazy(() => import('@/views/Onboarding'));
 const Notifications = lazy(() => import('@/views/Notifications'));
 const Requests = lazy(() => import('@/views/Requests'));
 const Licenses = lazy(() => import('@/views/Licenses'));
+const NotFound = lazy(() => import('@/views/NotFound'));
 import { captureInstallPrompt, initSwUpdateHandling } from '@/lib/pwa';
 
 captureInstallPrompt();
@@ -56,8 +57,8 @@ const queryClient = new QueryClient({
 /** Shown while a lazy route chunk downloads (first visit to a view). */
 function RouteFallback() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-base">
-      <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
+    <div role="status" aria-label="Loading page" className="flex min-h-dvh items-center justify-center bg-base">
+      <LoaderCircle className="h-6 w-6 animate-spin text-accent" aria-hidden="true" />
     </div>
   );
 }
@@ -99,6 +100,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/scan" element={<Scan />} />
                 <Route path="/labels" element={<Labels />} />
+                <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
           </RouteErrorBoundary>

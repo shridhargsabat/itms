@@ -13,9 +13,9 @@ import { useLogin } from '../useLogin';
  * credential-prefill and `demo`-as-email shortcut were NOT ported: the
  * `demo` affordance calls `onDemoClick()` → server mutation directly, the
  * hint line was rewritten to match, and the demo password literal appears
- * nowhere (not even here — see the security binding). `forgot --passphrase` and the build footer are additions the
- * mockup lacks (R1 contract + binding constraint). All auth behavior comes
- * from useLogin() — this file is presentation only.
+ * nowhere (not even here — see the security binding). `forgot --passphrase`
+ * is an addition the mockup lacks (R1 contract + binding constraint). All
+ * auth behavior comes from useLogin() — this file is presentation only.
  *
  * Intentional non-token colors (no var(--t-*) exists for these; task-14 sweep):
  * traffic-light dots (#ff5f57/#febc2e/#28c840), run-button ink (#04120a),
@@ -237,11 +237,6 @@ export default function TerminalLogin() {
               </p>
             )}
           </div>
-
-          <p className="mt-4 text-xs text-muted">
-            <span aria-hidden># </span>argon2 · revocable sessions · build{' '}
-            {__BUILD_SHA__}
-          </p>
         </div>
       </div>
     </div>

@@ -213,12 +213,19 @@ export default function DataTable<T extends { id: string }>({
         )}
         {columns.map((c) => {
           const sortKey = c.sortKey ?? c.key;
-          const isSorted = c.sortable === true && sort?.key === sortKey;
           return (
             <th
               key={c.key}
               scope="col"
-              aria-sort={isSorted ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+              aria-sort={
+                c.sortable
+                  ? sort?.key === sortKey
+                    ? sort.dir === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none'
+                  : undefined
+              }
               className={cn(TABLE_SPEC.th, c.className)}
             >
               {c.sortable ? (
@@ -226,7 +233,10 @@ export default function DataTable<T extends { id: string }>({
                   type="button"
                   onClick={() => cycleSort(c)}
                   className={cn(
-                    'inline-flex min-h-[24px] min-w-[24px] items-center gap-1 rounded transition-colors hover:text-primary',
+                    // Task 18 (UI-17): explicit uppercase — preflight sets
+                    // text-transform:none on buttons, which used to leave
+                    // sortable headers Title Case next to ALL-CAPS plain ones.
+                    'inline-flex min-h-[24px] min-w-[24px] items-center gap-1 rounded uppercase transition-colors hover:text-primary',
                     sort?.key === sortKey && 'text-accent',
                   )}
                 >

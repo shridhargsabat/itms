@@ -287,7 +287,7 @@ export default function Tickets() {
       sortable: true,
       render: (t) => (
         <div>
-          <span className="font-mono text-xs text-accent">{t.ticket_number}</span>
+          <span className="whitespace-nowrap font-mono text-xs text-accent">{t.ticket_number}</span>
           <p className="max-w-[220px] truncate font-medium text-primary">{t.title}</p>
         </div>
       ),
@@ -303,7 +303,7 @@ export default function Tickets() {
         )}
       </span>
     ) },
-    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} /> },
+    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <span className="whitespace-nowrap"><SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} /></span> },
     {
       key: 'ticket_type',
       header: 'Type',
@@ -324,7 +324,7 @@ export default function Tickets() {
       key: 'asset_tag',
       header: 'Asset',
       render: (t) => (
-        <span className="font-mono text-xs text-secondary">{t.asset_tag ?? '—'}</span>
+        <span className="whitespace-nowrap font-mono text-xs text-secondary">{t.asset_tag ?? '—'}</span>
       ),
     },
   ];
@@ -340,7 +340,7 @@ export default function Tickets() {
         title="Tickets"
         description={
           isLoading
-            ? 'Loading…'
+            ? 'Loading tickets…'
             : kanbanTruncated
               ? sort
                 ? `Showing ${rows.length} of ${data?.total} tickets`
@@ -506,7 +506,7 @@ export default function Tickets() {
             <ScrollX innerClassName="pb-2">
               <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4" aria-busy="true" aria-label="Loading tickets">
                 {TICKET_STATUSES.map((st) => (
-                  <div key={st} className="min-w-[240px] snap-start rounded-xl glass-dense liquid-glass-panel p-3 md:min-w-0">
+                  <div key={st} data-testid="kanban-skeleton" className="min-w-[240px] snap-start rounded-xl glass-dense liquid-glass-panel p-3 md:min-w-0">
                     <div className="mb-3 flex items-center justify-between px-1">
                       <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
                         {st.replace('_', ' ')}
@@ -583,7 +583,7 @@ export default function Tickets() {
 
         {selected &&
           createPortal(
-            <div className="fixed inset-0 z-[60]">
+            <div className="fixed inset-0 z-[70]">
             <div
               aria-hidden="true"
               className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -593,7 +593,7 @@ export default function Tickets() {
               role="dialog"
               aria-modal="true"
               aria-label={`Ticket ${selected.ticket_number}`}
-              className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome"
+              className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-edge bg-surface shadow-2xl"
             >
               <div className="flex items-start justify-between border-b border-edge px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
                 <div>
@@ -614,7 +614,7 @@ export default function Tickets() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => selectTicket(null)}
+                  onClick={(e) => { e.stopPropagation(); selectTicket(null); }}
                   aria-label="Close"
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg p-2 text-secondary transition-colors hover:bg-elevated hover:text-primary"
                 >
@@ -1043,7 +1043,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
       </div>
 
       {/* new comment */}
-      <div className="flex flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <CannedPicker onPick={(t) => setDraft((d) => (d ? d + '\n\n' + t : t))} />
         <textarea
           value={draft}
@@ -1061,7 +1061,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           />
         )}
         {uploadErr && <p className="text-[10px] text-red-400">{uploadErr}</p>}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -1099,7 +1099,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
             loading={post.isPending}
             variant="primary"
             size="sm"
-            className="ml-auto px-3 py-1.5 text-[11px]"
+            className="ml-auto shrink-0 px-3 py-1.5 text-[11px]"
           >
             Post comment
           </Button>
