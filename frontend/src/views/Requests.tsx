@@ -41,19 +41,19 @@ import type {
 } from '@/api/types';
 
 const STATUS_STYLE: Record<RequestStatus, string> = {
-  SUBMITTED: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-  APPROVED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-  REJECTED: 'bg-red-500/10 text-red-400 border-red-500/30',
-  IN_PROGRESS: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  SUBMITTED: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
+  APPROVED: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  REJECTED: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30',
+  IN_PROGRESS: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30',
   COMPLETED: 'bg-elevated/10 text-secondary border-edge2/30',
   CANCELLED: 'bg-elevated/10 text-muted border-edge2/30',
 };
 
 const PRIORITY_STYLE: Record<RequestPriority, string> = {
   LOW: 'text-secondary',
-  MEDIUM: 'text-blue-400',
-  HIGH: 'text-amber-400',
-  URGENT: 'text-red-400',
+  MEDIUM: 'text-blue-700 dark:text-blue-400',
+  HIGH: 'text-amber-700 dark:text-amber-400',
+  URGENT: 'text-red-700 dark:text-red-400',
 };
 
 const PRIORITIES: RequestPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
