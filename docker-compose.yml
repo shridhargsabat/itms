@@ -46,6 +46,9 @@ services:
     environment:
       DATABASE_URL: postgres://itms:${POSTGRES_PASSWORD:?set in .env}@db:5432/itms
       INTAKE_TOKEN: ${INTAKE_TOKEN:-}
+      # TBE-15 handler-layer sender allowlist (fail CLOSED: missing/empty denies
+      # intake). Comma-separated exact addresses + @domain suffixes.
+      INTAKE_SENDER_ALLOWLIST: ${INTAKE_SENDER_ALLOWLIST:?set in .env}
       # invoice-parse: bearer key for mimo-v2.5 OCR/parsing (OpenCode Go). Must
       # be present in .env or invoice parsing returns "not configured".
       OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY:-}

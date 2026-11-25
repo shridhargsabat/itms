@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, FileUp } from 'lucide-react';
-import { createAsset, listVendors, listLocations } from '@/api/client';
+import { createAsset, getMasters, listVendors, listLocations } from '@/api/client';
 import { ASSET_CATEGORIES, ASSET_STATUSES } from '@/api/types';
 import type { CreateAssetInput } from '@/api/types';
 import { cn, inputCls, labelCls } from '@/lib/utils';
 import { Button } from '@/components/Button';
+import { FieldError, errProps } from '@/components/FieldError';
 import Select from '@/components/Select';
 import InvoiceAssetUpload from '@/components/InvoiceAssetUpload';
 
@@ -42,6 +43,7 @@ export default function AddAssetForm({
   const [expectedEol, setExpectedEol] = useState('');
   const [locationId, setLocationId] = useState('');
   const [vendorId, setVendorId] = useState('');
+  const [errors, setErrors] = useState<{ name?: string; unitCost?: string }>({});
   const manualTabRef = useRef<HTMLButtonElement>(null);
   const invoiceTabRef = useRef<HTMLButtonElement>(null);
   const onTabKeyDown = (e: React.KeyboardEvent) => {
@@ -54,6 +56,15 @@ export default function AddAssetForm({
 
   const locationsQ = useQuery({ queryKey: ['locations'], queryFn: () => listLocations() });
   const vendorsQ = useQuery({ queryKey: ['vendors'], queryFn: () => listVendors() });
+  // FORM-09: Masters-backed Category options (same local-fetch approach as
+  // the Requests department select), falling back to the static list when
+  // Masters has no asset_category rows yet.
+  const mastersQ = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
+  const mastersCats = mastersQ.data?.asset_category ?? [];
+  const categoryOptions =
+    mastersCats.length > 0
+      ? mastersCats.map((c) => ({ value: c.code, label: c.label }))
+      : ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') }));
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -128,22 +139,43 @@ export default function AddAssetForm({
       ) : (
       <form
       className="space-y-4"
+      noValidate
       onSubmit={(ev) => {
         ev.preventDefault();
+        // FORM-02: submit-time inline validation replaces native-required-only.
+        const e: { name?: string; unitCost?: string } = {};
+        if (!form.name.trim()) e.name = 'Asset name is required';
+        if (unitCost !== '' && (Number.isNaN(Number(unitCost)) || Number(unitCost) < 0)) {
+          e.unitCost = 'Unit cost must be a number of 0 or more';
+        }
+        setErrors(e);
+        if (e.name) {
+          document.getElementById('asset-name')?.focus();
+          return;
+        }
+        if (e.unitCost) {
+          document.getElementById('asset-unit-cost')?.focus();
+          return;
+        }
         mutation.mutate();
       }}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className={labelCls} htmlFor="asset-name">Name *</label>
+          <label className={labelCls} htmlFor="asset-name">Name <span aria-hidden="true">*</span></label>
           <input
             id="asset-name"
-            required
+            aria-required="true"
+            {...errProps('asset-name', errors.name)}
             className={inputCls}
             value={form.name}
-            onChange={(e) => set('name', e.target.value)}
+            onChange={(e) => {
+              set('name', e.target.value);
+              if (errors.name) setErrors((er) => ({ ...er, name: undefined }));
+            }}
             placeholder="e.g. Dell XPS 15"
           />
+          <FieldError id="asset-name-error" error={errors.name} />
         </div>
         <div>
           <label className={labelCls} htmlFor="asset-tag">Asset Tag</label>
@@ -168,12 +200,13 @@ export default function AddAssetForm({
           />
         </div>
         <div>
-          <label className={labelCls}>Category</label>
+          <label className={labelCls} htmlFor="asset-category">Category</label>
           <Select
+            id="asset-category"
             className="w-full"
             value={form.category}
             onChange={(v) => set('category', v as CreateAssetInput['category'])}
-            options={ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
+            options={categoryOptions}
           />
         </div>
       </div>
@@ -218,9 +251,14 @@ export default function AddAssetForm({
             step="0.01"
             className={inputCls}
             value={unitCost}
-            onChange={(e) => setUnitCost(e.target.value)}
+            {...errProps('asset-unit-cost', errors.unitCost)}
+            onChange={(e) => {
+              setUnitCost(e.target.value);
+              if (errors.unitCost) setErrors((er) => ({ ...er, unitCost: undefined }));
+            }}
             placeholder="Optional"
           />
+          <FieldError id="asset-unit-cost-error" error={errors.unitCost} />
         </div>
         <div>
           <label className={labelCls} htmlFor="asset-expected-eol">Expected EOL</label>
@@ -307,7 +345,7 @@ export default function AddAssetForm({
         </div>
       </div>
       {mutation.isError && (
-        <p className="text-xs text-red-400">
+        <p role="alert" className="text-xs text-red-400">
           {mutation.error instanceof Error ? mutation.error.message : 'Failed to create asset.'}
         </p>
       )}

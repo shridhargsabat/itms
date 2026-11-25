@@ -33,6 +33,7 @@ import {
 import { useServerPagination } from '@/lib/usePagination';
 import PaginationFooter from '@/components/PaginationFooter';
 import { Button } from '@/components/Button';
+import { FieldError, errProps } from '@/components/FieldError';
 import type { License, LicenseType } from '@/api/types';
 
 const TYPE_STYLE: Record<LicenseType, string> = {
@@ -526,6 +527,7 @@ function LicenseFormModal({ license, onClose, onSaved }: { license: License | nu
   const [renewal, setRenewal] = useState(license?.renewal_cost != null ? String(license.renewal_cost) : '');
   const [notes, setNotes] = useState(license?.notes ?? '');
   const [err, setErr] = useState('');
+  const [errors, setErrors] = useState<{ name?: string; seats?: string }>({});
   const qc = useQueryClient();
 
   const save = useMutation({
@@ -552,12 +554,47 @@ function LicenseFormModal({ license, onClose, onSaved }: { license: License | nu
     onError: (e) => setErr((e as Error).message || 'Failed to save'),
   });
 
+  // FORM-02: submit-time inline validation — an empty/invalid submit shows
+  // FieldError messages and focuses the first invalid field, never silent.
+  const submit = () => {
+    const e: { name?: string; seats?: string } = {};
+    if (!name.trim()) e.name = 'Software name is required';
+    if (!seats.trim()) {
+      e.seats = 'Seats is required';
+    } else {
+      const n = Number(seats);
+      if (!Number.isInteger(n) || n < 0) e.seats = 'Seats must be a whole number of 0 or more';
+    }
+    setErrors(e);
+    if (e.name) {
+      document.getElementById('license-name')?.focus();
+      return;
+    }
+    if (e.seats) {
+      document.getElementById('license-seats')?.focus();
+      return;
+    }
+    save.mutate();
+  };
+
   return (
     <Modal onClose={onClose} title={license ? 'Edit License' : 'Register License'}>
       <div className="flex flex-col gap-3.5">
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1" htmlFor="license-name">
           <span className={labelCls}>Software name *</span>
-          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Microsoft 365 Business" />
+          <input
+            id="license-name"
+            className={inputCls}
+            value={name}
+            aria-required="true"
+            {...errProps('license-name', errors.name)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (errors.name) setErrors((e) => ({ ...e, name: undefined }));
+            }}
+            placeholder="e.g. Microsoft 365 Business"
+          />
+          <FieldError id="license-name-error" error={errors.name} />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
@@ -574,9 +611,22 @@ function LicenseFormModal({ license, onClose, onSaved }: { license: License | nu
           </label>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1" htmlFor="license-seats">
             <span className={labelCls}>Seats purchased *</span>
-            <input className={inputCls} type="number" min={0} value={seats} onChange={(e) => setSeats(e.target.value)} />
+            <input
+              id="license-seats"
+              className={inputCls}
+              type="number"
+              min={0}
+              value={seats}
+              aria-required="true"
+              {...errProps('license-seats', errors.seats)}
+              onChange={(e) => {
+                setSeats(e.target.value);
+                if (errors.seats) setErrors((er) => ({ ...er, seats: undefined }));
+              }}
+            />
+            <FieldError id="license-seats-error" error={errors.seats} />
           </label>
           <label className="flex flex-col gap-1">
             <span className={labelCls}>Currency</span>
@@ -611,12 +661,12 @@ function LicenseFormModal({ license, onClose, onSaved }: { license: License | nu
           <span className={labelCls}>Notes</span>
           <textarea className={cn(inputCls, 'min-h-[64px]')} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </label>
-        {err && <p className="text-xs text-red-400">{err}</p>}
+        {err && <p role="alert" className="text-xs text-red-400">{err}</p>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} variant="secondary">Cancel</Button>
           <Button
-            onClick={() => save.mutate()}
-            disabled={!name.trim() || !seats || save.isPending}
+            onClick={submit}
+            disabled={save.isPending}
             loading={save.isPending}
             variant="primary"
           >

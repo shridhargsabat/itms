@@ -20,6 +20,7 @@ import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
 import PaginationFooter from '@/components/PaginationFooter';
 import Select from '@/components/Select';
+import { FieldError, errProps } from '@/components/FieldError';
 import { getCachedUser } from '@/api/client';
 import {
   addOnboardingTask,
@@ -372,6 +373,7 @@ function CreateEventModal({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [startDate, setStartDate] = useState('');
+  const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
   const [tasks, setTasks] = useState<CreateTaskInput[]>(
     type === 'ONBOARDING' ? [...DEFAULT_ONBOARDING] : [...DEFAULT_OFFBOARDING],
   );
@@ -391,21 +393,67 @@ function CreateEventModal({
   const setTask = (i: number, patch: Partial<CreateTaskInput>) =>
     setTasks((ts) => ts.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
 
+  // FORM-02: submit-time inline validation — an empty/invalid submit shows
+  // FieldError messages and focuses the first invalid field, never silent.
+  const submit = () => {
+    const e: { name?: string; email?: string } = {};
+    if (!name.trim()) e.name = 'Full name is required';
+    if (!email.trim()) {
+      e.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      e.email = 'Enter a valid email address';
+    }
+    setErrors(e);
+    if (e.name) {
+      document.getElementById('onboard-name')?.focus();
+      return;
+    }
+    if (e.email) {
+      document.getElementById('onboard-email')?.focus();
+      return;
+    }
+    create.mutate();
+  };
+
   return (
     <Modal onClose={onClose} title={`New ${type === 'ONBOARDING' ? 'Joiner' : 'Leaver'} Event`}>
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1" htmlFor="onboard-name">
             <span className={labelCls}>
               Full name <span aria-hidden="true" className="text-red-400">*</span>
             </span>
-            <input className={inputCls} value={name} aria-required="true" onChange={(e) => setName(e.target.value)} placeholder="e.g. Priya Sharma" />
+            <input
+              id="onboard-name"
+              className={inputCls}
+              value={name}
+              aria-required="true"
+              {...errProps('onboard-name', errors.name)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) setErrors((er) => ({ ...er, name: undefined }));
+              }}
+              placeholder="e.g. Priya Sharma"
+            />
+            <FieldError id="onboard-name-error" error={errors.name} />
           </label>
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1" htmlFor="onboard-email">
             <span className={labelCls}>
               Email <span aria-hidden="true" className="text-red-400">*</span>
             </span>
-            <input className={inputCls} value={email} aria-required="true" onChange={(e) => setEmail(e.target.value)} placeholder="e.g. priya@company.com" />
+            <input
+              id="onboard-email"
+              className={inputCls}
+              value={email}
+              aria-required="true"
+              {...errProps('onboard-email', errors.email)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors((er) => ({ ...er, email: undefined }));
+              }}
+              placeholder="e.g. priya@company.com"
+            />
+            <FieldError id="onboard-email-error" error={errors.email} />
           </label>
         </div>
         <label className="flex flex-col gap-1">
@@ -458,13 +506,13 @@ function CreateEventModal({
         </div>
 
         {create.isError && (
-          <p className="text-xs text-red-400">Failed to create event. Please try again.</p>
+          <p role="alert" className="text-xs text-red-400">Failed to create event. Please try again.</p>
         )}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} variant="secondary">Cancel</Button>
           <Button
-            onClick={() => create.mutate()}
-            disabled={!name.trim() || !email.trim()}
+            onClick={submit}
+            disabled={create.isPending}
             loading={create.isPending}
             variant="primary"
           >
@@ -669,6 +717,7 @@ function EditEventModal({
   const [name, setName] = useState(event.person_name);
   const [email, setEmail] = useState(event.person_email);
   const [startDate, setStartDate] = useState(event.start_date ?? '');
+  const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
 
   const save = useMutation({
     mutationFn: () =>
@@ -680,16 +729,63 @@ function EditEventModal({
     onSuccess: onSaved,
   });
 
+  // FORM-02: same submit-time inline validation as the create modal.
+  const submit = () => {
+    const e: { name?: string; email?: string } = {};
+    if (!name.trim()) e.name = 'Full name is required';
+    if (!email.trim()) {
+      e.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      e.email = 'Enter a valid email address';
+    }
+    setErrors(e);
+    if (e.name) {
+      document.getElementById('edit-event-name')?.focus();
+      return;
+    }
+    if (e.email) {
+      document.getElementById('edit-event-email')?.focus();
+      return;
+    }
+    save.mutate();
+  };
+
   return (
     <Modal onClose={onClose} title="Edit event">
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1">
-          <span className={labelCls}>Full name</span>
-          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
+        <label className="flex flex-col gap-1" htmlFor="edit-event-name">
+          <span className={labelCls}>
+            Full name <span aria-hidden="true" className="text-red-400">*</span>
+          </span>
+          <input
+            id="edit-event-name"
+            className={inputCls}
+            value={name}
+            aria-required="true"
+            {...errProps('edit-event-name', errors.name)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (errors.name) setErrors((er) => ({ ...er, name: undefined }));
+            }}
+          />
+          <FieldError id="edit-event-name-error" error={errors.name} />
         </label>
-        <label className="flex flex-col gap-1">
-          <span className={labelCls}>Email</span>
-          <input className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} />
+        <label className="flex flex-col gap-1" htmlFor="edit-event-email">
+          <span className={labelCls}>
+            Email <span aria-hidden="true" className="text-red-400">*</span>
+          </span>
+          <input
+            id="edit-event-email"
+            className={inputCls}
+            value={email}
+            aria-required="true"
+            {...errProps('edit-event-email', errors.email)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((er) => ({ ...er, email: undefined }));
+            }}
+          />
+          <FieldError id="edit-event-email-error" error={errors.email} />
         </label>
         <label className="flex flex-col gap-1">
           <span className={labelCls}>Start date</span>
@@ -698,7 +794,7 @@ function EditEventModal({
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} variant="secondary">Cancel</Button>
           <Button
-            onClick={() => save.mutate()}
+            onClick={submit}
             loading={save.isPending}
             variant="primary"
           >

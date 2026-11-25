@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { changePassword, getCachedUser } from '@/api/client';
 import { inputCls, labelCls } from '@/lib/utils';
 import { Button } from '@/components/Button';
+import { FieldError, errProps } from '@/components/FieldError';
 import PageHeader from '@/components/PageHeader';
 
 // P1-6: self-service change-own-password page.
@@ -16,6 +17,7 @@ export default function Account() {
   const [showPw2, setShowPw2] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk] = useState(false);
+  const [errors, setErrors] = useState<{ cur?: string; pw?: string; pw2?: string }>({});
   const user = getCachedUser();
   // Wave 2-C: onSuccess already clears all three fields; the unmount cleanup
   // pins it for every exit path (navigation mid-typing, etc.).
@@ -33,7 +35,13 @@ export default function Account() {
     },
   });
 
-  const mismatch = pw2.length > 0 && pw !== pw2;
+  // FORM-02: the confirm-mismatch hint stays live while typing, now as a
+  // FieldError (role=alert); submit-time errors take precedence.
+  const pw2LiveMismatch = pw2.length > 0 && pw !== pw2 ? 'Passwords do not match.' : undefined;
+  const pw2Error = errors.pw2 ?? pw2LiveMismatch;
+
+  const clearError = (key: 'cur' | 'pw' | 'pw2') =>
+    setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
 
   return (
     <div className="mx-auto w-full max-w-md">
@@ -52,24 +60,52 @@ export default function Account() {
         className="space-y-4 rounded-xl glass-card p-6"
         onSubmit={(e) => {
           e.preventDefault();
-          if (pw.length < 8) { setErr('Password must be at least 8 characters.'); return; }
-          if (pw !== pw2) { setErr('Passwords do not match.'); return; }
+          // FORM-02: submit-time inline validation with focus-first-invalid.
+          const errs: { cur?: string; pw?: string; pw2?: string } = {};
+          if (!cur) errs.cur = 'Current password is required';
+          if (!pw) {
+            errs.pw = 'New password is required';
+          } else if (pw.length < 8) {
+            errs.pw = 'Password must be at least 8 characters.';
+          }
+          if (!pw2) {
+            errs.pw2 = 'Please confirm your new password.';
+          } else if (pw !== pw2) {
+            errs.pw2 = 'Passwords do not match.';
+          }
+          setErrors(errs);
+          if (errs.cur) {
+            document.getElementById('account-current')?.focus();
+            return;
+          }
+          if (errs.pw) {
+            document.getElementById('account-new')?.focus();
+            return;
+          }
+          if (errs.pw2) {
+            document.getElementById('account-confirm')?.focus();
+            return;
+          }
           setErr('');
           mutation.mutate();
         }}
       >
         <div>
           <label className={labelCls} htmlFor="account-current">
-            Current password
+            Current password <span aria-hidden="true">*</span>
           </label>
           <div className="relative">
             <input
               id="account-current"
               type={showCur ? 'text' : 'password'}
-              required
+              aria-required="true"
+              {...errProps('account-current', errors.cur)}
               className={`${inputCls} pr-10`}
               value={cur}
-              onChange={(e) => setCur(e.target.value)}
+              onChange={(e) => {
+                setCur(e.target.value);
+                clearError('cur');
+              }}
               autoFocus
             />
             <button
@@ -81,19 +117,24 @@ export default function Account() {
               {showCur ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+          <FieldError id="account-current-error" error={errors.cur} />
         </div>
         <div>
           <label className={labelCls} htmlFor="account-new">
-            New password
+            New password <span aria-hidden="true">*</span>
           </label>
           <div className="relative">
             <input
               id="account-new"
               type={showPw ? 'text' : 'password'}
-              required
+              aria-required="true"
+              {...errProps('account-new', errors.pw)}
               className={`${inputCls} pr-10`}
               value={pw}
-              onChange={(e) => setPw(e.target.value)}
+              onChange={(e) => {
+                setPw(e.target.value);
+                clearError('pw');
+              }}
             />
             <button
               type="button"
@@ -105,19 +146,24 @@ export default function Account() {
             </button>
           </div>
           <p className="mt-1 text-xs text-muted">At least 8 characters.</p>
+          <FieldError id="account-new-error" error={errors.pw} />
         </div>
         <div>
           <label className={labelCls} htmlFor="account-confirm">
-            Confirm new password
+            Confirm new password <span aria-hidden="true">*</span>
           </label>
           <div className="relative">
             <input
               id="account-confirm"
               type={showPw2 ? 'text' : 'password'}
-              required
+              aria-required="true"
+              {...errProps('account-confirm', pw2Error)}
               className={`${inputCls} pr-10`}
               value={pw2}
-              onChange={(e) => setPw2(e.target.value)}
+              onChange={(e) => {
+                setPw2(e.target.value);
+                clearError('pw2');
+              }}
             />
             <button
               type="button"
@@ -128,10 +174,10 @@ export default function Account() {
               {showPw2 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {mismatch && <p className="mt-1 text-xs text-red-400">Passwords do not match.</p>}
+          <FieldError id="account-confirm-error" error={pw2Error} />
         </div>
-        {err && <p className="text-sm text-red-500">{err}</p>}
-        {ok && <p className="text-sm text-emerald-500">Password updated.</p>}
+        {err && <p role="alert" className="text-sm text-red-500">{err}</p>}
+        {ok && <p role="status" className="text-sm text-emerald-500">Password updated.</p>}
         <Button
           type="submit"
           loading={mutation.isPending}

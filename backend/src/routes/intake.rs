@@ -44,6 +44,74 @@ pub fn check_intake_token(headers: &HeaderMap, expected: &str) -> Result<(), App
     Ok(())
 }
 
+/// TBE-15 handler-layer sender allowlist (fail CLOSED).
+/// `allowlist_raw` is the raw INTAKE_SENDER_ALLOWLIST env value: comma-separated
+/// exact addresses and `@domain` suffix entries (case-insensitive, trimmed).
+/// `@domain` matches only that exact domain (no subdomain wildcard).
+/// Pure predicate — env is read in the handler so unit tests avoid env races.
+/// Comparisons are constant-time (subtle), mirroring check_intake_token: every
+/// entry is compared (no early break); length mismatches simply never match.
+pub fn is_sender_allowed(from_email: &str, allowlist_raw: &str) -> bool {
+    use subtle::ConstantTimeEq;
+    let sender = from_email.trim().to_lowercase();
+    if sender.is_empty() || !sender.contains('@') {
+        return false;
+    }
+    let sender_domain = sender.rsplit('@').next().unwrap_or("");
+    let mut any_rule = false;
+    let mut allowed = false;
+    for raw_entry in allowlist_raw.split(',') {
+        let entry = raw_entry.trim().to_lowercase();
+        if entry.is_empty() {
+            continue;
+        }
+        if let Some(domain) = entry.strip_prefix('@') {
+            if domain.is_empty() {
+                continue;
+            }
+            any_rule = true;
+            let ok: bool = sender_domain.as_bytes().ct_eq(domain.as_bytes()).into();
+            allowed |= ok;
+        } else {
+            if !entry.contains('@') {
+                continue;
+            }
+            any_rule = true;
+            let ok: bool = sender.as_bytes().ct_eq(entry.as_bytes()).into();
+            allowed |= ok;
+        }
+    }
+    any_rule && allowed
+}
+
+/// TBE-15 gate: deny when INTAKE_SENDER_ALLOWLIST is missing/empty (503, fail
+/// CLOSED — mirrors check_intake_token) or when the sender is not listed (403).
+/// `allowlist_raw` is passed in (not read from env here) so the predicate stays
+/// unit-testable without env races.
+pub fn check_sender_allowlist(from_email: &str, allowlist_raw: &str) -> Result<(), AppError> {
+    let configured = allowlist_raw.split(',').any(|e| {
+        let t = e.trim();
+        if t.is_empty() {
+            return false;
+        }
+        if let Some(d) = t.strip_prefix('@') {
+            !d.trim().is_empty()
+        } else {
+            t.contains('@')
+        }
+    });
+    if !configured {
+        return Err(AppError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "intake sender allowlist not configured",
+        ));
+    }
+    if !is_sender_allowed(from_email, allowlist_raw) {
+        return Err(AppError::new(StatusCode::FORBIDDEN, "sender not allowed"));
+    }
+    Ok(())
+}
+
 pub fn router() -> Router<AppState> {
     Router::new().route("/email", post(intake_email))
 }
@@ -340,16 +408,20 @@ async fn intake_email(
     Json(body): Json<EmailIntakeInput>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // ── TBE-15 trust boundary ─────────────────────────────────────────────
-    // This endpoint authenticates the CRON (shared X-Intake-Token), NOT the
-    // email sender: the From address below is self-asserted by whoever
-    // handed the message to the cron. Spoof-resistance for the sender
-    // identity itself MUST be enforced by the external intake cron before
-    // POSTing here.
-    // TODO(cron): verify SPF + DKIM (+DMARC alignment) on every message and
-    // enforce a sender allowlist in itms-email-intake.py; unauthenticated
-    // mail must never reach this endpoint. The handler additionally
-    // quarantines replies whose sender is not a participant of the cited
-    // ticket/request, so a spoofed citation can't pollute other threads.
+    // This endpoint authenticates the CRON (shared X-Intake-Token) AND enforces
+    // a handler-layer sender allowlist (INTAKE_SENDER_ALLOWLIST, fail CLOSED):
+    // the From address below is self-asserted by whoever handed the message to
+    // the cron, so any sender missing from the allowlist — or any request when
+    // the allowlist is empty/unset — is denied here, after the token gate.
+    // The handler receives parsed JSON and CANNOT verify SPF/DKIM crypto itself;
+    // spoof-resistance for the sender identity MUST still be enforced by the
+    // external intake cron before POSTing here.
+    // TODO(cron): verify SPF + DKIM (+DMARC alignment) on every message in the
+    // external itms-email-intake.py fetcher (not in this repo); unauthenticated
+    // mail must never reach this endpoint. Defense in depth: keep a matching
+    // allowlist at the fetcher too. The handler additionally quarantines replies
+    // whose sender is not a participant of the cited ticket/request, so a
+    // spoofed citation can't pollute other threads.
     // ─────────────────────────────────────────────────────────────────────
     let pool = &state.pool;
     let from_email = body.from_email.trim().to_lowercase();
@@ -362,6 +434,12 @@ async fn intake_email(
     // (fail-closed + constant-time — see check_intake_token).
     let expected = std::env::var("INTAKE_TOKEN").unwrap_or_default();
     check_intake_token(&headers, &expected)?;
+
+    // TBE-15 handler-layer sender allowlist (fail CLOSED): the handler cannot
+    // verify SPF/DKIM crypto itself (parsed JSON only), so it enforces
+    // INTAKE_SENDER_ALLOWLIST here as a second gate after the cron token.
+    let allowlist = std::env::var("INTAKE_SENDER_ALLOWLIST").unwrap_or_default();
+    check_sender_allowlist(&from_email, &allowlist)?;
 
     // 1. dedupe by Message-ID — idempotent redelivery is a no-op
     let dup: Option<String> = sqlx::query_scalar("SELECT kind FROM email_ingest WHERE message_id = $1")
@@ -694,5 +772,74 @@ mod tickets_audit_tests {
             validate_intake_lengths(&bad).unwrap_err().status,
             StatusCode::UNPROCESSABLE_ENTITY
         );
+    }
+}
+
+#[cfg(test)]
+mod sender_allowlist_tests {
+    use super::*;
+
+    #[test]
+    fn exact_match_allows_listed_sender() {
+        assert!(is_sender_allowed("alice@example.com", "alice@example.com"));
+        assert!(is_sender_allowed(
+            "alice@example.com",
+            "bob@corp.example,alice@example.com,@other.org"
+        ));
+        assert!(!is_sender_allowed("eve@example.com", "alice@example.com"));
+        assert!(check_sender_allowlist("alice@example.com", "alice@example.com").is_ok());
+        let err = check_sender_allowlist("eve@example.com", "alice@example.com").unwrap_err();
+        assert_eq!(err.status, StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn at_domain_match_allows_exact_domain_only() {
+        assert!(is_sender_allowed("bob@trusted.com", "@trusted.com"));
+        assert!(is_sender_allowed(
+            "bob@trusted.com",
+            "alice@example.com, @trusted.com"
+        ));
+        assert!(!is_sender_allowed("bob@other.com", "@trusted.com"));
+        // no subdomain wildcard: sub.trusted.com is NOT covered by @trusted.com
+        assert!(!is_sender_allowed("bob@sub.trusted.com", "@trusted.com"));
+        assert!(check_sender_allowlist("bob@trusted.com", "@trusted.com").is_ok());
+    }
+
+    #[test]
+    fn matching_is_case_insensitive() {
+        assert!(is_sender_allowed("ALICE@EXAMPLE.COM", "alice@example.com"));
+        assert!(is_sender_allowed("alice@example.com", "ALICE@EXAMPLE.COM"));
+        assert!(is_sender_allowed("Bob@Trusted.COM", "@TRUSTED.com"));
+        assert!(is_sender_allowed("BOB@TRUSTED.COM", "@trusted.COM"));
+    }
+
+    #[test]
+    fn denies_when_allowlist_missing_or_empty() {
+        // missing / empty / whitespace-only / commas-only / bare-@ → 503 closed
+        for raw in ["", "   ", " , , ", "@", "  @  ", "not-an-email", " , bogus , "] {
+            assert!(!is_sender_allowed("alice@example.com", raw), "raw={raw:?}");
+            let err = check_sender_allowlist("alice@example.com", raw).unwrap_err();
+            assert_eq!(err.status, StatusCode::SERVICE_UNAVAILABLE, "raw={raw:?}");
+        }
+        // empty sender never opens, even with a valid allowlist
+        assert!(!is_sender_allowed("", "alice@example.com"));
+        assert!(!is_sender_allowed("   ", "@example.com"));
+    }
+
+    #[test]
+    fn whitespace_around_entries_is_ignored() {
+        assert!(is_sender_allowed(
+            "  alice@example.com  ",
+            "  alice@example.com ,  @example.org  "
+        ));
+        assert!(is_sender_allowed(
+            "bob@example.org",
+            "alice@example.com,   @example.org   "
+        ));
+        assert!(is_sender_allowed(
+            "alice@example.com",
+            ",, alice@example.com ,,"
+        ));
+        assert!(!is_sender_allowed("eve@example.com", "  alice@example.com , @example.org "));
     }
 }

@@ -106,3 +106,22 @@ describe('Select Escape layering (Bug #3)', () => {
     }
   });
 });
+
+describe('Select aria-label wiring (TFE-33)', () => {
+  const options = [
+    { value: 'LOW', label: 'LOW' },
+    { value: 'MEDIUM', label: 'MEDIUM' },
+  ];
+
+  it('forwards ariaLabel to the trigger button as its accessible name', () => {
+    render(<Select ariaLabel="Ticket priority" value="MEDIUM" onChange={vi.fn()} options={options} />);
+    const trigger = screen.getByRole('button', { name: 'Ticket priority' });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.getAttribute('aria-label')).toBe('Ticket priority');
+  });
+
+  it("supports the 'aria-label' alias", () => {
+    render(<Select aria-label="Rows per page" value="" onChange={vi.fn()} options={options} />);
+    expect(screen.getByRole('button', { name: 'Rows per page' })).toBeInTheDocument();
+  });
+});
