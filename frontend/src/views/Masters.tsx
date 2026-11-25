@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, Database, LoaderCircle, MapPin, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
+import { ClipboardList, Database, MapPin, Pencil, Plus, Save, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react';
 import { cn, inputCls, labelCls } from '@/lib/utils';
 import { useServerPagination } from '@/lib/usePagination';
 import { TABLE_SPEC } from '@/components/tableSpec';
@@ -270,27 +270,38 @@ function UsersTab() {
     [departments],
   );
 
+  const updateParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) {
+      next.set(key, value);
+    } else {
+      next.delete(key);
+    }
+    setParams(next, { replace: true });
+  };
+
   return (
     <div className="space-y-4">
       <FilterBar>
         <input
           type="search"
           inputMode="search"
+          aria-label="Search users"
           className={cn(inputCls, 'w-full sm:w-56')}
           placeholder="Search name or email…"
           value={search}
-          onChange={(e) => setParams(e.target.value ? { search: e.target.value } : {}, { replace: true })}
+          onChange={(e) => updateParam('search', e.target.value)}
         />
         <Select
           className="w-full sm:w-auto sm:min-w-[130px]"
           value={role}
-          onChange={(v) => setParams(v ? { role: v } : {}, { replace: true })}
+          onChange={(v) => updateParam('role', v)}
           options={[{ value: '', label: 'All Roles' }, ...ROLES.map((r) => ({ value: r, label: r }))]}
         />
         <Select
           className="w-full sm:w-auto sm:min-w-[150px]"
           value={department}
-          onChange={(v) => setParams(v ? { department: v } : {}, { replace: true })}
+          onChange={(v) => updateParam('department', v)}
           options={[
             { value: '', label: 'All Departments' },
             ...departments.filter((d) => d.active).map((d) => ({ value: d.code, label: d.label })),
@@ -307,50 +318,30 @@ function UsersTab() {
         </Button>
       </FilterBar>
 
-      {users.isLoading ? (
-        <div className="flex items-center justify-center rounded-xl glass-card py-16">
-          <LoaderCircle className="h-6 w-6 animate-spin text-muted" />
-        </div>
-      ) : (users.data?.items?.length ?? 0) === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="No users match the filters"
-          description="Try widening the search, or add a new user to get started."
-          action={
-            <Button
-              type="button"
-              onClick={openCreate}
-              variant="primary"
-              leftIcon={<Plus className="h-4 w-4" />}
-            >
-              New User
-            </Button>
+      <DataTable<UserRecord>
+        rows={users.data?.items ?? []}
+        total={users.data?.total}
+        loading={users.isLoading}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
+        onSortChange={(s) => {
+          const next = new URLSearchParams(params);
+          if (s) {
+            next.set('sort', s.key);
+            next.set('order', s.dir);
+          } else {
+            next.delete('sort');
+            next.delete('order');
           }
-        />
-      ) : (
-        <DataTable<UserRecord>
-          rows={users.data?.items ?? []}
-          total={users.data?.total}
-          page={page}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
-          onSortChange={(s) => {
-            const next = new URLSearchParams(params);
-            if (s) {
-              next.set('sort', s.key);
-              next.set('order', s.dir);
-            } else {
-              next.delete('sort');
-              next.delete('order');
-            }
-            setParams(next, { replace: true });
-          }}
-          columns={columns}
-          emptyMessage="No users match the filters."
-        />
-      )}
+          setParams(next, { replace: true });
+        }}
+        columns={columns}
+        emptyMessage="No users match the filters."
+        caption="Users"
+      />
 
       {formOpen && (
         <Modal title={editing ? 'Edit User' : 'New User'} onClose={() => setFormOpen(false)}>

@@ -60,11 +60,19 @@ export default function Labels() {
   const [batchStage, setBatchStage] = useState<LabelPrinterStage>('processing');
   const [batchRun, setBatchRun] = useState(0);
 
+  // Debounced search: the input stays responsive while the backend query
+  // only fires ~300ms after the last keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const assets = useQuery({
-    queryKey: ['assets', search, category, status],
+    queryKey: ['assets', debouncedSearch, category, status],
     queryFn: () =>
       listAssets({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         category: category === 'ALL' ? undefined : category,
         status: status === 'ALL' ? undefined : status,
         limit: 500,
@@ -75,8 +83,13 @@ export default function Labels() {
   // Client-side pagination of the fetched list (batch-selection page — the
   // full list is kept for the selection count below). 20/page matches the
   // app-wide per-page default.
-  const { page, pageSize, setPage, setPageSize, pageRows } = useClientPagination(allRows, 20);
+  const { page, pageSize, setPage, setPageSize, reset, pageRows } = useClientPagination(allRows, 20);
   const rows = pageRows;
+  // Filter changes invalidate the current page — snap back to page 1.
+  useEffect(() => {
+    reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, category, status]);
   // Selection must span ALL fetched rows, not just the current page, or the
   // "Print labels (N)" / "Start audit run" counts silently drop off-page
   // selections (the Set persists across page changes).
@@ -224,7 +237,7 @@ export default function Labels() {
             className={cn(inputCls, 'pl-9')}
           />
         </div>
-        <Select className="w-full sm:w-auto" value={category} onChange={setCategory} options={[{ value: 'ALL', label: 'All categories' }, ...getCategories(rows).map((c) => ({ value: c, label: c }))]} />
+        <Select className="w-full sm:w-auto" value={category} onChange={setCategory} options={[{ value: 'ALL', label: 'All categories' }, ...getCategories(allRows).map((c) => ({ value: c, label: c }))]} />
         <Select className="w-full sm:w-auto" value={status} onChange={setStatus} options={STATUS_OPTIONS.map((s) => ({ value: s, label: s === 'ALL' ? 'All statuses' : s }))} />
       </FilterBar>
 
@@ -243,6 +256,7 @@ export default function Labels() {
         isRowSelectable={(a) => a.status !== 'RETIRED'}
         loading={assets.isLoading}
         emptyMessage="No assets match — widen the filters."
+        caption="Assets for labels"
         page={page}
         pageSize={pageSize}
         total={allRows.length}

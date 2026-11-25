@@ -28,7 +28,13 @@ export default function ServiceQueue() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['service-queue'],
-    queryFn: () => listTickets({ limit: 25 }),
+    queryFn: async () => {
+      const [open, inProgress] = await Promise.all([
+        listTickets({ status: 'OPEN', limit: 25 }),
+        listTickets({ status: 'IN_PROGRESS', limit: 25 }),
+      ]);
+      return { items: [...open.items, ...inProgress.items], total: open.total + inProgress.total };
+    },
     refetchInterval: 60_000,
   });
 

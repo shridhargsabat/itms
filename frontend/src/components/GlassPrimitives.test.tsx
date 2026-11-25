@@ -45,7 +45,7 @@ describe('Task 6 glass primitives: pills, modal, frosted rows', () => {
     expect(scrim).not.toBeNull();
   });
 
-  it('DataTable clickable rows carry frosted hover classes', () => {
+  it('DataTable clickable rows carry a single token hover class', () => {
     render(
       <DataTable
         columns={[{ key: 'name', header: 'Name' }]}
@@ -56,8 +56,10 @@ describe('Task 6 glass primitives: pills, modal, frosted rows', () => {
     const rows = screen.getAllByRole('row');
     expect(rows.length).toBeGreaterThan(1);
     const bodyRow = rows[1];
-    expect(bodyRow.className).toContain('hover:bg-white/40');
-    expect(bodyRow.className).toContain('dark:hover:bg-white/10');
+    // One token hover (glass tint comes from the index.css tbody tr:hover rules).
+    expect(bodyRow.className).toContain('hover:bg-elevated/60');
+    expect(bodyRow.className).not.toContain('hover:bg-white/40');
+    expect(bodyRow.className).not.toContain('dark:hover:bg-white/10');
   });
 });
 

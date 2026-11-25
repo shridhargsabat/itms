@@ -417,6 +417,7 @@ export const listAssets = (params?: { search?: string; category?: string; status
   if (params?.search) q.set('search', params.search);
   if (params?.category) q.set('category', params.category);
   if (params?.status) q.set('status', params.status);
+  if (params?.location_id) q.set('location_id', params.location_id);
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
   if (params?.sort) q.set('sort', params.sort);
@@ -549,6 +550,7 @@ export const exportAssetsCsv = async (params?: {
   if (params?.search) q.set('search', params.search);
   if (params?.category) q.set('category', params.category);
   if (params?.status) q.set('status', params.status);
+  if (params?.location_id) q.set('location_id', params.location_id);
   if (params?.sort) q.set('sort', params.sort);
   if (params?.order) q.set('order', params.order);
   if (params?.ids?.length) q.set('ids', params.ids.join(','));

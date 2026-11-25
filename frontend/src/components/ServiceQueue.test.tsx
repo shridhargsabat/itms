@@ -73,7 +73,13 @@ const T3 = ticket({
 });
 
 beforeEach(() => {
-  vi.mocked(listTickets).mockResolvedValue({ items: [T1, T2, T3], total: 3 });
+  // ServiceQueue fetches server-filtered: OPEN + IN_PROGRESS in parallel.
+  // T3 (RESOLVED) rides along to prove the client-side live-status filter.
+  vi.mocked(listTickets).mockImplementation((params?: { status?: string }) =>
+    Promise.resolve(
+      params?.status === 'IN_PROGRESS' ? { items: [T2], total: 1 } : { items: [T1, T3], total: 2 },
+    ),
+  );
   vi.mocked(patchTicketStatus).mockImplementation((id: string, status: string) =>
     Promise.resolve({ ...T1, id, status: status as TicketStatus }),
   );
@@ -94,12 +100,13 @@ function renderQueue() {
 }
 
 describe('ServiceQueue (task 9)', () => {
-  it('fetches 25 tickets and renders only OPEN/IN_PROGRESS rows with badges', async () => {
+  it('fetches server-filtered OPEN/IN_PROGRESS tickets and renders live rows with badges', async () => {
     renderQueue();
     const queue = await screen.findByTestId('service-queue');
     await within(queue).findByText('TKT-1048');
 
-    expect(listTickets).toHaveBeenCalledWith({ limit: 25 });
+    expect(listTickets).toHaveBeenCalledWith({ status: 'OPEN', limit: 25 });
+    expect(listTickets).toHaveBeenCalledWith({ status: 'IN_PROGRESS', limit: 25 });
     expect(within(queue).getByText('TKT-1048')).toBeInTheDocument();
     expect(within(queue).getByText('PostgreSQL pool exhaustion on ITMS API')).toBeInTheDocument();
     expect(within(queue).getByText('TKT-1047')).toBeInTheDocument();
