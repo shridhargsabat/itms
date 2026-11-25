@@ -593,7 +593,7 @@ export default function Tickets() {
               role="dialog"
               aria-modal="true"
               aria-label={`Ticket ${selected.ticket_number}`}
-              className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col liquid-glass-panel"
+              className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col liquid-glass-panel modal-panel"
             >
               <div className="flex items-start justify-between border-b border-edge px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
                 <div>
