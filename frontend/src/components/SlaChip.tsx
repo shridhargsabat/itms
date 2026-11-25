@@ -35,10 +35,10 @@ export default function SlaChip({ dueAt, policyHours }: { dueAt: string | null; 
       className={cn(
         'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold',
         critical
-          ? 'bg-red-500/15 text-red-400'
+          ? 'bg-red-500/15 text-red-700 dark:text-red-400'
           : frac <= 0.5
-            ? 'bg-amber-500/15 text-amber-400'
-            : 'bg-emerald-500/15 text-emerald-400',
+            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
       )}
       title={`SLA due ${new Date(dueAt).toLocaleString()}`}
     >

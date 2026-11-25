@@ -822,9 +822,9 @@ function VendorsTab() {
   const amcBadge = (v: Vendor) => {
     if (!v.amc_expiry) return null;
     const days = Math.round((new Date(v.amc_expiry).getTime() - Date.now()) / 86400000);
-    const cls = days < 0 ? 'bg-red-500/10 text-red-400 border-red-500/30'
-      : days <= 60 ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+    const cls = days < 0 ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30'
+      : days <= 60 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30'
+      : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
     return <span className={`rounded-md border px-1.5 py-0.5 text-[11px] ${cls}`}>{days < 0 ? `AMC expired ${-days}d ago` : `AMC ${days}d`}</span>;
   };
 
