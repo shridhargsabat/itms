@@ -53,7 +53,11 @@ export default function Reports() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `repeat-incidents-${days}d.csv`;
+    // Fix round 1: attach before click — Firefox ignores programmatic
+    // clicks on detached anchors (matches Assets/client downloadBlob).
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     URL.revokeObjectURL(url);
   };
 
