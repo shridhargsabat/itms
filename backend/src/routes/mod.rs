@@ -127,6 +127,7 @@ async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 /// Uniform JSON error for the whole API: `{"error": "..."}`.
+#[derive(Debug)]
 pub struct AppError {
     pub status: StatusCode,
     pub message: String,
@@ -158,5 +159,32 @@ impl From<sqlx::Error> for AppError {
             StatusCode::INTERNAL_SERVER_ERROR,
             "internal server error",
         )
+    }
+}
+
+/// TBE-22: path-id extractor that reports 422 (not axum's default 400) when
+/// a path segment fails to parse — so "bad id in path" matches "bad id in
+/// body" (serde failures surface as 422). Drop-in for `Path<T>`: destructure
+/// `UuidPath(id)` / `UuidPath((a, b))` exactly like `Path`.
+pub struct UuidPath<T>(pub T);
+
+impl<S, T> axum::extract::FromRequestParts<S> for UuidPath<T>
+where
+    T: serde::de::DeserializeOwned + Send,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        match axum::extract::Path::<T>::from_request_parts(parts, state).await {
+            Ok(axum::extract::Path(v)) => Ok(UuidPath(v)),
+            Err(_) => Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid id in path",
+            )),
+        }
     }
 }

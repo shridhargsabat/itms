@@ -25,6 +25,8 @@ export default function SlaChip({ dueAt, policyHours }: { dueAt: string | null; 
   const now = Date.now();
   const left = due - now;
   const overdue = left < 0;
+  // TFE-37: red when overdue OR within 10 min of breach (matches the header comment).
+  const critical = left <= 10 * 60_000;
   const total = (policyHours ?? 24) * 3_600_000;
   const frac = total > 0 ? Math.abs(left) / total : 1;
 
@@ -32,7 +34,7 @@ export default function SlaChip({ dueAt, policyHours }: { dueAt: string | null; 
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold',
-        overdue
+        critical
           ? 'bg-red-500/15 text-red-400'
           : frac <= 0.5
             ? 'bg-amber-500/15 text-amber-400'

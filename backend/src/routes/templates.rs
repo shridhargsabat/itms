@@ -29,7 +29,9 @@ pub struct TicketTemplate {
 }
 
 fn require_staff(role: &str) -> Result<(), AppError> {
-    if role == "EMPLOYEE" {
+    // TBE-27: strict allowlist via is_staff_role — the old `role == "EMPLOYEE"`
+    // check failed OPEN for any unexpected role value.
+    if !super::auth::is_staff_role(role) {
         return Err(AppError::new(StatusCode::FORBIDDEN, "agents and admins only"));
     }
     Ok(())

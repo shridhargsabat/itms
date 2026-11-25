@@ -232,6 +232,12 @@ pub async fn set_theme(
 /// Axum middleware: 401 unless a valid Bearer session is presented.
 /// Inserts the authenticated user's id + role into request extensions so
 /// downstream handlers/middleware can enforce RBAC.
+///
+/// TBE-28 note: the role here is resolved LIVE per request (sessions JOIN
+/// users in `current_user`), NOT snapshotted at login — a mid-session role
+/// change or deactivation takes effect on the very next request with no
+/// re-login needed for any server-side gate. (Clients cache their own copy
+/// from /auth/me and should refetch it when they need fresh role UI.)
 pub async fn require_auth(
     State(state): State<AppState>,
     mut req: Request,

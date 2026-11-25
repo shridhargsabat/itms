@@ -316,6 +316,10 @@ export interface CreateTicketInput {
 }
 
 export interface UpdateTicketInput {
+  // C1: PATCH accepts title/description/ticket_type (staff details edit, TFE-29).
+  title?: string;
+  description?: string;
+  ticket_type?: string;
   priority?: Priority;
   assignee_id?: string | null;
   asset_id?: string | null;

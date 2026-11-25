@@ -295,20 +295,33 @@ export default function DataTable<T extends { id: string }>({
             {rows.map((row, i) => {
               const expanded = expandedId === row.id;
               const clickable = onRowClick !== undefined || renderExpanded !== undefined;
+              const activate = renderExpanded
+                ? () => setExpandedId(expanded ? null : row.id)
+                : onRowClick
+                  ? () => onRowClick(row)
+                  : undefined;
               return (
                 <Fragment key={row.id}>
                   <tr
-                    onClick={
-                      renderExpanded
-                        ? () => setExpandedId(expanded ? null : row.id)
-                        : onRowClick
-                          ? () => onRowClick(row)
-                          : undefined
+                    onClick={activate}
+                    // TFE-04: keyboard access for clickable rows — focusable + Enter/Space.
+                    // Interactive children (checkboxes, links, buttons) keep their own keys.
+                    onKeyDown={
+                      activate
+                        ? (e) => {
+                            if (e.key !== 'Enter' && e.key !== ' ') return;
+                            const t = e.target as HTMLElement;
+                            if (t.closest('button, a, input, select, textarea, [role="button"], [role="option"], [role="link"]')) return;
+                            e.preventDefault();
+                            activate();
+                          }
+                        : undefined
                     }
+                    tabIndex={clickable ? 0 : undefined}
                     aria-expanded={renderExpanded ? expanded : undefined}
                     className={cn(
                       'animate-list-in transition-colors',
-                      clickable && 'cursor-pointer hover:bg-elevated/60 hover:bg-white/40 dark:hover:bg-white/10',
+                      clickable && 'cursor-pointer hover:bg-elevated/60 hover:bg-white/40 focus-visible:bg-elevated focus-visible:outline-none dark:hover:bg-white/10',
                     )}
                     style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                   >

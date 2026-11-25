@@ -12,7 +12,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::AppState;
-use crate::routes::AppError;
+use crate::routes::{AppError, UuidPath};
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct KbArticle {
@@ -48,7 +48,9 @@ const ARTICLE_SELECT: &str = "SELECT a.id, a.ticket_type, a.title, a.body, a.sou
      LEFT JOIN users uu ON uu.id = a.updated_by";
 
 fn require_staff(role: &str) -> Result<(), AppError> {
-    if role == "EMPLOYEE" {
+    // TBE-27: strict allowlist via is_staff_role — the old `role == "EMPLOYEE"`
+    // check failed OPEN for any unexpected role value.
+    if !super::auth::is_staff_role(role) {
         return Err(AppError::new(
             StatusCode::FORBIDDEN,
             "agents and admins only",
@@ -359,7 +361,7 @@ pub async fn convert_to_article(
     State(state): State<AppState>,
     Extension(uid): Extension<Uuid>,
     Extension(role): Extension<String>,
-    Path(ticket_id): Path<Uuid>,
+    UuidPath(ticket_id): UuidPath<Uuid>,
     Json(body): Json<ConvertRequest>,
 ) -> Result<(StatusCode, Json<KbArticle>), AppError> {
     require_staff(&role)?;
@@ -409,6 +411,16 @@ pub async fn convert_to_article(
                 .await?;
             }
         }
+        // TBE-08: ticket-side row so the conversion shows in the timeline.
+        sqlx::query(
+            "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
+             VALUES ($1, 'TICKET_CONVERT', 'ticket', $2, $3)",
+        )
+        .bind(uid)
+        .bind(ticket_id)
+        .bind(serde_json::json!({"article_id": existing_id, "reconvert": true}))
+        .execute(&state.pool)
+        .await?;
         return Ok((
             StatusCode::OK,
             Json(
@@ -447,6 +459,17 @@ pub async fn convert_to_article(
     .bind(uid)
     .bind(id)
     .bind(serde_json::json!({"ticket_id": ticket_id, "title": title}))
+    .execute(&state.pool)
+    .await?;
+    // TBE-08: ticket-side row so the conversion shows in the timeline
+    // (previously only the kb_article-side row existed — invisible there).
+    sqlx::query(
+        "INSERT INTO audit_logs (actor_id, action, target_type, target_id, diff) \
+         VALUES ($1, 'TICKET_CONVERT', 'ticket', $2, $3)",
+    )
+    .bind(uid)
+    .bind(ticket_id)
+    .bind(serde_json::json!({"article_id": id, "title": title}))
     .execute(&state.pool)
     .await?;
     Ok((
