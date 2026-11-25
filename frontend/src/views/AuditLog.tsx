@@ -333,6 +333,7 @@ export default function AuditLog() {
           }}
           loading={isLoading}
           emptyMessage={hasFilters ? 'No audit entries match the current filters.' : 'No audit entries yet.'}
+          caption="Audit log"
           renderExpanded={(e) => <DiffBlock diff={e.diff} />}
         />
       )}

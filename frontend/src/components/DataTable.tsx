@@ -46,6 +46,10 @@ interface DataTableProps<T> {
   onSelectionChange?: (ids: Set<string>) => void;
   /** Rows whose checkbox must be disabled (excluded from select-all). */
   isRowSelectable?: (row: T) => boolean;
+  /** Optional table caption (rendered as <caption>, passed to the scroll region as its label). */
+  caption?: string;
+  /** Row id to spotlight with an accent ring (wired by parents in views). */
+  highlightId?: string;
 }
 
 export default function DataTable<T extends { id: string }>({
@@ -66,6 +70,8 @@ export default function DataTable<T extends { id: string }>({
   selectedIds,
   onSelectionChange,
   isRowSelectable,
+  caption,
+  highlightId,
 }: DataTableProps<T>) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const selectable = selectedIds !== undefined && onSelectionChange !== undefined;
@@ -82,6 +88,15 @@ export default function DataTable<T extends { id: string }>({
   const [, setFillTick] = useState(0);
   useEffect(() => {
     const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+    const findScrollParent = (shell: HTMLElement): HTMLElement | null => {
+      let el: HTMLElement | null = shell;
+      while (el && el !== document.documentElement && el !== document.body) {
+        const ov = getComputedStyle(el).overflowY;
+        if (/auto|scroll/.test(ov)) return el;
+        el = el.parentElement;
+      }
+      return null;
+    };
     const compute = () => {
       const shell = shellRef.current;
       if (!isDesktop() || !shell) {
@@ -99,15 +114,7 @@ export default function DataTable<T extends { id: string }>({
       // next to the table's own. Walk up to the real scroll container so the shell
       // caps exactly to its bottom; fall back to the window when no bounded scroll
       // ancestor exists (mobile / unlocked flow).
-      const scrollParent = (() => {
-        let el: HTMLElement | null = shell;
-        while (el && el !== document.documentElement && el !== document.body) {
-          const ov = getComputedStyle(el).overflowY;
-          if (/auto|scroll/.test(ov)) return el;
-          el = el.parentElement;
-        }
-        return null;
-      })();
+      const scrollParent = findScrollParent(shell);
       // Target the scroll container's CONTENT-BOX bottom (drop its bottom
       // padding) so the capped shell never spills past the wrapper's content —
       // otherwise the wrapper still scrolls a few px and gives a second bar.
@@ -127,15 +134,21 @@ export default function DataTable<T extends { id: string }>({
       }
     };
     compute();
+    // Perf: ResizeObserver on the shell + its scroll parent only. There is
+    // deliberately NO scroll listener here — re-measuring (getComputedStyle +
+    // getBoundingClientRect per tick) on every scroll event, including the
+    // table's own inner scroll via capture, was pure layout churn for a value
+    // that only moves on resize/layout shifts.
     const ro = new ResizeObserver(compute);
-    if (shellRef.current) ro.observe(shellRef.current);
+    if (shellRef.current) {
+      ro.observe(shellRef.current);
+      const sp = findScrollParent(shellRef.current);
+      if (sp) ro.observe(sp);
+    }
     window.addEventListener('resize', compute);
-    // the page scrolls under a sticky header on some screens — re-measure on scroll too
-    window.addEventListener('scroll', compute, { passive: true, capture: true });
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', compute);
-      window.removeEventListener('scroll', compute, { capture: true } as EventListenerOptions);
     };
   }, []);
 
@@ -195,49 +208,52 @@ export default function DataTable<T extends { id: string }>({
             />
           </th>
         )}
-        {columns.map((c) => (
-          <th
-            key={c.key}
-            scope="col"
-            aria-sort={
-              c.sortable
-                ? sort?.key === (c.sortKey ?? c.key)
-                  ? sort.dir === 'asc'
-                    ? 'ascending'
-                    : 'descending'
-                  : 'none'
-                : undefined
-            }
-            className={cn(TABLE_SPEC.th, c.className)}
-          >
-            {c.sortable ? (
-              <button
-                type="button"
-                onClick={() => cycleSort(c)}
-                className={cn(
-                  // Task 18 (UI-17): explicit uppercase — preflight sets
-                  // text-transform:none on buttons, which used to leave
-                  // sortable headers Title Case next to ALL-CAPS plain ones.
-                  'inline-flex items-center gap-1 rounded uppercase transition-colors hover:text-primary',
-                  sort?.key === (c.sortKey ?? c.key) && 'text-accent',
-                )}
-              >
-                {c.header}
-                {sort?.key === (c.sortKey ?? c.key) ? (
-                  sort.dir === 'asc' ? (
-                    <ArrowUp className="h-3 w-3" aria-hidden="true" />
+        {columns.map((c) => {
+          const sortKey = c.sortKey ?? c.key;
+          return (
+            <th
+              key={c.key}
+              scope="col"
+              aria-sort={
+                c.sortable
+                  ? sort?.key === sortKey
+                    ? sort.dir === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none'
+                  : undefined
+              }
+              className={cn(TABLE_SPEC.th, c.className)}
+            >
+              {c.sortable ? (
+                <button
+                  type="button"
+                  onClick={() => cycleSort(c)}
+                  className={cn(
+                    // Task 18 (UI-17): explicit uppercase — preflight sets
+                    // text-transform:none on buttons, which used to leave
+                    // sortable headers Title Case next to ALL-CAPS plain ones.
+                    'inline-flex min-h-[24px] min-w-[24px] items-center gap-1 rounded uppercase transition-colors hover:text-primary',
+                    sort?.key === sortKey && 'text-accent',
+                  )}
+                >
+                  {c.header}
+                  {sort?.key === sortKey ? (
+                    sort.dir === 'asc' ? (
+                      <ArrowUp className="h-3 w-3" aria-hidden="true" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                    )
                   ) : (
-                    <ArrowDown className="h-3 w-3" aria-hidden="true" />
-                  )
-                ) : (
-                  <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden="true" />
-                )}
-              </button>
-            ) : (
-              c.header
-            )}
-          </th>
-        ))}
+                    <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden="true" />
+                  )}
+                </button>
+              ) : (
+                c.header
+              )}
+            </th>
+          );
+        })}
       </tr>
     </thead>
   );
@@ -246,10 +262,12 @@ export default function DataTable<T extends { id: string }>({
     return (
       <div ref={shellRef} style={fillStyle} className={cn(TABLE_SPEC.shell, 'flex flex-col')}>
         <ScrollX
+          aria-label={caption}
           className="min-h-0 flex-1 flex flex-col"
           innerClassName={cn(TABLE_SPEC.tableScroll, 'flex-1 min-h-0')}
         >
           <table className={cn(TABLE_SPEC.table, minWidth)}>
+            {caption ? <caption>{caption}</caption> : null}
             {head}
             <tbody className={TABLE_SPEC.tbody}>
               {Array.from({ length: 5 }).map((_, i) => (
@@ -302,10 +320,12 @@ export default function DataTable<T extends { id: string }>({
       className={cn(TABLE_SPEC.shell, 'flex flex-col')}
     >
       <ScrollX
+        aria-label={caption}
         className="min-h-0 flex-1 flex flex-col"
         innerClassName={cn(TABLE_SPEC.tableScroll, 'flex-1 min-h-0')}
       >
         <table className={cn(TABLE_SPEC.table, minWidth)}>
+          {caption ? <caption>{caption}</caption> : null}
           {head}
           <tbody className={TABLE_SPEC.tbody}>
             {rows.map((row, i) => {
@@ -316,6 +336,8 @@ export default function DataTable<T extends { id: string }>({
                 : onRowClick
                   ? () => onRowClick(row)
                   : undefined;
+              const rowRec = row as Record<string, unknown>;
+              const rowLabel = String(rowRec.asset_tag ?? rowRec.title ?? rowRec.name ?? row.id);
               return (
                 <Fragment key={row.id}>
                   <tr
@@ -336,19 +358,30 @@ export default function DataTable<T extends { id: string }>({
                     tabIndex={clickable ? 0 : undefined}
                     aria-expanded={renderExpanded ? expanded : undefined}
                     className={cn(
-                      'animate-list-in transition-colors',
-                      clickable && 'cursor-pointer hover:bg-elevated/60 hover:bg-white/40 focus-visible:bg-elevated focus-visible:outline-none dark:hover:bg-white/10',
+                      'transition-colors',
+                      // Perf: entrance animation on the first screenful only —
+                      // animating every row in a long table janks scroll.
+                      i < 12 && 'animate-list-in',
+                      clickable && 'cursor-pointer hover:bg-elevated/60 focus-visible:bg-elevated focus-visible:outline-none',
+                      highlightId === row.id && 'ring-2 ring-inset ring-accent',
                     )}
-                    style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
+                    style={i < 12 ? { animationDelay: `${Math.min(i, 8) * 35}ms` } : undefined}
                   >
                     {selectable && (
-                      <td className={TABLE_SPEC.checkboxCell} onClick={(e) => {
-                        // checkbox click must not open the row detail
-                        e.stopPropagation();
-                      }}>
+                      <td
+                        className={TABLE_SPEC.checkboxCell}
+                        onClick={(e) => {
+                          // checkbox click must not open the row detail
+                          e.stopPropagation();
+                        }}
+                        onKeyDown={(e) => {
+                          // checkbox keys must not trigger the row's Enter/Space activation
+                          e.stopPropagation();
+                        }}
+                      >
                         <input
                           type="checkbox"
-                          aria-label={`Select ${String((row as Record<string, unknown>).asset_tag ?? row.id)}`}
+                          aria-label={`Select ${rowLabel}`}
                           checked={selectedIds!.has(row.id)}
                           onChange={() => toggleRow(row.id)}
                           disabled={!rowSelectable(row)}

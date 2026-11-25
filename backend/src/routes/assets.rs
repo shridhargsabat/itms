@@ -1022,6 +1022,13 @@ async fn export_assets(
         qb.push("a.category = ").push_bind(category);
         any = true;
     }
+    if let Some(location_id) = params.location_id {
+        if any {
+            qb.push(" AND ");
+        }
+        qb.push("a.location_id = ").push_bind(location_id);
+        any = true;
+    }
     if let Some(status) = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         if any {
             qb.push(" AND ");

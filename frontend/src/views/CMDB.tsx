@@ -72,7 +72,7 @@ export default function CMDB() {
       key: 'asset_tag',
       header: 'Tag',
       sortable: true,
-      sortKey: 'tag',
+      sortKey: 'asset_tag',
       className: 'px-2',
       render: (n) => <span className="whitespace-nowrap font-mono text-xs text-accent">{n.asset_tag}</span>,
     },
@@ -177,6 +177,8 @@ export default function CMDB() {
                     : 'No configuration items found.'
                 }
                 minWidth={CI_TABLE_MIN_WIDTH}
+                caption="Configuration items"
+                highlightId={selectedId ?? undefined}
                 onRowClick={(n) => setSelectedId(n.id)}
               />
             </div>

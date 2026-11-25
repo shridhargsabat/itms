@@ -44,7 +44,11 @@ describe('pagination footer ghost nav (task-15 sweep)', () => {
     const { container } = render(
       <PaginationFooter page={1} pageSize={20} total={45} rowsLength={20} />,
     );
-    expect((container.firstChild as HTMLElement).className).toMatch(/sticky/);
+    // Tables-audit de-stickied TABLE_SPEC.footer (sticky was dead outside the
+    // scroll container), so pin the footer-spec marker classes instead.
+    const cls = (container.firstChild as HTMLElement).className;
+    expect(cls).toContain('rounded-b-2xl');
+    expect(cls).not.toContain('mt-4');
   });
   it('renders nothing when total is 0', () => {
     const { container } = render(

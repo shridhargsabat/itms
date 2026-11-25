@@ -1,8 +1,10 @@
 /** Canonical table geometry — the ONE spec every ITMS table renders with.
  *  Header text-xs uppercase on bg-surface, cells py-3/px-4 text-sm, shell
- *  overflow-hidden rounded-2xl glass-card, min-w-[640px] + ScrollX for consistent mobile behavior. */
+ *  overflow-hidden rounded-2xl glass-card table-shell, min-w-[640px] + ScrollX
+ *  for consistent mobile behavior. table-shell lets glass themes drop the SVG
+ *  refraction filter on table shells (paint perf) while keeping frosted blur. */
 export const TABLE_SPEC = {
-  shell: 'overflow-hidden rounded-2xl glass-card',
+  shell: 'overflow-hidden rounded-2xl glass-card table-shell',
   /* Vertical scroll lives on the ScrollX INNER container (the same element that does
      overflow-x) so the sticky header pins to that box's top (top:0 always). It MUST
      be on the single scrolling element — if the vertical scroll sat on an outer shell
@@ -27,7 +29,10 @@ export const TABLE_SPEC = {
   table: 'w-full text-left text-sm',
   tbody: 'divide-y divide-edge/60 bg-surface',
   checkboxCell: 'px-3 py-3',
+  /* Static (not sticky): the footer sits OUTSIDE the scroll container at the
+     shell bottom, so sticky positioning here was dead — it never stuck to
+     anything and only cost a needless stacking context. */
   footer:
-    'sticky bottom-[3.5rem] z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-2xl border-t border-edge/60 bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur lg:bottom-0',
+    'flex flex-wrap items-center justify-between gap-2 rounded-b-2xl border-t border-edge/60 bg-surface/95 px-3 py-2.5 text-xs text-secondary backdrop-blur',
   minWidth: 'min-w-[640px]',
 } as const;

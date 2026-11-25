@@ -111,18 +111,13 @@ export default function Licenses() {
   );
 
   // Buckets are nested server-side (expiring_30 ⊆ expiring_60 ⊆ expiring_90),
-  // so expiring_90 alone is the full ≤90d set — one definition for KPI,
-  // tab badge, and filtered list.
+  // so expiring_90 alone is the full ≤90d set — one definition for KPI and
+  // tab badges. Alert-tab lists are server-paginated via pageQ (backend scope
+  // param mirrors the same predicates), so badge counts and list totals agree.
   const expiring = alerts.data?.expiring_90 ?? [];
   const expired = alerts.data?.expired ?? [];
-
-  const list =
-    tab === 'expiring'
-      ? expiring
-      : tab === 'expired'
-        ? expired
-        : (pageQ.data?.items ?? []);
-  const total = tab === 'all' ? (pageQ.data?.total ?? 0) : list.length;
+  const list = pageQ.data?.items ?? [];
+  const total = pageQ.data?.total ?? 0;
   const alertCount = expired.length + expiring.length;
 
   return (

@@ -1263,12 +1263,12 @@
    dark guard chain. In Liquid Glass themes, .glass-card already frosts the
    table shell; making thead/th/tbody/footer translucent lets the ambient
    aurora refract through the table like the sidebar and dashboard cards,
-   while keeping sticky <th> headers at 82% opacity so scrolling rows never
+   while keeping sticky <th> headers at 95% opacity so scrolling rows never
    collide with header labels. No backdrop-filter on table/thead/tbody/scroll
    containers (preserves the position:sticky contract). */
 :root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) table thead,
 :root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) table thead th {
-  background-color: rgb(248 250 252 / 0.82);
+  background-color: rgb(248 250 252 / 0.95);
   border-color: rgb(255 255 255 / 0.75);
 }
 :root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) table tbody {
@@ -1282,7 +1282,7 @@
 }
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) table thead,
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) table thead th {
-  background-color: rgb(15 23 42 / 0.85);
+  background-color: rgb(15 23 42 / 0.95);
   border-color: rgb(255 255 255 / 0.12);
 }
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) table tbody {
@@ -1363,6 +1363,25 @@
     scrollbar-width: auto;
     scrollbar-color: auto;
   }
+}
+
+/* ---------- DataTable paint perf: table shells skip SVG refraction (appended)
+   Glass scope only: day rules ride the light guard chain, night rules the
+   dark guard chain (copied verbatim from the Task 4 selectors above). Table
+   shells are the largest glass surfaces on list screens, and the SVG
+   refraction filter repainted on every row scroll is the biggest paint cost
+   in the app — so table shells get plain frosted blur with no url() while
+   every other glass surface keeps refraction. This block sits later in the
+   file than the refraction rules, so it wins ties. */
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .glass-card.table-shell,
+:root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) [data-liquid-glass="active"].glass-card.table-shell {
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+}
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .glass-card.table-shell,
+.dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) [data-liquid-glass="active"].glass-card.table-shell {
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
 }
 
 /* ---------- FORM shared: modal-panel opacity boost (appended) ----------

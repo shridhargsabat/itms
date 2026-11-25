@@ -48,7 +48,12 @@ vi.mock('@/api/client', async (importOriginal) => {
   const mod = await importOriginal<typeof import('@/api/client')>();
   return {
     ...mod,
-    getLicenses: () => Promise.resolve({ items: [licA, licB, licC, licD], total: 4 }),
+    getLicenses: (params?: { scope?: string }) =>
+      params?.scope === 'expiring'
+        ? Promise.resolve({ items: [licA, licB, licC], total: 3 })
+        : params?.scope === 'expired'
+          ? Promise.resolve({ items: [licD], total: 1 })
+          : Promise.resolve({ items: [licA, licB, licC, licD], total: 4 }),
     getLicenseAlerts: () => Promise.resolve(ALERTS),
     getLicenseDetail: () => Promise.resolve({ license: licA, allocations: [] }),
   };
