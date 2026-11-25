@@ -169,7 +169,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
         role="dialog"
         aria-modal="true"
         aria-label="Asset details"
-        className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-edge bg-surface shadow-2xl"
+        className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col liquid-glass-panel"
       >
         <div className="flex items-start justify-between border-b border-edge px-5 py-4">
           <div>
