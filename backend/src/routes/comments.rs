@@ -122,6 +122,75 @@ fn reject_when_closed(status: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// R2-BE-07 (#140): lock the ticket row FOR UPDATE inside the caller's tx and
+/// return `(title, status)` — the ticket-PATCH pattern. Holding the row lock
+/// from the closed check through the mutation serializes against a concurrent
+/// PATCH-to-CLOSED instead of racing it. 404 when the ticket is gone
+/// (ticket-delete race).
+async fn lock_ticket_for_mutation(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ticket_id: Uuid,
+) -> Result<(String, String), AppError> {
+    let row: Option<(String, String)> =
+        sqlx::query_as("SELECT title, status FROM tickets WHERE id = $1 FOR UPDATE")
+            .bind(ticket_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+    row.ok_or_else(|| AppError::not_found("ticket not found"))
+}
+
+/// R2-BE-08 (#141): per-ticket attachment quota — 20 files / 100 MB total.
+const MAX_ATTACHMENTS_PER_TICKET: i64 = 20;
+const MAX_ATTACHMENT_TOTAL_BYTES: i64 = 100 * 1024 * 1024;
+
+/// Quota check, called inside the row-locked tx so parallel uploads can't
+/// each pass the check and jointly overshoot. File-count overage is 422
+/// (validation); byte overage is 413 (matches the per-file 413 above).
+async fn check_attachment_quota(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ticket_id: Uuid,
+    new_bytes: i64,
+) -> Result<(), AppError> {
+    // NOTE: SUM(bigint) returns NUMERIC in Postgres — cast back to BIGINT so
+    // the row decodes as (i64, i64).
+    let row: (i64, i64) =
+        sqlx::query_as("SELECT COUNT(*), COALESCE(SUM(size_bytes), 0)::BIGINT FROM ticket_attachments WHERE ticket_id = $1")
+            .bind(ticket_id)
+            .fetch_one(&mut **tx)
+            .await?;
+    if row.0 >= MAX_ATTACHMENTS_PER_TICKET {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("attachment limit reached: ticket already has {MAX_ATTACHMENTS_PER_TICKET} files"),
+        ));
+    }
+    if row.1 + new_bytes > MAX_ATTACHMENT_TOTAL_BYTES {
+        return Err(AppError::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "attachment quota exceeded: ticket already stores 100 MB",
+        ));
+    }
+    Ok(())
+}
+
+/// R2-BE-08 (#141): TBE-26 pattern for attachment inserts — a ticket deleted
+/// between the visibility check and the INSERT is 404 (it's gone), a vanished
+/// uploader is 422 (stale actor). Never 500.
+fn map_attachment_fk_violation(err: sqlx::Error) -> AppError {
+    if let sqlx::Error::Database(db) = &err {
+        let is_fk = db.code().as_deref() == Some("23503")
+            || db.constraint().is_some_and(|c| c.contains("fkey"));
+        if is_fk {
+            // Auto-named constraint: ticket_attachments_ticket_id_fkey.
+            if db.constraint().is_some_and(|c| c.contains("ticket_id")) {
+                return AppError::not_found("ticket not found");
+            }
+            return AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "uploader no longer exists");
+        }
+    }
+    AppError::from(err)
+}
+
 // ── comments ────────────────────────────────────────────────────────────────
 
 async fn list_comments(
@@ -161,11 +230,8 @@ async fn create_comment(
 ) -> Result<(StatusCode, Json<TicketComment>), AppError> {
     let pool = &state.pool;
     super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
-    let subject = ensure_ticket(pool, ticket_id).await?;
-    let Some((subject, status)) = subject else {
-        return Err(AppError::not_found("ticket not found"));
-    };
-    reject_when_closed(&status)?;
+    // Cheap validation runs before the row lock (ticket-PATCH pattern): the
+    // lock is held only around the guarded mutation, not request parsing.
     let body_text = body.body.trim();
     // TBE-22: body-validation failures are 422 (were 400).
     if body_text.is_empty() {
@@ -200,6 +266,13 @@ async fn create_comment(
         json!(mentions.iter().map(|u| u.to_string()).collect::<Vec<_>>())
     };
 
+    // R2-BE-07 (#140): lock the ticket row FOR UPDATE inside a tx so a
+    // concurrent PATCH-to-CLOSED serializes before the closed check instead
+    // of racing it (same pattern as the ticket PATCH handlers).
+    let mut tx = pool.begin().await?;
+    let (subject, status) = lock_ticket_for_mutation(&mut tx, ticket_id).await?;
+    reject_when_closed(&status)?;
+
     let comment = sqlx::query_as::<_, TicketComment>(
         "INSERT INTO ticket_comments (ticket_id, author_id, body, mentions) \
          VALUES ($1, $2, $3, $4) \
@@ -211,7 +284,7 @@ async fn create_comment(
     .bind(actor_id)
     .bind(body_text)
     .bind(&mentions_json)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|e| {
         // TBE-26: author/ticket FK race → 422, not 500.
@@ -227,7 +300,7 @@ async fn create_comment(
     })?;
 
     write(
-        pool,
+        &mut *tx,
         Some(actor_id),
         "TICKET_COMMENT",
         "ticket",
@@ -235,6 +308,7 @@ async fn create_comment(
         json!({"subject": subject, "comment": comment.id.to_string(), "mentions": mentions.len()}),
     )
     .await?;
+    tx.commit().await?;
 
     // P1-2: notify requester + assignee + prior commenters + mentioned users
     // (skip the author). TBE-12: mentions were previously never notified.
@@ -278,31 +352,35 @@ async fn delete_comment(
 ) -> Result<StatusCode, AppError> {
     let pool = &state.pool;
     super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
-    let row: Option<(String, String, Uuid, String,)> = sqlx::query_as::<_, (String, String, Uuid, String)>(
-        "SELECT c.body, t.title, c.author_id, t.status FROM ticket_comments c \
-         JOIN tickets t ON t.id = c.ticket_id WHERE c.id = $1 AND c.ticket_id = $2",
+    // R2-BE-07 (#140): comment lookup + ticket row lock + delete + audit in
+    // one tx — a concurrent PATCH-to-CLOSED can't slip between the closed
+    // check and the delete.
+    let mut tx = pool.begin().await?;
+    let row: Option<(String, Uuid)> = sqlx::query_as::<_, (String, Uuid)>(
+        "SELECT c.body, c.author_id FROM ticket_comments c WHERE c.id = $1 AND c.ticket_id = $2",
     )
     .bind(comment_id)
     .bind(ticket_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *tx)
     .await?;
-    let Some((body, subject, author, status)) = row else {
+    let Some((body, author)) = row else {
         return Err(AppError::not_found("comment not found"));
     };
+    let (subject, status) = lock_ticket_for_mutation(&mut tx, ticket_id).await?;
     reject_when_closed(&status)?;
     let user_role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
         .bind(actor_id)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
     if author != actor_id && user_role != "ADMIN" {
         return Err(AppError::new(StatusCode::FORBIDDEN, "only the author or an admin can delete a comment"));
     }
     sqlx::query("DELETE FROM ticket_comments WHERE id = $1")
         .bind(comment_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     write(
-        pool,
+        &mut *tx,
         Some(actor_id),
         "TICKET_COMMENT_DELETE",
         "ticket",
@@ -310,6 +388,7 @@ async fn delete_comment(
         json!({"subject": subject, "body": body.chars().take(80).collect::<String>()}),
     )
     .await?;
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -324,11 +403,9 @@ async fn upload_attachment(
 ) -> Result<(StatusCode, Json<TicketAttachment>), AppError> {
     let pool = &state.pool;
     super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
-    let subject = ensure_ticket(pool, ticket_id).await?;
-    let Some((subject, status)) = subject else {
-        return Err(AppError::not_found("ticket not found"));
-    };
-    reject_when_closed(&status)?;
+    // NOTE: the ticket existence/closed checks happen below inside the
+    // row-locked tx (R2-BE-07), after the multipart body is fully parsed, so
+    // the lock is never held across slow request-body reads.
     let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "/app/uploads".to_string());
     tokio::fs::create_dir_all(&dir).await.map_err(|e| {
         AppError::new(StatusCode::INTERNAL_SERVER_ERROR, format!("cannot create upload dir: {e}"))
@@ -351,31 +428,28 @@ async fn upload_attachment(
         }
     })? {
         let name = field.name().unwrap_or("").to_string();
-        match name.as_str() {
-            "file" => {
-                file_name = field.file_name().map(|s| s.to_string());
-                content_type = field.content_type().map(|s| s.to_string());
-                let bytes = field.bytes().await.map_err(|e| {
-                    // DefaultBodyLimit aborts mid-read when the field exceeds
-                    // the limit — surface 413, not 400.
-                    if e.to_string().contains("multipart") || e.to_string().contains("length limit") {
-                        AppError::new(
-                            StatusCode::PAYLOAD_TOO_LARGE,
-                            "file exceeds 10 MB limit",
-                        )
-                    } else {
-                        AppError::new(StatusCode::BAD_REQUEST, format!("read error: {e}"))
-                    }
-                })?;
-                if bytes.len() as i64 > MAX_ATTACHMENT_BYTES {
-                    return Err(AppError::new(
+        if name.as_str() == "file" {
+            file_name = field.file_name().map(|s| s.to_string());
+            content_type = field.content_type().map(|s| s.to_string());
+            let bytes = field.bytes().await.map_err(|e| {
+                // DefaultBodyLimit aborts mid-read when the field exceeds
+                // the limit — surface 413, not 400.
+                if e.to_string().contains("multipart") || e.to_string().contains("length limit") {
+                    AppError::new(
                         StatusCode::PAYLOAD_TOO_LARGE,
-                        format!("file exceeds 10 MB limit ({} bytes)", bytes.len()),
-                    ));
+                        "file exceeds 10 MB limit",
+                    )
+                } else {
+                    AppError::new(StatusCode::BAD_REQUEST, format!("read error: {e}"))
                 }
-                data = Some(bytes.to_vec());
+            })?;
+            if bytes.len() as i64 > MAX_ATTACHMENT_BYTES {
+                return Err(AppError::new(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    format!("file exceeds 10 MB limit ({} bytes)", bytes.len()),
+                ));
             }
-            _ => {}
+            data = Some(bytes.to_vec());
         }
     }
     let Some(file_name) = file_name else {
@@ -397,6 +471,15 @@ async fn upload_attachment(
     // or missing → octet-stream fallback), so downloads never reflect an
     // attacker-chosen Content-Type.
     let content_type = sanitize_content_type(content_type.as_deref());
+
+    // R2-BE-07 (#140) + R2-BE-08 (#141): lock the ticket row, re-check
+    // CLOSED, then enforce the per-ticket quota — all inside one tx so a
+    // concurrent PATCH-to-CLOSED or a parallel upload can't race the checks.
+    let mut tx = pool.begin().await?;
+    let (subject, status) = lock_ticket_for_mutation(&mut tx, ticket_id).await?;
+    reject_when_closed(&status)?;
+    check_attachment_quota(&mut tx, ticket_id, data.len() as i64).await?;
+
     let storage_key = format!("{ticket_id}/{}.bin", Uuid::new_v4());
     let abs = PathBuf::from(&dir).join(&storage_key);
     if let Some(parent) = abs.parent() {
@@ -408,7 +491,10 @@ async fn upload_attachment(
         AppError::new(StatusCode::INTERNAL_SERVER_ERROR, format!("cannot store file: {e}"))
     })?;
 
-    let att = sqlx::query_as::<_, TicketAttachment>(
+    // R2-BE-08 (#141): the bytes land on disk before their row exists — every
+    // failure below removes the just-written file so failures leave no
+    // orphaned files behind.
+    let att = match sqlx::query_as::<_, TicketAttachment>(
         "INSERT INTO ticket_attachments (ticket_id, uploader_id, file_name, content_type, size_bytes, storage_key) \
          VALUES ($1, $2, $3, $4, $5, $6) \
          RETURNING id, ticket_id, uploader_id, file_name, content_type, size_bytes, storage_key, created_at, \
@@ -420,18 +506,33 @@ async fn upload_attachment(
     .bind(&content_type)
     .bind(data.len() as i64)
     .bind(&storage_key)
-    .fetch_one(pool)
-    .await?;
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(att) => att,
+        Err(e) => {
+            let _ = tokio::fs::remove_file(&abs).await;
+            return Err(map_attachment_fk_violation(e));
+        }
+    };
 
-    write(
-        pool,
+    if let Err(e) = write(
+        &mut *tx,
         Some(actor_id),
         "TICKET_ATTACH",
         "ticket",
         ticket_id,
         json!({"subject": subject, "file": clean, "bytes": data.len()}),
     )
-    .await?;
+    .await
+    {
+        let _ = tokio::fs::remove_file(&abs).await;
+        return Err(AppError::from(e));
+    }
+    if let Err(e) = tx.commit().await {
+        let _ = tokio::fs::remove_file(&abs).await;
+        return Err(AppError::from(e));
+    }
     Ok((StatusCode::CREATED, Json(att)))
 }
 
@@ -443,36 +544,36 @@ async fn delete_attachment(
 ) -> Result<StatusCode, AppError> {
     let pool = &state.pool;
     super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
-    let row: Option<(String, String, String, Uuid, String,)> = sqlx::query_as::<_, (String, String, String, Uuid, String)>(
-        "SELECT a.file_name, a.storage_key, t.title, a.uploader_id, t.status FROM ticket_attachments a \
-         JOIN tickets t ON t.id = a.ticket_id WHERE a.id = $1 AND a.ticket_id = $2",
+    // R2-BE-07 (#140): attachment lookup + ticket row lock + delete + audit
+    // in one tx — a concurrent PATCH-to-CLOSED can't slip between the closed
+    // check and the delete.
+    let mut tx = pool.begin().await?;
+    let row: Option<(String, String, Uuid)> = sqlx::query_as::<_, (String, String, Uuid)>(
+        "SELECT a.file_name, a.storage_key, a.uploader_id FROM ticket_attachments a \
+         WHERE a.id = $1 AND a.ticket_id = $2",
     )
     .bind(attachment_id)
     .bind(ticket_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *tx)
     .await?;
-    let Some((file_name, storage_key, subject, uploader, status)) = row else {
+    let Some((file_name, storage_key, uploader)) = row else {
         return Err(AppError::not_found("attachment not found"));
     };
+    let (subject, status) = lock_ticket_for_mutation(&mut tx, ticket_id).await?;
     reject_when_closed(&status)?;
     let user_role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
         .bind(actor_id)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await?;
     if uploader != actor_id && user_role != "ADMIN" {
         return Err(AppError::new(StatusCode::FORBIDDEN, "only the uploader or an admin can delete an attachment"));
     }
     sqlx::query("DELETE FROM ticket_attachments WHERE id = $1")
         .bind(attachment_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
-    let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "/app/uploads".to_string());
-    let abs = PathBuf::from(&dir).join(&storage_key);
-    if abs.exists() {
-        let _ = tokio::fs::remove_file(&abs).await;
-    }
     write(
-        pool,
+        &mut *tx,
         Some(actor_id),
         "TICKET_ATTACH_DELETE",
         "ticket",
@@ -480,6 +581,12 @@ async fn delete_attachment(
         json!({"subject": subject, "file": file_name}),
     )
     .await?;
+    tx.commit().await?;
+    let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "/app/uploads".to_string());
+    let abs = PathBuf::from(&dir).join(&storage_key);
+    if abs.exists() {
+        let _ = tokio::fs::remove_file(&abs).await;
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -657,5 +764,335 @@ mod tests {
         );
         assert!(reject_when_closed("RESOLVED").is_ok());
         assert!(reject_when_closed("OPEN").is_ok());
+    }
+}
+
+/// R2 P2 regression tests (issues #140 R2-BE-07, #141 R2-BE-08): DB-backed
+/// handler tests. Same TEST_DATABASE_URL-with-skip pattern as
+/// routes::intake::r2_regression_tests — when no test DB is reachable they
+/// skip (pass with a notice) so `cargo test` stays green without a database.
+#[cfg(test)]
+mod r2_p2_regression_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+
+    const DEFAULT_TEST_DB_URL: &str = "postgres://itms_test:itms_test@127.0.0.1:55434/itms_test";
+
+    async fn test_pool() -> Option<sqlx::PgPool> {
+        let url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| DEFAULT_TEST_DB_URL.to_string());
+        match PgPoolOptions::new().max_connections(5).connect(&url).await {
+            Ok(pool) => {
+                sqlx::migrate!("./migrations")
+                    .run(&pool)
+                    .await
+                    .expect("test DB migrations must apply");
+                Some(pool)
+            }
+            Err(e) => {
+                eprintln!("r2_p2_regression_tests(comments): skipping — no test DB at {url} ({e})");
+                None
+            }
+        }
+    }
+
+    fn test_state(pool: sqlx::PgPool) -> AppState {
+        AppState { pool, login_attempts: Default::default(), opencode_api_key: None }
+    }
+
+    async fn create_user(pool: &sqlx::PgPool, role: &str) -> Uuid {
+        let email = format!("r2p2-c-{}@example.com", Uuid::new_v4().simple());
+        sqlx::query_scalar(
+            "INSERT INTO users (name, email, role, department, password_hash, active) \
+             VALUES ('R2P2 Comments', $1, $2, 'IT', 'test-hash', TRUE) RETURNING id",
+        )
+        .bind(&email)
+        .bind(role)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn create_ticket(pool: &sqlx::PgPool, requester: Uuid, status: &str) -> Uuid {
+        let number = format!("INC-8{:09}", rand::random::<u32>() % 1_000_000_000);
+        sqlx::query_scalar(
+            "INSERT INTO tickets (ticket_number, title, description, requester_id, status) \
+             VALUES ($1, 'r2p2', 'r2p2', $2, $3) RETURNING id",
+        )
+        .bind(&number)
+        .bind(requester)
+        .bind(status)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn create_comment_row(pool: &sqlx::PgPool, ticket: Uuid, author: Uuid) -> Uuid {
+        sqlx::query_scalar("INSERT INTO ticket_comments (ticket_id, author_id, body) VALUES ($1, $2, 'seed') RETURNING id")
+            .bind(ticket)
+            .bind(author)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn create_attachment_row(pool: &sqlx::PgPool, ticket: Uuid, uploader: Uuid, size: i64) -> Uuid {
+        let key = format!("r2p2-c-{}", Uuid::new_v4().simple());
+        sqlx::query_scalar(
+            "INSERT INTO ticket_attachments (ticket_id, uploader_id, file_name, size_bytes, storage_key) \
+             VALUES ($1, $2, 'seed.bin', $3, $4) RETURNING id",
+        )
+        .bind(ticket)
+        .bind(uploader)
+        .bind(size)
+        .bind(&key)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    fn comment_req(body: &str) -> Json<CreateCommentRequest> {
+        Json(CreateCommentRequest { body: body.to_string(), mentions: vec![] })
+    }
+
+    // ── R2-BE-07: CLOSED-ticket rejection still holds through the tx path ───
+
+    #[tokio::test]
+    async fn closed_ticket_rejects_comment_create() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "CLOSED").await;
+
+        let err = create_comment(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            comment_req("should not land"),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("closed"), "message: {}", err.message);
+
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ticket_comments WHERE ticket_id = $1")
+            .bind(tid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(0, n);
+    }
+
+    #[tokio::test]
+    async fn open_ticket_accepts_comment_create_with_audit() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "OPEN").await;
+
+        let (code, Json(c)) = create_comment(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            comment_req("hello via tx path"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(code, StatusCode::CREATED);
+        assert_eq!(c.ticket_id, tid);
+        let audit: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM audit_logs WHERE action = 'TICKET_COMMENT' AND target_id = $1",
+        )
+        .bind(tid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(1, audit);
+    }
+
+    #[tokio::test]
+    async fn closed_ticket_rejects_comment_delete() {
+        let Some(pool) = test_pool().await else { return };
+        let admin = create_user(&pool, "ADMIN").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "CLOSED").await;
+        let cid = create_comment_row(&pool, tid, admin).await;
+
+        let err = delete_comment(
+            State(test_state(pool.clone())),
+            Extension(admin),
+            Extension("ADMIN".to_string()),
+            UuidPath((tid, cid)),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("closed"), "message: {}", err.message);
+
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ticket_comments WHERE id = $1")
+            .bind(cid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(1, n);
+    }
+
+    #[tokio::test]
+    async fn open_ticket_accepts_comment_delete_with_audit() {
+        let Some(pool) = test_pool().await else { return };
+        let admin = create_user(&pool, "ADMIN").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "OPEN").await;
+        let cid = create_comment_row(&pool, tid, admin).await;
+
+        let code = delete_comment(
+            State(test_state(pool.clone())),
+            Extension(admin),
+            Extension("ADMIN".to_string()),
+            UuidPath((tid, cid)),
+        )
+        .await
+        .unwrap();
+        assert_eq!(code, StatusCode::NO_CONTENT);
+        let audit: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM audit_logs WHERE action = 'TICKET_COMMENT_DELETE' AND target_id = $1",
+        )
+        .bind(tid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(1, audit);
+    }
+
+    #[tokio::test]
+    async fn closed_ticket_rejects_attachment_delete() {
+        let Some(pool) = test_pool().await else { return };
+        let admin = create_user(&pool, "ADMIN").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "CLOSED").await;
+        let aid = create_attachment_row(&pool, tid, admin, 128).await;
+
+        let err = delete_attachment(
+            State(test_state(pool.clone())),
+            Extension(admin),
+            Extension("ADMIN".to_string()),
+            UuidPath((tid, aid)),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("closed"), "message: {}", err.message);
+
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ticket_attachments WHERE id = $1")
+            .bind(aid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(1, n);
+    }
+
+    #[tokio::test]
+    async fn lock_helper_surfaces_closed_status_and_404s_missing() {
+        let Some(pool) = test_pool().await else { return };
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "CLOSED").await;
+
+        let mut tx = pool.begin().await.unwrap();
+        let (title, status) = lock_ticket_for_mutation(&mut tx, tid).await.unwrap();
+        assert!(!title.is_empty());
+        assert_eq!(status, "CLOSED");
+        assert_eq!(
+            reject_when_closed(&status).unwrap_err().status,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        let err = lock_ticket_for_mutation(&mut tx, Uuid::new_v4()).await.unwrap_err();
+        assert_eq!(err.status, StatusCode::NOT_FOUND);
+        tx.rollback().await.unwrap();
+    }
+
+    // ── R2-BE-08: quota enforcement ──────────────────────────────────────────
+
+    #[tokio::test]
+    async fn attachment_quota_count_returns_422_at_20_files() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "OPEN").await;
+        for _ in 0..20 {
+            create_attachment_row(&pool, tid, staff, 10).await;
+        }
+
+        let mut tx = pool.begin().await.unwrap();
+        let err = check_attachment_quota(&mut tx, tid, 10).await.unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("20"), "message: {}", err.message);
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn attachment_quota_bytes_returns_413_over_100mb() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "OPEN").await;
+        create_attachment_row(&pool, tid, staff, 100 * 1024 * 1024).await;
+
+        let mut tx = pool.begin().await.unwrap();
+        let err = check_attachment_quota(&mut tx, tid, 1).await.unwrap_err();
+        assert_eq!(err.status, StatusCode::PAYLOAD_TOO_LARGE);
+        tx.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn attachment_quota_allows_headroom() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "OPEN").await;
+        create_attachment_row(&pool, tid, staff, 1024).await;
+
+        let mut tx = pool.begin().await.unwrap();
+        check_attachment_quota(&mut tx, tid, 1024).await.unwrap();
+        tx.rollback().await.unwrap();
+    }
+
+    // ── R2-BE-08: FK-violation mapping (TBE-26 pattern) ─────────────────────
+
+    #[tokio::test]
+    async fn attachment_fk_violation_maps_to_404_and_422() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT").await;
+        let requester = create_user(&pool, "EMPLOYEE").await;
+        let tid = create_ticket(&pool, requester, "OPEN").await;
+
+        // Ticket-delete race → 404 (gone), not 500.
+        let raw = sqlx::query(
+            "INSERT INTO ticket_attachments (ticket_id, uploader_id, file_name, size_bytes, storage_key) \
+             VALUES ($1, $2, 'race.bin', 1, $3)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(staff)
+        .bind(format!("r2p2-c-{}", Uuid::new_v4().simple()))
+        .execute(&pool)
+        .await
+        .unwrap_err();
+        assert_eq!(map_attachment_fk_violation(raw).status, StatusCode::NOT_FOUND);
+
+        // Vanished uploader → 422 (stale actor), not 500.
+        let raw = sqlx::query(
+            "INSERT INTO ticket_attachments (ticket_id, uploader_id, file_name, size_bytes, storage_key) \
+             VALUES ($1, $2, 'race.bin', 1, $3)",
+        )
+        .bind(tid)
+        .bind(Uuid::new_v4())
+        .bind(format!("r2p2-c-{}", Uuid::new_v4().simple()))
+        .execute(&pool)
+        .await
+        .unwrap_err();
+        assert_eq!(
+            map_attachment_fk_violation(raw).status,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
     }
 }
