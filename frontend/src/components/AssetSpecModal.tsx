@@ -574,6 +574,10 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                   placeholder="Search users…"
                   value={assignQuery}
                   onFocus={() => {
+                    // A selection leaves "Name (email)" in the input, which
+                    // would match nothing — reset the query so reopening the
+                    // picker shows the full directory (pending selection kept).
+                    if (assignUserId) setAssignQuery('');
                     setAssignOpen(true);
                     setAssignActive(0);
                   }}
@@ -619,11 +623,11 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                       <p className="px-3 py-2 text-sm text-muted">No users match “{assignQuery.trim()}”.</p>
                     ) : (
                       assignMatches.map((u, i) => (
-                        <button
+                        <div
                           key={u.id}
                           id={`asset-assign-opt-${u.id}`}
-                          type="button"
                           role="option"
+                          tabIndex={-1}
                           aria-selected={u.id === assignUserId}
                           title={`${u.name} (${u.email})`}
                           onMouseDown={(e) => {
@@ -635,14 +639,14 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                           onMouseMove={() => setAssignActive(i)}
                           className={
                             i === Math.min(assignActive, assignMatches.length - 1)
-                              ? 'flex w-full items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md bg-elevated2/70 px-3 py-2 text-left text-sm text-primary'
-                              : 'flex w-full items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-secondary hover:bg-elevated2/40 hover:text-primary'
+                              ? 'flex w-full cursor-pointer items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md bg-elevated2/70 px-3 py-2 text-left text-sm text-primary'
+                              : 'flex w-full cursor-pointer items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-secondary hover:bg-elevated2/40 hover:text-primary'
                           }
                         >
                           <span className="min-w-0 truncate">
                             {u.name} ({u.email})
                           </span>
-                        </button>
+                        </div>
                       ))
                     )}
                   </div>

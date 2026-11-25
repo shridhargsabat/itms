@@ -115,4 +115,30 @@ describe('Assets assignment user combobox (task 12)', () => {
     fireEvent.click(await screen.findByText('AST-10014')); // opens spec modal
     expect(await screen.findByRole('button', { name: /unassign/i })).toBeInTheDocument();
   });
+
+  it('keeps picker options out of the tab order (active-descendant pattern)', async () => {
+    renderAssets();
+    fireEvent.click(await screen.findByText('AST-10014')); // opens spec modal
+    const combo = await screen.findByRole('combobox', { name: /assign/i });
+    fireEvent.focus(combo);
+    const options = await screen.findAllByRole('option');
+    expect(options.length).toBe(2);
+    options.forEach((o) => {
+      expect(o.tagName).not.toBe('BUTTON');
+      expect(o.tabIndex).toBe(-1);
+    });
+  });
+
+  it('reopening the picker after selection shows the user list', async () => {
+    renderAssets();
+    fireEvent.click(await screen.findByText('AST-10014')); // opens spec modal
+    const combo = (await screen.findByRole('combobox', { name: /assign/i })) as HTMLInputElement;
+    fireEvent.change(combo, { target: { value: 'priya' } });
+    fireEvent.mouseDown(await screen.findByRole('option', { name: /priya.*@.*\./i }));
+    expect(combo.value).toBe('Priya Sharma (priya.sharma@example.com)');
+    fireEvent.blur(combo);
+    fireEvent.focus(combo);
+    expect(screen.queryByText(/no users match/i)).not.toBeInTheDocument();
+    expect(await screen.findAllByRole('option')).toHaveLength(2);
+  });
 });
