@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { clearSession, exchangeOAuthCode, me, setSession } from '@/api/client';
-import { hydrateThemeFromUser } from '@/lib/theme';
+import { syncThemeAfterLogin } from '@/lib/theme';
 
 /**
  * #53 / wave-2a: SSO callback landing page — the backend 302s here with ONLY
@@ -35,9 +35,11 @@ export default function OAuthCallback() {
         try {
           const fresh = await me();
           setSession(res.token, fresh);
-          hydrateThemeFromUser(fresh);
+          // Task 16: a login-screen theme choice (session flag survives the
+          // SSO round-trip) wins and is pushed up; else the server pref wins.
+          await syncThemeAfterLogin(fresh);
         } catch {
-          hydrateThemeFromUser(res.user);
+          await syncThemeAfterLogin(res.user);
         }
       } catch {
         await clearSession();

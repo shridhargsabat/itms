@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { LiquidGlassFilterBank } from '@/components/LiquidGlass';
@@ -6,6 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { Button } from '@/components/Button';
 import { applyTheme, watchSystemTheme } from '@/lib/theme';
 import {
+  ChevronUp,
   Download,
   KeyRound,
   LogOut,
@@ -31,6 +32,9 @@ export default function Layout() {
   // Transient hover expand: when the collapsed rail is hovered it peeks open (overlay).
   const [hovering, setHovering] = useState(false);
   const [showIosTip, setShowIosTip] = useState(false);
+  // Task 16 (UI-15): profile popover open state (user chip in the compact footer).
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const user = getCachedUser();
@@ -70,6 +74,25 @@ export default function Layout() {
       setShowIosTip(true);
       window.setTimeout(() => setShowIosTip(false), 6000);
     }
+  };
+
+  // Task 16: click-outside closes the profile popover (same pattern as
+  // ThemeToggle); any navigation closes it too.
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [profileOpen]);
+
+  useEffect(() => {
+    setProfileOpen(false);
+  }, [location.pathname]);
+
+  const closeProfileOnEscape = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') setProfileOpen(false);
   };
 
   // Smooth page transitions via the View Transitions API (Chromium/Safari 18+).
@@ -192,84 +215,134 @@ export default function Layout() {
           <QuickCapture wide={wide} />
         </div>
 
-        {wide && user && (
-          <div className="flex items-center gap-3 border-t border-edge px-4 py-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
-              {(user.name ?? user.email ?? '?').slice(0, 2).toUpperCase()}
-            </span>
-            <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-medium text-primary">{user.name ?? user.email}</p>
-              <p className="truncate text-[11px] text-muted">
-                {user.role ?? ''}
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="p-2">
-          <Button
-            type="button"
-            onClick={toggleSidebar}
-            variant="ghost"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={cn(
-              'w-full justify-start gap-3 px-3 py-2 text-sm',
-              wide ? '' : 'justify-center px-0',
-            )}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="h-5 w-5 shrink-0" />
-            ) : (
-              <PanelLeftClose className="h-5 w-5 shrink-0" />
-            )}
-            {wide && <span>{collapsed ? 'Expand' : 'Collapse'}</span>}
-          </Button>
-          <Button
-            type="button"
-            onClick={signOut}
-            variant="ghost"
-            className={cn(
-              'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm hover:bg-red-500/10 hover:text-red-400',
-              wide ? '' : 'justify-center px-0',
-            )}
-            title="Sign out"
-          >
-            <LogOut className="h-5 w-5 shrink-0" />
-            {wide && <span>Sign out</span>}
-          </Button>
-          <Link
-            to="/account"
-            className={cn(
-              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary',
-              wide ? '' : 'justify-center px-0',
-            )}
-            title="Change password"
-          >
-            <KeyRound className="h-5 w-5 shrink-0" />
-            {wide && <span>Change password</span>}
-          </Link>
-          {installable && (
+        {/* Task 16 (UI-15): compact pinned footer — user chip (opens the
+            profile popover) + theme switcher only. Change password,
+            Install app, collapse/sign-out and the build hash moved into
+            the popover, giving the nav the vertical room back (the
+            Reports row clipped into Quick Capture at 1440×900). */}
+        <div ref={profileRef} className="relative border-t border-edge">
+          <div className="p-2">
             <Button
               type="button"
-              onClick={promptInstall}
+              onClick={() => setProfileOpen((o) => !o)}
+              onKeyDown={closeProfileOnEscape}
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              aria-label={user ? `Profile: ${user.name ?? user.email}` : 'Profile'}
+              title={user?.name ?? user?.email ?? 'Profile'}
               variant="ghost"
+              fullWidth
               className={cn(
-                'mt-1 w-full justify-start gap-3 px-3 py-2 text-sm',
+                'h-auto justify-start gap-3 px-3 py-2 text-sm',
                 wide ? '' : 'justify-center px-0',
               )}
-              title="Install app"
-              >
-              <Download className="h-5 w-5 shrink-0" />
-              {wide && <span>Install app</span>}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+                {(user?.name ?? user?.email ?? '?').slice(0, 2).toUpperCase()}
+              </span>
+              {wide && (
+                <>
+                  <span className="min-w-0 flex-1 text-left leading-tight">
+                    <span className="block truncate font-medium text-primary">
+                      {user?.name ?? user?.email ?? 'Account'}
+                    </span>
+                    {user?.role && (
+                      <span className="block truncate text-[11px] font-normal text-muted">
+                        {user.role}
+                      </span>
+                    )}
+                  </span>
+                  <ChevronUp
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted transition-transform',
+                      profileOpen && 'rotate-180',
+                    )}
+                    aria-hidden="true"
+                  />
+                </>
+              )}
             </Button>
+          </div>
+          {profileOpen && (
+            <div
+              role="menu"
+              aria-label="Profile"
+              onKeyDown={closeProfileOnEscape}
+              className="absolute bottom-full left-2 z-50 mb-2 w-60 max-w-[calc(100vw-2rem)] rounded-xl border border-edge bg-surface p-1.5 shadow-xl"
+            >
+              <Link
+                to="/account"
+                role="menuitem"
+                onClick={() => setProfileOpen(false)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:bg-elevated hover:text-primary"
+                title="Change password"
+              >
+                <KeyRound className="h-5 w-5 shrink-0" />
+                <span>Change password</span>
+              </Link>
+              {installable && (
+                <Button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    promptInstall();
+                  }}
+                  variant="ghost"
+                  fullWidth
+                  className="justify-start gap-3 px-3 py-2 text-sm"
+                  title="Install app"
+                >
+                  <Download className="h-5 w-5 shrink-0" />
+                  <span>Install app</span>
+                </Button>
+              )}
+              <Button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setProfileOpen(false);
+                  toggleSidebar();
+                }}
+                variant="ghost"
+                fullWidth
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className="justify-start gap-3 px-3 py-2 text-sm"
+              >
+                {collapsed ? (
+                  <PanelLeftOpen className="h-5 w-5 shrink-0" />
+                ) : (
+                  <PanelLeftClose className="h-5 w-5 shrink-0" />
+                )}
+                <span>{collapsed ? 'Expand' : 'Collapse'}</span>
+              </Button>
+              <Button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setProfileOpen(false);
+                  void signOut();
+                }}
+                variant="ghost"
+                fullWidth
+                className="justify-start gap-3 px-3 py-2 text-sm hover:bg-red-500/10 hover:text-red-400"
+                title="Sign out"
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                <span>Sign out</span>
+              </Button>
+              <p className="mt-1 border-t border-edge px-3 pb-1 pt-2 text-left text-[10px] text-muted">
+                build {__BUILD_SHA__}
+              </p>
+            </div>
           )}
-          <div className={cn('mt-2 border-t border-edge pt-2', wide ? 'px-2' : 'flex justify-center')}>
+        </div>
+
+        <div className="px-2 pb-2">
+          <div className={cn(wide ? 'px-2' : 'flex justify-center')}>
             <ThemeToggle showLabel={wide} direction="up" variant="ghost" className={cn('w-full', wide ? 'h-9 justify-start gap-3 px-3 py-2 text-sm' : 'h-9 w-9')} />
           </div>
-          {wide && (
-            <p className="mt-1 px-3 text-left text-[10px] text-muted">build {__BUILD_SHA__}</p>
-          )}
         </div>
       </aside>
 

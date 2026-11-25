@@ -11,7 +11,7 @@ import {
   Terminal,
   Zap,
 } from 'lucide-react';
-import { getThemeMode, onThemeChanged, setThemeModeLocal, type ThemeMode } from '@/lib/theme';
+import { getThemeMode, markLoginThemeChoice, onThemeChanged, setThemeModeLocal, type ThemeMode } from '@/lib/theme';
 import { THEME_REGISTRY, type ThemeMeta as RegistryMeta } from '@/lib/theme-registry';
 import { cn } from '@/lib/utils';
 
@@ -65,6 +65,9 @@ export default function LoginThemeMenu() {
 
   const choose = (value: ThemeMode) => {
     setThemeModeLocal(value);
+    // Task 16: an explicit pre-auth pick must survive login (syncThemeAfterLogin
+    // consumes this once and pushes the choice up instead of hydrating over it).
+    markLoginThemeChoice();
     setMode(value);
     setOpen(false);
   };
