@@ -95,10 +95,9 @@ export default function Layout() {
     if (e.key === 'Escape') setProfileOpen(false);
   };
 
-  // Smooth page transitions via the View Transitions API (Chromium/Safari 18+).
-  // Intercepts internal <a> clicks and wraps the navigation so the browser
-  // crossfades between screens. No transforms on wrappers — that would break
-  // position:fixed children (see dropdown alignment incident).
+  // No page-transition effects: navigations are instant. (A View Transitions
+  // crossfade used to live here; removed per user request — every click
+  // flashed the full screen.)
   useEffect(() => {
     applyTheme();
     watchSystemTheme();
@@ -107,38 +106,7 @@ export default function Layout() {
     // just scrolled above the fold; combined with the sticky actions row
     // this makes the add buttons effectively always reachable.
     window.scrollTo(0, 0);
-    if (!('startViewTransition' in document)) return;
-    const onClick = (e: MouseEvent) => {
-      if (
-        e.defaultPrevented ||
-        e.metaKey ||
-        e.ctrlKey ||
-        e.shiftKey ||
-        e.altKey ||
-        e.button !== 0
-      ) {
-        return;
-      }
-      const anchor = (e.target as Element).closest('a[href^="/"]');
-      if (!anchor || anchor.getAttribute('target') === '_blank') return;
-      const href = anchor.getAttribute('href');
-      if (!href || href.startsWith('http')) return;
-      e.preventDefault();
-      // Task 18 (UI-19): reduced-motion users skip the crossfade entirely
-      // (plain navigation; the CSS guard is the backstop).
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        navigate(href);
-        return;
-      }
-      document.startViewTransition(() => {
-        navigate(href);
-      });
-    };
-    // Capture phase: runs BEFORE react-router's Link handler, so we can
-    // preventDefault first and wrap the navigation in a view transition.
-    document.addEventListener('click', onClick, true);
-    return () => document.removeEventListener('click', onClick, true);
-  }, [navigate, location.pathname]);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen">
