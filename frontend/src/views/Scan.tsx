@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import jsQR from 'jsqr';
-import { CheckCircle2, CircleAlert, Flag, ScanLine, XCircle } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Flag, ScanLine, Video, XCircle } from 'lucide-react';
 import { listAssets, scanAudit } from '@/api/client';
 import type { Asset, QrScanResult } from '@/api/types';
 import { cn, inputCls, labelCls } from '@/lib/utils';
@@ -35,7 +35,9 @@ export default function Scan() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef(0);
+  const streamRef = useRef<MediaStream | null>(null);
   const [camError, setCamError] = useState('');
+  const [camActive, setCamActive] = useState(false);
   const [last, setLast] = useState<{ ok: boolean; msg: string; tag?: string; name?: string } | null>(null);
   const [manual, setManual] = useState('');
   const [run, setRun] = useState<RunState | null>(() => loadRun());
@@ -90,25 +92,31 @@ export default function Scan() {
     rafRef.current = requestAnimationFrame(tick);
   }, []);
 
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-          rafRef.current = requestAnimationFrame(tick);
-        }
-      } catch {
-        setCamError('Camera unavailable — use the manual tag field below (or grant camera permission).');
+  const startCamera = useCallback(async () => {
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCamError('');
+        setCamActive(true);
+        rafRef.current = requestAnimationFrame(tick);
       }
-    })();
+    } catch {
+      setCamActive(false);
+      setCamError('Camera unavailable — use the manual tag field below (or grant camera permission).');
+    }
+  }, [tick]);
+
+  useEffect(() => {
+    startCamera();
     return () => {
       cancelAnimationFrame(rafRef.current);
-      stream?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [tick]);
+  }, [startCamera]);
 
   const manualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,25 +136,11 @@ export default function Scan() {
   const pct = expected > 0 ? Math.round((found / expected) * 100) : 0;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="mx-auto max-w-2xl space-y-5 lg:max-w-5xl">
       <PageHeader
         title="Scan Audit"
         description="Point the camera at an ITMS label. Each scan records an audit entry on the asset; the run tally reconciles found vs expected."
       />
-
-      {/* Camera card */}
-      <div className="relative overflow-hidden rounded-xl border border-edge bg-black">
-        <video ref={videoRef} playsInline muted className="aspect-[4/3] w-full object-cover" />
-        <canvas ref={canvasRef} className="hidden" />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="flex h-40 w-40 items-center justify-center rounded-2xl border-2 border-dashed border-accent/60">
-            <ScanLine className="h-14 w-14 text-accent/70" />
-          </div>
-        </div>
-        <div className="absolute bottom-3 left-3 rounded-lg bg-black/60 px-2.5 py-1 text-[11px] text-white backdrop-blur">
-          {camError ? 'camera off — manual mode' : run && targets.length > 0 ? `Audit run: ${found}/${expected} found` : 'scan mode'}
-        </div>
-      </div>
 
       {/* Result flash */}
       {last && (
@@ -159,23 +153,54 @@ export default function Scan() {
         </div>
       )}
 
-      {camError && (
-        <form onSubmit={manualSubmit} className="space-y-2 rounded-xl glass-card p-3">
-          <label className={labelCls}>Manual tag lookup</label>
-          <div className="flex gap-2">
-            <input
-              value={manual}
-              onChange={(e) => setManual(e.target.value)}
-              placeholder="e.g. AST-0012 or serial"
-              className={cn(inputCls, 'min-w-0 flex-1 font-mono')}
-            />
-            <Button type="submit" variant="primary" size="sm" className="shrink-0">Enter</Button>
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        {/* Camera card */}
+        <div className="relative overflow-hidden rounded-xl border border-edge bg-black">
+          <video ref={videoRef} playsInline muted className="aspect-[4/3] w-full object-cover" />
+          <canvas ref={canvasRef} className="hidden" />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="flex h-40 w-40 items-center justify-center rounded-2xl border-2 border-dashed border-accent/60">
+              <ScanLine className="h-14 w-14 text-accent/70" />
+            </div>
           </div>
-        </form>
-      )}
+          {!camActive && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-6 text-center">
+              <Video className="h-10 w-10 text-accent/80" />
+              <div>
+                <p className="text-sm font-medium text-white">Camera is off</p>
+                <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-white/70">
+                  Tap Enable Camera, then choose Allow when your browser asks for camera permission.
+                  If you blocked it before, re-enable it in your browser&apos;s site settings
+                  (on iOS: Settings → Safari → Camera).
+                </p>
+              </div>
+              <Button type="button" variant="primary" size="sm" onClick={startCamera}>
+                Enable Camera
+              </Button>
+              {camError && <p className="max-w-xs text-[11px] text-white/50">{camError}</p>}
+            </div>
+          )}
+          <div className="absolute bottom-3 left-3 rounded-lg bg-black/60 px-2.5 py-1 text-[11px] text-white backdrop-blur">
+            {camError ? 'camera off — manual mode' : run && targets.length > 0 ? `Audit run: ${found}/${expected} found` : 'scan mode'}
+          </div>
+        </div>
 
-      {/* Audit run card */}
-      <div className="rounded-xl glass-card p-4">
+        <div className="space-y-5">
+          <form onSubmit={manualSubmit} className="space-y-2 rounded-xl glass-card p-3">
+            <label className={labelCls}>Manual tag lookup</label>
+            <div className="flex gap-2">
+              <input
+                value={manual}
+                onChange={(e) => setManual(e.target.value)}
+                placeholder="e.g. AST-0012 or serial"
+                className={cn(inputCls, 'min-w-0 flex-1 font-mono')}
+              />
+              <Button type="submit" variant="primary" size="sm" className="shrink-0">Enter</Button>
+            </div>
+          </form>
+
+          {/* Audit run card */}
+          <div className="rounded-xl glass-card p-4">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-secondary"><Flag className="h-3.5 w-3.5" /> Audit run</h2>
           {run && expected > 0 && !ended && (
@@ -229,6 +254,8 @@ export default function Scan() {
             {targets.length > 3 && <p className="text-[11px] text-muted">… and {targets.length - 3} more targets</p>}
           </div>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );

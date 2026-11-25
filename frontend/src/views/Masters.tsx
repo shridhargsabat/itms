@@ -44,9 +44,9 @@ import type { LookupOption, LocationWithCount, MasterFamily, TicketTemplate, Use
 import { TICKET_TYPES } from '@/api/types';
 
 const TABS: { id: MasterFamily | 'users' | 'templates' | 'vendors' | 'locations'; label: string }[] = [
+  { id: 'users', label: 'Users' },
   { id: 'vendors', label: 'Vendors' },
   { id: 'locations', label: 'Locations' },
-  { id: 'users', label: 'Users' },
   { id: 'department', label: 'Departments' },
   { id: 'asset_category', label: 'Asset Categories' },
   { id: 'ticket_type', label: 'Ticket Types' },
@@ -87,14 +87,16 @@ export default function Masters() {
 
       <FilterBar>
         <ScrollX className="w-full pb-1">
-          <div className="flex gap-2">
+          <div className="flex gap-2" role="tablist" aria-label="Master data">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
+              role="tab"
+              aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors',
+                'flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors',
                 tab === t.id
                   ? 'bg-elevated text-primary'
                   : 'text-secondary hover:text-primary',
