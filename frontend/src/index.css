@@ -1368,6 +1368,8 @@
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) [data-liquid-glass="active"].glass-card.table-shell {
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
+}
+
 /* ---------- FORM shared: modal-panel opacity boost (appended) ----------
    Glass scope only: day rules ride the light guard chain, night rules the
    dark guard chain (both copied verbatim from the glass-chrome refraction
