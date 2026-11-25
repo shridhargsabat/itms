@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -74,6 +75,8 @@ export default function DataTable<T extends { id: string }>({
   highlightId,
 }: DataTableProps<T>) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Spring row motion is desktop delight — hard-off under reduced motion.
+  const reduceMotion = useReducedMotion();
   const selectable = selectedIds !== undefined && onSelectionChange !== undefined;
   const headCheckboxRef = useRef<HTMLInputElement>(null);
   const rowSelectable = (r: T) => (isRowSelectable ? isRowSelectable(r) : true);
@@ -328,6 +331,7 @@ export default function DataTable<T extends { id: string }>({
           {caption ? <caption>{caption}</caption> : null}
           {head}
           <tbody className={TABLE_SPEC.tbody}>
+            <AnimatePresence>
             {rows.map((row, i) => {
               const expanded = expandedId === row.id;
               const clickable = onRowClick !== undefined || renderExpanded !== undefined;
@@ -338,9 +342,24 @@ export default function DataTable<T extends { id: string }>({
                   : undefined;
               const rowRec = row as Record<string, unknown>;
               const rowLabel = String(rowRec.asset_tag ?? rowRec.title ?? rowRec.name ?? row.id);
+              // Every body row is a motion.tr so the element type never flips
+              // when sorting/filtering moves a row across the motion boundary
+              // (a type flip remounts the node, replays the entrance, and
+              // drops keyboard focus). Only the first screenful animates.
+              const animateRow = !reduceMotion && i < 12;
               return (
                 <Fragment key={row.id}>
-                  <tr
+                  <motion.tr
+                    data-motion-row={animateRow ? '' : undefined}
+                    initial={animateRow ? { opacity: 0, y: 14, filter: 'blur(4px)' } : false}
+                    animate={animateRow ? { opacity: 1, y: 0, filter: 'blur(0px)' } : undefined}
+                    exit={animateRow ? { opacity: 0, transition: { duration: 0.15, delay: 0 } } : undefined}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 380,
+                      damping: 30,
+                      delay: Math.min(i, 8) * 0.035,
+                    }}
                     onClick={activate}
                     // TFE-04: keyboard access for clickable rows — focusable + Enter/Space.
                     // Interactive children (checkboxes, links, buttons) keep their own keys.
@@ -359,13 +378,9 @@ export default function DataTable<T extends { id: string }>({
                     aria-expanded={renderExpanded ? expanded : undefined}
                     className={cn(
                       'transition-colors',
-                      // Perf: entrance animation on the first screenful only —
-                      // animating every row in a long table janks scroll.
-                      i < 12 && 'animate-list-in',
                       clickable && 'cursor-pointer hover:bg-elevated/60 focus-visible:bg-elevated focus-visible:outline-none',
                       highlightId === row.id && 'ring-2 ring-inset ring-accent',
                     )}
-                    style={i < 12 ? { animationDelay: `${Math.min(i, 8) * 35}ms` } : undefined}
                   >
                     {selectable && (
                       <td
@@ -396,7 +411,7 @@ export default function DataTable<T extends { id: string }>({
                           : String((row as Record<string, unknown>)[c.key] ?? '')}
                       </td>
                     ))}
-                  </tr>
+                  </motion.tr>
                   {expanded && renderExpanded && (
                     <tr className="bg-surface/60">
                       <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-4 py-3">
@@ -407,6 +422,7 @@ export default function DataTable<T extends { id: string }>({
                 </Fragment>
               );
             })}
+            </AnimatePresence>
           </tbody>
         </table>
       </ScrollX>
