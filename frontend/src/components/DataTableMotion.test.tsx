@@ -51,4 +51,32 @@ describe('DataTable row motion', () => {
     });
     expect(within(container).getByText('Row 0')).toBeInTheDocument();
   });
+
+  it('keeps row DOM identity when reordering moves rows across the motion boundary', () => {
+    const thirteen = rows(13);
+    const { container, rerender } = render(
+      <DataTable columns={columns} rows={thirteen} />,
+    );
+    const before = within(container).getByText('Row 11').closest('tr');
+    expect(before).not.toBeNull();
+    // Rotate right: Row 11 moves from index 11 (motion) to index 12 (static).
+    const rotated = [thirteen[12], ...thirteen.slice(0, 12)];
+    rerender(<DataTable columns={columns} rows={rotated} />);
+    const after = within(container).getByText('Row 11').closest('tr');
+    expect(after).toBe(before);
+  });
+
+  it('clears instantly on empty and re-enters on refill with no stuck rows', async () => {
+    const { container, rerender } = render(
+      <DataTable columns={columns} rows={rows(3)} emptyMessage="Nothing here." />,
+    );
+    rerender(<DataTable columns={columns} rows={[]} emptyMessage="Nothing here." />);
+    expect(within(container).getByText('Nothing here.')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-motion-row]')).toHaveLength(0);
+    rerender(<DataTable columns={columns} rows={rows(3)} emptyMessage="Nothing here." />);
+    await waitFor(() => {
+      expect(within(container).getByText('Row 2')).toBeInTheDocument();
+    });
+    expect(container.querySelectorAll('[data-motion-row]')).toHaveLength(3);
+  });
 });

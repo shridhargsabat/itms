@@ -1,5 +1,4 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import type { ElementType } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
@@ -333,27 +332,24 @@ export default function DataTable<T extends { id: string }>({
                   : undefined;
               const rowRec = row as Record<string, unknown>;
               const rowLabel = String(rowRec.asset_tag ?? rowRec.title ?? rowRec.name ?? row.id);
-              // Spring entrance for the first screenful only; static <tr> past that.
-              const useMotionRow = !reduceMotion && i < 12;
-              const RowTag: ElementType = useMotionRow ? motion.tr : 'tr';
-              const motionProps = useMotionRow
-                ? {
-                    'data-motion-row': '',
-                    initial: { opacity: 0, y: 14, filter: 'blur(4px)' },
-                    animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
-                    exit: { opacity: 0, transition: { duration: 0.15, delay: 0 } },
-                    transition: {
+              // Every body row is a motion.tr so the element type never flips
+              // when sorting/filtering moves a row across the motion boundary
+              // (a type flip remounts the node, replays the entrance, and
+              // drops keyboard focus). Only the first screenful animates.
+              const animateRow = !reduceMotion && i < 12;
+              return (
+                <Fragment key={row.id}>
+                  <motion.tr
+                    data-motion-row={animateRow ? '' : undefined}
+                    initial={animateRow ? { opacity: 0, y: 14, filter: 'blur(4px)' } : false}
+                    animate={animateRow ? { opacity: 1, y: 0, filter: 'blur(0px)' } : undefined}
+                    exit={animateRow ? { opacity: 0, transition: { duration: 0.15, delay: 0 } } : undefined}
+                    transition={{
                       type: 'spring',
                       stiffness: 380,
                       damping: 30,
                       delay: Math.min(i, 8) * 0.035,
-                    },
-                  }
-                : {};
-              return (
-                <Fragment key={row.id}>
-                  <RowTag
-                    {...motionProps}
+                    }}
                     onClick={activate}
                     // TFE-04: keyboard access for clickable rows — focusable + Enter/Space.
                     // Interactive children (checkboxes, links, buttons) keep their own keys.
@@ -405,7 +401,7 @@ export default function DataTable<T extends { id: string }>({
                           : String((row as Record<string, unknown>)[c.key] ?? '')}
                       </td>
                     ))}
-                  </RowTag>
+                  </motion.tr>
                   {expanded && renderExpanded && (
                     <tr className="bg-surface/60">
                       <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-4 py-3">
