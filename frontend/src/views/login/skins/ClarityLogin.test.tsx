@@ -28,7 +28,8 @@ describe('clarity login skin', () => {
   it('carries every auth path', async () => {
     wrap();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    // Exact: the show/hide toggle is also labelled "... password".
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toHaveAttribute('type', 'submit');
     expect(screen.getByRole('button', { name: 'Use demo account' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /forgot/i })).toBeInTheDocument();
@@ -42,8 +43,8 @@ describe('clarity login skin', () => {
     expect(container.querySelector('.ab-mesh, .ab-blobs, .ab-particles')).toBeNull();
   });
 
-  it('shows the argon2 footer line', () => {
-    wrap();
-    expect(screen.getByText(/argon2 password hashing/i)).toBeInTheDocument();
+  it('exposes no internal auth details on the public card', () => {
+    const { container } = wrap();
+    expect(container.textContent).not.toMatch(/argon2/i);
   });
 });

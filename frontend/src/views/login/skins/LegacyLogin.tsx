@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, KeyRound, LoaderCircle, Network, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CircleAlert, Eye, EyeOff, KeyRound, LoaderCircle, Network } from 'lucide-react';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { LiquidGlassFilterBank, LiquidGlassSurface } from '@/components/LiquidGlass';
 import { useLogin } from '../useLogin';
@@ -27,6 +28,7 @@ export default function LegacyLogin() {
     loginError,
     demoPending,
   } = useLogin();
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-base px-4">
@@ -53,17 +55,22 @@ export default function LegacyLogin() {
             </div>
 
             {loginError && (
-              <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+              <div
+                role="alert"
+                className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400"
+              >
+                <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                 {loginError}
               </div>
             )}
 
             <form className="space-y-4" onSubmit={submit}>
               <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-secondary">
+                <label htmlFor="legacy-email" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-secondary">
                   Email
                 </label>
                 <input
+                  id="legacy-email"
                   type="email"
                   required
                   autoComplete="email"
@@ -74,18 +81,34 @@ export default function LegacyLogin() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-secondary">
+                <label htmlFor="legacy-password" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-secondary">
                   Password
                 </label>
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-lg glass-dense px-4 py-3 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
+                <div className="relative">
+                  <input
+                    id="legacy-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-lg glass-dense px-4 py-3 pr-12 text-sm text-primary placeholder:text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPassword}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted transition-colors hover:text-primary"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"
@@ -130,7 +153,7 @@ export default function LegacyLogin() {
 
             <div className="mt-8 flex items-center gap-3 text-[11px] text-muted">
               <span className="h-px flex-1 bg-elevated" />
-              demo
+              Demo
               <span className="h-px flex-1 bg-elevated" />
             </div>
             <button
@@ -146,11 +169,6 @@ export default function LegacyLogin() {
             </button>
             <p className="mt-4 text-center text-[11px] text-muted">
               One-click showcase account — no password needed
-            </p>
-
-            <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400/80" />
-              Real auth — argon2 hashes + revocable sessions · build {__BUILD_SHA__}
             </p>
           </LiquidGlassSurface>
         </div>

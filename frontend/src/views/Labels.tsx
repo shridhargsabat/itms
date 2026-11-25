@@ -6,6 +6,7 @@ import { CheckCircle2, Download, Printer, QrCode, Search } from 'lucide-react';
 import { listAssets } from '@/api/client';
 import type { Asset } from '@/api/types';
 import { cn, inputCls } from '@/lib/utils';
+import { formatEnum } from '@/lib/formatEnum';
 import { payloadFor } from '@/lib/qr';
 import EmptyState from '@/components/EmptyState';
 import FilterBar from '@/components/FilterBar';
@@ -92,7 +93,7 @@ export default function Labels() {
     {
       key: 'category',
       header: 'Category',
-      render: (a) => <span className="text-xs text-secondary">{a.category}</span>,
+      render: (a) => <span className="text-xs text-secondary">{formatEnum(a.category)}</span>,
     },
     {
       key: 'status',
@@ -187,6 +188,7 @@ export default function Labels() {
       <PageHeader
         title="QR Labels"
         description="Pick assets and print an A4 label sheet (38×21 mm, 3×8 grid), or start an audit run for the factory floor (target: 5% monthly, 100% annual, <3% ghost)."
+        className="mb-0 lg:flex-nowrap"
         actions={
           <>
             <Button
@@ -224,9 +226,15 @@ export default function Labels() {
             className={cn(inputCls, 'pl-9')}
           />
         </div>
-        <Select className="w-full sm:w-auto" value={category} onChange={setCategory} options={[{ value: 'ALL', label: 'All categories' }, ...getCategories(rows).map((c) => ({ value: c, label: c }))]} />
-        <Select className="w-full sm:w-auto" value={status} onChange={setStatus} options={STATUS_OPTIONS.map((s) => ({ value: s, label: s === 'ALL' ? 'All statuses' : s }))} />
+        <Select className="w-full sm:w-auto" value={category} onChange={setCategory} options={[{ value: 'ALL', label: 'All categories' }, ...getCategories(rows).map((c) => ({ value: c, label: formatEnum(c) }))]} />
+        <Select className="w-full sm:w-auto" value={status} onChange={setStatus} options={STATUS_OPTIONS.map((s) => ({ value: s, label: s === 'ALL' ? 'All statuses' : formatEnum(s) }))} />
       </FilterBar>
+
+      {(assets.data?.total ?? 0) > allRows.length && (
+        <p className="text-xs text-muted">
+          Showing first 500 of {assets.data!.total} assets — narrow the search or filters to reach the rest.
+        </p>
+      )}
 
       {!assets.isLoading && rows.length === 0 ? (
         <EmptyState

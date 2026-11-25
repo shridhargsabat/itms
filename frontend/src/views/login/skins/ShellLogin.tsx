@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LoaderCircle } from 'lucide-react';
+import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { useLogin } from '../useLogin';
 
 /**
@@ -169,8 +169,9 @@ export default function ShellLogin() {
           {loginError && (
             <div
               role="alert"
-              className="mb-3.5 rounded-[9px] border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-800"
+              className="mb-3.5 flex items-center gap-2 rounded-[9px] border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-800"
             >
+              <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
               {loginError}
             </div>
           )}
@@ -298,10 +299,6 @@ export default function ShellLogin() {
               {flash}
             </p>
           )}
-
-          <p className="mt-4 text-center text-[11.5px] text-muted">
-            argon2 · revocable sessions · build {__BUILD_SHA__}
-          </p>
         </div>
       </div>
 

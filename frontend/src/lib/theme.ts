@@ -98,6 +98,66 @@ export function hydrateThemeFromUser(user?: { theme?: string } | null) {
 
 const THEME_CHANGED = 'itms-theme-changed';
 
+/**
+ * Login-choice handshake (Task 16 / UI-15): the theme a visitor picks on
+ * /login must survive authentication. The server column is NOT NULL with a
+ * never-explicitly-chosen default, so a plain "server wins" hydrate at login
+ * would clobber the login pick back to the default right after auth.
+ *
+ * LoginThemeMenu.choose() marks the choice; the login-success path consumes
+ * it exactly once via syncThemeAfterLogin(), which keeps the local pick and
+ * pushes it up (awaited — RequireAuth's /auth/me hydrate then reads the
+ * same value back, so there is no flash and no race). When nothing was
+ * marked, sync falls through to the plain server-wins hydrate, preserving
+ * cross-device sync.
+ *
+ * sessionStorage (not a module flag): the SSO round-trip reloads the page,
+ * which would drop module state; the same-tab session flag survives it.
+ * This is a boolean marker only — the theme VALUE still lives solely in
+ * the existing `itms_theme` localStorage key.
+ */
+const LOGIN_CHOICE_KEY = 'itms_theme_login_choice';
+
+export function markLoginThemeChoice(): void {
+  try {
+    sessionStorage.setItem(LOGIN_CHOICE_KEY, '1');
+  } catch {
+    /* private-mode: choice just won't survive auth */
+  }
+}
+
+/** Single-shot: true iff a login choice was marked since the last consume. */
+export function consumeLoginThemeChoice(): boolean {
+  try {
+    const marked = sessionStorage.getItem(LOGIN_CHOICE_KEY) === '1';
+    sessionStorage.removeItem(LOGIN_CHOICE_KEY);
+    return marked;
+  } catch {
+    /* private-mode: treat as unmarked */
+    return false;
+  }
+}
+
+/**
+ * Login-success theme sync. Returns 'pushed' when an explicit login-screen
+ * choice won (local value kept + pushed to the server pref), 'hydrated'
+ * when the server pref won (no choice was made).
+ */
+export async function syncThemeAfterLogin(
+  user?: { theme?: string } | null,
+): Promise<'pushed' | 'hydrated'> {
+  if (consumeLoginThemeChoice()) {
+    // Awaited: callers navigate right after, and RequireAuth's /auth/me
+    // hydrate must observe the pushed value, not the stale default.
+    // Best-effort — a failure here degrades to today's behavior
+    // (RequireAuth re-syncs from the server anyway).
+    await setThemePref(getThemeMode()).catch(() => {});
+    return 'pushed';
+  }
+  hydrateThemeFromUser(user);
+  return 'hydrated';
+}
+
 /** Re-read whenever the theme changes from anywhere (toggle or server sync). */
 export function onThemeChanged(cb: () => void): () => void {
   window.addEventListener(THEME_CHANGED, cb);

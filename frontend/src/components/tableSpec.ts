@@ -16,11 +16,13 @@ export const TABLE_SPEC = {
      that breaks position:sticky on th. */
   tableScroll: 'max-h-[55vh] overflow-y-auto lg:max-h-none',
   emptyShell: 'rounded-2xl border border-dashed border-edge p-10 text-center text-sm text-muted',
-  head: 'bg-surface text-xs uppercase tracking-wide text-secondary',
+  head: 'bg-surface text-xs uppercase tracking-wider text-secondary',
   /* sticky top-0 pins the header inside the shell's vertical scroll box; opaque-enough bg so
      body rows never show through; z-10 above body cells + the ScrollX right-edge fade
-     (fade stays z-[5]) but below modals/menus/top-bar (z-[40,60,70]). */
-  th: 'sticky top-0 z-10 border-b border-edge/60 bg-surface px-4 py-3 font-medium',
+     (fade stays z-[5]) but below modals/menus/top-bar (z-[40,60,70]).
+     Task 18 (UI-17): casing lives ON the th (not inherited from thead) so
+     every header — sortable, plain, and custom tables — renders identical. */
+  th: 'sticky top-0 z-10 border-b border-edge/60 bg-surface px-4 py-3 text-xs font-medium uppercase tracking-wider',
   td: 'px-4 py-3',
   table: 'w-full text-left text-sm',
   tbody: 'divide-y divide-edge/60 bg-surface',

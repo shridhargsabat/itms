@@ -181,7 +181,7 @@ export default function DataTable<T extends { id: string }>({
     <thead className={TABLE_SPEC.head}>
       <tr>
         {selectable && (
-          <th className={cn('w-10 sticky top-0 z-10 bg-surface', TABLE_SPEC.checkboxCell)}>
+          <th scope="col" className={cn('w-10 sticky top-0 z-10 bg-surface', TABLE_SPEC.checkboxCell)}>
             <input
               type="checkbox"
               aria-label="Select all on page"
@@ -196,25 +196,41 @@ export default function DataTable<T extends { id: string }>({
           </th>
         )}
         {columns.map((c) => (
-          <th key={c.key} className={cn(TABLE_SPEC.th, c.className)}>
+          <th
+            key={c.key}
+            scope="col"
+            aria-sort={
+              c.sortable
+                ? sort?.key === (c.sortKey ?? c.key)
+                  ? sort.dir === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : 'none'
+                : undefined
+            }
+            className={cn(TABLE_SPEC.th, c.className)}
+          >
             {c.sortable ? (
               <button
                 type="button"
                 onClick={() => cycleSort(c)}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded transition-colors hover:text-primary',
+                  // Task 18 (UI-17): explicit uppercase — preflight sets
+                  // text-transform:none on buttons, which used to leave
+                  // sortable headers Title Case next to ALL-CAPS plain ones.
+                  'inline-flex items-center gap-1 rounded uppercase transition-colors hover:text-primary',
                   sort?.key === (c.sortKey ?? c.key) && 'text-accent',
                 )}
               >
                 {c.header}
                 {sort?.key === (c.sortKey ?? c.key) ? (
                   sort.dir === 'asc' ? (
-                    <ArrowUp className="h-3 w-3" />
+                    <ArrowUp className="h-3 w-3" aria-hidden="true" />
                   ) : (
-                    <ArrowDown className="h-3 w-3" />
+                    <ArrowDown className="h-3 w-3" aria-hidden="true" />
                   )
                 ) : (
-                  <ArrowUpDown className="h-3 w-3 opacity-40" />
+                  <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden="true" />
                 )}
               </button>
             ) : (

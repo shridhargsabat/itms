@@ -16,6 +16,7 @@ export interface PaginationFooterProps {
   rowsLength: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  variant?: 'sticky' | 'static';
 }
 
 export default function PaginationFooter({
@@ -25,7 +26,9 @@ export default function PaginationFooter({
   rowsLength,
   onPageChange,
   onPageSizeChange,
+  variant = 'sticky',
 }: PaginationFooterProps) {
+  if (total === 0) return null;
   const pages = total !== undefined && total > 0 ? Math.ceil(total / pageSize) : 0;
   // Clamp `from` to total so a stale page (data shrank while sitting on a
   // page past the last one) never renders a range like "Showing 81–45 of 45".
@@ -48,7 +51,7 @@ export default function PaginationFooter({
     : `${navBtn} px-2`;
 
   return (
-    <div className={TABLE_SPEC.footer}>
+    <div className={variant === 'static' ? 'mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-edge/60 bg-surface px-3 py-2.5 text-xs text-secondary' : TABLE_SPEC.footer}>
       <span>
         {total !== undefined && total > 0 && rowsLength > 0
           ? `Showing ${from}–${to} of ${total}`
@@ -58,6 +61,7 @@ export default function PaginationFooter({
         <Select
           className="w-auto shrink-0"
           triggerClassName="h-8 px-1.5 py-0 text-xs"
+          aria-label="Rows per page"
           value={String(pageSize)}
           onChange={(v) => onPageSizeChange?.(Number(v))}
           options={[
