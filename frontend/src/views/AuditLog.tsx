@@ -145,14 +145,32 @@ export default function AuditLog() {
   const rows = hasFilters ? filtered.slice((page - 1) * pageSize, page * pageSize) : filtered;
   const total = hasFilters ? filtered.length : (data?.total ?? filtered.length);
 
-  const actionOptions = useMemo(
-    () => [...new Set((data?.items ?? []).map((e) => e.action))].sort(),
-    [data],
-  );
-  const targetTypeOptions = useMemo(
-    () => [...new Set((data?.items ?? []).map((e) => e.target_type))].sort(),
-    [data],
-  );
+  // Select options come from a dedicated 500-event window: the main list
+  // query only holds the current 20-row page when idle, so deriving options
+  // from it would omit every value not on this page. Union with the current
+  // page (a deep page can sit past offset 500, outside the window) and always
+  // keep the active selection (it can vanish from the window after a swap).
+  const { data: distinctData } = useQuery({
+    queryKey: ['audit', 'distinct'],
+    queryFn: () => getAuditLog({ limit: FILTER_WINDOW, offset: 0 }),
+  });
+
+  const actionOptions = useMemo(() => {
+    const set = new Set([
+      ...(distinctData?.items ?? []).map((e) => e.action),
+      ...(data?.items ?? []).map((e) => e.action),
+    ]);
+    if (action) set.add(action);
+    return [...set].sort();
+  }, [distinctData, data, action]);
+  const targetTypeOptions = useMemo(() => {
+    const set = new Set([
+      ...(distinctData?.items ?? []).map((e) => e.target_type),
+      ...(data?.items ?? []).map((e) => e.target_type),
+    ]);
+    if (targetType) set.add(targetType);
+    return [...set].sort();
+  }, [distinctData, data, targetType]);
 
   const clearFilters = () => {
     setActor('');
