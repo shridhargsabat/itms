@@ -7,7 +7,6 @@ import {
   ArrowUpCircle,
   CheckCircle2,
   ClipboardList,
-  LoaderCircle,
   Pencil,
   Plus,
   Trash2,
@@ -211,8 +210,13 @@ export default function Onboarding() {
       {/* Event cards */}
       <div className="flex flex-col gap-3">
         {events.isLoading && (
-          <div className="flex justify-center py-10">
-            <LoaderCircle className="h-6 w-6 animate-spin text-muted" />
+          <div data-testid="onboarding-skeleton" className="flex flex-col gap-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-2 rounded-xl glass-card p-4">
+                <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-elevated" />
+                <div className="h-4 w-full max-w-[220px] animate-pulse rounded bg-elevated" />
+              </div>
+            ))}
           </div>
         )}
         {!events.isLoading && list.length === 0 && (

@@ -230,9 +230,11 @@ export default function Tickets() {
       <PageHeader
         title="Tickets"
         description={
-          kanbanTruncated
-            ? `Showing newest ${rows.length} of ${data?.total} tickets`
-            : `${matchCount} ticket${matchCount === 1 ? '' : 's'} matching filters`
+          isLoading
+            ? 'Loading tickets…'
+            : kanbanTruncated
+              ? `Showing newest ${rows.length} of ${data?.total} tickets`
+              : `${matchCount} ticket${matchCount === 1 ? '' : 's'} matching filters`
         }
         actions={
           <>
@@ -351,6 +353,28 @@ export default function Tickets() {
               emptyMessage="No tickets match the current filters."
               onRowClick={(t) => setSelectedId(t.id)}
             />
+          ) : isLoading ? (
+            <ScrollX innerClassName="pb-2">
+              <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4">
+                {TICKET_STATUSES.map((st) => (
+                  <div
+                    key={st}
+                    data-testid="kanban-skeleton"
+                    className="min-w-[240px] snap-start rounded-xl glass-dense liquid-glass-panel p-3 md:min-w-0"
+                  >
+                    <div className="mb-3 flex items-center justify-between px-1">
+                      <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-elevated" />
+                      <div className="h-4 w-8 animate-pulse rounded-full bg-elevated" />
+                    </div>
+                    <div className="space-y-2">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="h-16 w-full animate-pulse rounded-lg bg-elevated" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollX>
           ) : (
             <ScrollX innerClassName="pb-2">
               <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4">
