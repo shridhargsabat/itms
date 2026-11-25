@@ -256,16 +256,27 @@ fn validate_intake_lengths(body: &EmailIntakeInput) -> Result<(), AppError> {
 /// Resolve the sender to a user id, auto-creating an EMPLOYEE when unknown.
 /// Auto-created users get a USER_CREATE audit row (TBE-08) and a real masters
 /// department (TBE-32). Runs inside the caller's transaction.
+/// R2-BE-01: an existing but INACTIVE sender is rejected (403) — never reused,
+/// never auto-reactivated. All four call sites (new ticket, ticket reply,
+/// request reply, quarantine) route through here, so all are gated.
 async fn resolve_or_create_sender(
     conn: &mut sqlx::PgConnection,
     from_email: &str,
     from_name: Option<&str>,
 ) -> Result<Uuid, AppError> {
-    if let Some(uid) = sqlx::query_scalar("SELECT id FROM users WHERE LOWER(email) = $1")
-        .bind(from_email)
-        .fetch_optional(&mut *conn)
-        .await?
+    if let Some((uid, active)) = sqlx::query_as::<_, (Uuid, bool)>(
+        "SELECT id, active FROM users WHERE LOWER(email) = $1",
+    )
+    .bind(from_email)
+    .fetch_optional(&mut *conn)
+    .await?
     {
+        if !active {
+            return Err(AppError::new(
+                StatusCode::FORBIDDEN,
+                "sender account is inactive",
+            ));
+        }
         return Ok(uid);
     }
     let name = from_name
@@ -349,8 +360,8 @@ async fn create_intake_ticket(
         super::sla::set_sla_due(&mut *conn, ticket.id, &ticket.priority, "OPEN", ticket.created_at, false).await?;
 
         sqlx::query(
-            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind) \
-             VALUES ($1, $2, $3, $4, $5, $6, 'TICKET')",
+            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind, body) \
+             VALUES ($1, $2, $3, $4, $5, $6, 'TICKET', $7)",
         )
         .bind(&body.message_id)
         .bind(&body.thread_key)
@@ -358,6 +369,7 @@ async fn create_intake_ticket(
         .bind(from_email)
         .bind(&body.from_name)
         .bind(&body.subject)
+        .bind(&body.body)
         .execute(&mut *conn)
         .await?;
 
@@ -499,14 +511,15 @@ async fn intake_email(
             return quarantine_as_new_ticket(pool, &body, &from_email, &subject_clean, &request_number).await;
         }
         sqlx::query(
-            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind) \
-             VALUES ($1, $2, NULL, $3, $4, $5, 'REPLY')",
+            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind, body) \
+             VALUES ($1, $2, NULL, $3, $4, $5, 'REPLY', $6)",
         )
         .bind(&body.message_id)
         .bind(&body.thread_key)
         .bind(&from_email)
         .bind(&body.from_name)
         .bind(&body.subject)
+        .bind(&body.body)
         .execute(&mut *tx)
         .await?;
         crate::audit::write(
@@ -574,8 +587,8 @@ async fn intake_email(
         .await?;
 
         sqlx::query(
-            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind) \
-             VALUES ($1, $2, $3, $4, $5, $6, 'REPLY')",
+            "INSERT INTO email_ingest (message_id, thread_key, ticket_id, from_email, from_name, subject, kind, body) \
+             VALUES ($1, $2, $3, $4, $5, $6, 'REPLY', $7)",
         )
         .bind(&body.message_id)
         .bind(&body.thread_key)
@@ -583,6 +596,7 @@ async fn intake_email(
         .bind(&from_email)
         .bind(&body.from_name)
         .bind(&body.subject)
+        .bind(&body.body)
         .execute(&mut *tx)
         .await?;
 
@@ -841,5 +855,295 @@ mod sender_allowlist_tests {
             ",, alice@example.com ,,"
         ));
         assert!(!is_sender_allowed("eve@example.com", "  alice@example.com , @example.org "));
+    }
+}
+
+/// R2 P1 regression tests (issues #134 R2-BE-01, #135 R2-BE-02): DB-backed
+/// handler tests. They connect to TEST_DATABASE_URL when set, else to the
+/// conventional local test database; when neither is reachable they skip
+/// (pass with a notice) so `cargo test` stays green without a database.
+#[cfg(test)]
+mod r2_regression_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+
+    const TEST_TOKEN: &str = "r2-intake-test-token";
+    const TEST_ALLOWLIST: &str = "@example.com";
+    const DEFAULT_TEST_DB_URL: &str = "postgres://itms_test:itms_test@127.0.0.1:55434/itms_test";
+
+    async fn test_pool() -> Option<sqlx::PgPool> {
+        let url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| DEFAULT_TEST_DB_URL.to_string());
+        match PgPoolOptions::new().max_connections(5).connect(&url).await {
+            Ok(pool) => {
+                // Concurrent runs are serialized by sqlx's migration advisory lock.
+                sqlx::migrate!("./migrations")
+                    .run(&pool)
+                    .await
+                    .expect("test DB migrations must apply");
+                Some(pool)
+            }
+            Err(e) => {
+                eprintln!("r2_regression_tests: skipping — no test DB at {url} ({e})");
+                None
+            }
+        }
+    }
+
+    fn test_state(pool: sqlx::PgPool) -> AppState {
+        // Same values in every test — parallel-safe (no other test module
+        // touches these vars, and the handler only reads them).
+        std::env::set_var("INTAKE_TOKEN", TEST_TOKEN);
+        std::env::set_var("INTAKE_SENDER_ALLOWLIST", TEST_ALLOWLIST);
+        AppState { pool, login_attempts: Default::default(), opencode_api_key: None }
+    }
+
+    fn test_headers() -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("x-intake-token", TEST_TOKEN.parse().unwrap());
+        h
+    }
+
+    fn unique_email(tag: &str) -> String {
+        format!("r2-{tag}-{}@example.com", Uuid::new_v4().simple())
+    }
+
+    fn intake_input(from_email: &str, subject: &str, body: &str) -> EmailIntakeInput {
+        EmailIntakeInput {
+            message_id: format!("r2-{}", Uuid::new_v4().simple()),
+            thread_key: None,
+            from_email: from_email.to_string(),
+            from_name: Some("R2 Tester".to_string()),
+            subject: subject.to_string(),
+            body: body.to_string(),
+        }
+    }
+
+    async fn create_user(pool: &sqlx::PgPool, email: &str, active: bool) -> Uuid {
+        sqlx::query_scalar(
+            "INSERT INTO users (name, email, role, department, password_hash, active) \
+             VALUES ('R2 Tester', $1, 'EMPLOYEE', 'IT', 'test-hash', $2) RETURNING id",
+        )
+        .bind(email)
+        .bind(active)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn count_scalar(pool: &sqlx::PgPool, sql: &str, id: Uuid) -> i64 {
+        sqlx::query_scalar(sql).bind(id).fetch_one(pool).await.unwrap()
+    }
+
+    /// Long body (over 600 chars) with a unique marker — proves retention beyond the
+    /// 500-char audit excerpt and the 120-char notify snippet.
+    fn long_body(marker: &str) -> String {
+        let pad = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(14);
+        format!("{marker}\n{pad}")
+    }
+
+    // ── R2-BE-01: inactive senders are rejected on every entry path ─────────
+
+    #[tokio::test]
+    async fn inactive_sender_new_ticket_rejected() {
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("inactive-new");
+        let sender = create_user(&pool, &email, false).await;
+
+        let input = intake_input(&email, "printer down", "please help with my printer");
+        let err = intake_email(State(test_state(pool.clone())), test_headers(), Json(input))
+            .await
+            .unwrap_err();
+        assert_eq!(err.status, StatusCode::FORBIDDEN);
+        assert!(err.message.contains("inactive"), "message: {}", err.message);
+
+        // Nothing created: no ticket, no ingest row, no audit row — and the
+        // sender stays inactive (no auto-reactivation).
+        assert_eq!(0, count_scalar(&pool, "SELECT COUNT(*) FROM tickets WHERE requester_id = $1", sender).await);
+        let ingest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_ingest WHERE from_email = $1")
+            .bind(&email)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(0, ingest);
+        assert_eq!(0, count_scalar(&pool, "SELECT COUNT(*) FROM audit_logs WHERE actor_id = $1", sender).await);
+        let still_active: bool =
+            sqlx::query_scalar("SELECT active FROM users WHERE id = $1").bind(sender).fetch_one(&pool).await.unwrap();
+        assert!(!still_active);
+    }
+
+    #[tokio::test]
+    async fn inactive_sender_ticket_reply_rejected() {
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("inactive-reply");
+        let sender = create_user(&pool, &email, false).await;
+        let number = format!("INC-9{:09}", rand::random::<u32>() % 1_000_000_000);
+        let ticket_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO tickets (ticket_number, title, description, requester_id) VALUES ($1, 't', 'd', $2) RETURNING id",
+        )
+        .bind(&number)
+        .bind(sender)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let input = intake_input(&email, &format!("[{number}] still broken"), "any update?");
+        let err = intake_email(State(test_state(pool.clone())), test_headers(), Json(input))
+            .await
+            .unwrap_err();
+        assert_eq!(err.status, StatusCode::FORBIDDEN);
+        assert!(err.message.contains("inactive"), "message: {}", err.message);
+
+        // No comment appended, no ingest row recorded.
+        assert_eq!(0, count_scalar(&pool, "SELECT COUNT(*) FROM ticket_comments WHERE author_id = $1", sender).await);
+        let ingest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_ingest WHERE ticket_id = $1")
+            .bind(ticket_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(0, ingest);
+    }
+
+    #[tokio::test]
+    async fn inactive_sender_request_reply_rejected() {
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("inactive-req");
+        let sender = create_user(&pool, &email, false).await;
+        let catalog: Uuid = sqlx::query_scalar("SELECT id FROM request_catalog_items WHERE code = 'PASSWORD_RESET'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let number = format!("REQ-2026-{:06}", rand::random::<u32>() % 1_000_000);
+        sqlx::query(
+            "INSERT INTO service_requests (request_number, catalog_item_id, requester_id, subject) VALUES ($1, $2, $3, 's')",
+        )
+        .bind(&number)
+        .bind(catalog)
+        .bind(sender)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let input = intake_input(&email, &format!("[{number}] ping"), "any update?");
+        let err = intake_email(State(test_state(pool.clone())), test_headers(), Json(input))
+            .await
+            .unwrap_err();
+        assert_eq!(err.status, StatusCode::FORBIDDEN);
+        assert!(err.message.contains("inactive"), "message: {}", err.message);
+
+        let ingest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM email_ingest WHERE from_email = $1")
+            .bind(&email)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(0, ingest);
+    }
+
+    // ── R2-BE-02: full body persisted verbatim on every ingest path ─────────
+
+    #[tokio::test]
+    async fn request_reply_persists_full_body() {
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("req-body");
+        let sender = create_user(&pool, &email, true).await;
+        let catalog: Uuid = sqlx::query_scalar("SELECT id FROM request_catalog_items WHERE code = 'PASSWORD_RESET'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let number = format!("REQ-2026-{:06}", rand::random::<u32>() % 1_000_000);
+        sqlx::query(
+            "INSERT INTO service_requests (request_number, catalog_item_id, requester_id, subject) VALUES ($1, $2, $3, 's')",
+        )
+        .bind(&number)
+        .bind(catalog)
+        .bind(sender)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let marker = format!("REQBODY-{}", Uuid::new_v4().simple());
+        let full = long_body(&marker);
+        assert!(full.chars().count() > 600);
+        let input = intake_input(&email, &format!("[{number}] details"), &full);
+        let mid = input.message_id.clone();
+        let out = intake_email(State(test_state(pool.clone())), test_headers(), Json(input)).await.unwrap();
+        assert_eq!(out.0["kind"], "request_reply");
+
+        let stored: Option<String> =
+            sqlx::query_scalar("SELECT body FROM email_ingest WHERE message_id = $1")
+                .bind(&mid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(Some(full.clone()), stored);
+
+        // Excerpt behavior unchanged: audit keeps the 500-char prefix.
+        let excerpt: String = sqlx::query_scalar(
+            "SELECT diff->>'excerpt' FROM audit_logs WHERE action = 'REQUEST_EMAIL_REPLY' AND diff->>'message_id' = $1",
+        )
+        .bind(&mid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let expected: String = full.trim().chars().take(500).collect();
+        assert_eq!(expected, excerpt);
+    }
+
+    #[tokio::test]
+    async fn ticket_reply_persists_full_body() {
+        let Some(pool) = test_pool().await else { return };
+        let email = unique_email("tkt-body");
+        let sender = create_user(&pool, &email, true).await;
+        let number = format!("INC-9{:09}", rand::random::<u32>() % 1_000_000_000);
+        sqlx::query("INSERT INTO tickets (ticket_number, title, description, requester_id) VALUES ($1, 't', 'd', $2)")
+            .bind(&number)
+            .bind(sender)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let marker = format!("TKTBODY-{}", Uuid::new_v4().simple());
+        let full = long_body(&marker);
+        assert!(full.chars().count() > 600);
+        let input = intake_input(&email, &format!("[{number}] update"), &full);
+        let mid = input.message_id.clone();
+        let out = intake_email(State(test_state(pool.clone())), test_headers(), Json(input)).await.unwrap();
+        assert_eq!(out.0["kind"], "reply");
+
+        let stored: Option<String> =
+            sqlx::query_scalar("SELECT body FROM email_ingest WHERE message_id = $1")
+                .bind(&mid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(Some(full.clone()), stored);
+    }
+
+    #[tokio::test]
+    async fn new_ticket_persists_full_body() {
+        let Some(pool) = test_pool().await else { return };
+        // Unknown allowlisted sender: auto-created (active) + ticket + body.
+        let email = unique_email("new-body");
+        let marker = format!("NEWBODY-{}", Uuid::new_v4().simple());
+        let full = long_body(&marker);
+        assert!(full.chars().count() > 600);
+        let input = intake_input(&email, "brand new issue", &full);
+        let mid = input.message_id.clone();
+        let out = intake_email(State(test_state(pool.clone())), test_headers(), Json(input)).await.unwrap();
+        assert_eq!(out.0["kind"], "ticket");
+
+        let stored: Option<String> =
+            sqlx::query_scalar("SELECT body FROM email_ingest WHERE message_id = $1")
+                .bind(&mid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(Some(full), stored);
+        let created_active: bool =
+            sqlx::query_scalar("SELECT active FROM users WHERE LOWER(email) = $1")
+                .bind(email.to_lowercase())
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(created_active);
     }
 }
