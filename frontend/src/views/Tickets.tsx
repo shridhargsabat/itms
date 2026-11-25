@@ -149,10 +149,14 @@ export default function Tickets() {
     queryKey: ['ticket', selectedId],
     queryFn: () => getTicket(selectedId!),
     enabled: Boolean(selectedId && !rowMatch),
+    // FE-07: fail fast — the default 3 retries delay a bad deep link by seconds.
+    retry: false,
   });
   const selected = rowMatch ?? singleTicket.data ?? null;
   // TFE-08: deep link to a missing/inaccessible ticket — surfaced as a notice, not a silent no-op.
   const badOpen = Boolean(selectedId && !rowMatch && singleTicket.isError);
+  // FE-07: deep link resolving — a pending drawer skeleton (below) instead of nothing.
+  const deepLinkPending = Boolean(selectedId && !rowMatch && singleTicket.isPending);
   const users = useQuery({ queryKey: ['users', 'picker'], queryFn: () => listUsers({ limit: 200 }) });
   // TFE-28: live SLA policy with the const as fallback (values match the server today).
   const slaPolicy = useQuery({ queryKey: ['sla-policy'], queryFn: getSlaPolicy, staleTime: Infinity, retry: false });
@@ -177,7 +181,9 @@ export default function Tickets() {
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="listbox"]')) selectTicket(null);
+      // FE-02: an open Modal is topmost — it owns Escape (and stopPropagates),
+      // so the drawer must not close underneath it.
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="listbox"]') && !document.querySelector('[data-modal]')) selectTicket(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -199,6 +205,8 @@ export default function Tickets() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
       if (document.querySelector('[role="listbox"]')) return;
+      // FE-02: topmost-only trap — an open Modal owns Tab while it is up.
+      if (document.querySelector('[data-modal]')) return;
       const scope = drawerRef.current;
       if (!scope) return;
       const items = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
@@ -415,6 +423,12 @@ export default function Tickets() {
 
   const nextStatuses = selected ? (ALLOWED_TICKET_TRANSITIONS[selected.status] ?? []) : [];
 
+  // CT-03 (drawer): only active ADMIN/AGENT users are assignable — EMPLOYEE
+  // and deactivated accounts are filtered out of the assignee picker.
+  const staffUsers = (users.data?.items ?? []).filter(
+    (u) => (u.role === 'ADMIN' || u.role === 'AGENT') && u.active,
+  );
+
   const matchCount = data?.total ?? rows.length;
   const kanbanTruncated = view === 'kanban' && (data?.total ?? 0) > rows.length;
 
@@ -433,6 +447,8 @@ export default function Tickets() {
         }
         actions={
           <>
+            {/* CT-02: CSV export is staff-only — EMPLOYEE never sees the button. */}
+            {isStaff && (
             <Button
               type="button"
               onClick={handleExport}
@@ -444,6 +460,7 @@ export default function Tickets() {
             >
               Export
             </Button>
+            )}
             <Button
               type="button"
               onClick={() => setNewOpen(true)}
@@ -665,6 +682,31 @@ export default function Tickets() {
           )}
         </div>
 
+        {/* FE-07: deep-link resolving — a pending drawer skeleton so ?open=
+            shows a loading state instead of nothing until the fetch lands. */}
+        {deepLinkPending &&
+          createPortal(
+            <div className="fixed inset-0 z-[70]">
+              <div aria-hidden="true" className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" />
+              <div
+                role="status"
+                aria-label="Loading ticket"
+                aria-busy="true"
+                data-testid="ticket-drawer-skeleton"
+                className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col liquid-glass-panel modal-panel px-5 py-6"
+              >
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 w-24 rounded bg-elevated" />
+                  <div className="h-6 w-3/4 rounded bg-elevated" />
+                  <div className="h-3 w-1/3 rounded bg-elevated" />
+                  <div className="mt-6 h-20 rounded-lg bg-elevated" />
+                  <div className="h-10 rounded-lg bg-elevated" />
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
         {selected &&
           createPortal(
             <div ref={drawerRef} className="fixed inset-0 z-[70]">
@@ -744,18 +786,23 @@ export default function Tickets() {
                     className={inputCls}
                     value={detailsDraft.title}
                     maxLength={200}
+                    disabled={saveDetails.isPending}
                     onChange={(e) => setDetailsDraft((d) => ({ ...d, title: e.target.value }))}
                   />
                 </div>
                 <div>
                   <label className={labelCls}>Type</label>
-                  <Select
-                    ariaLabel="Ticket type"
-                    className="w-full"
-                    value={detailsDraft.ticket_type}
-                    onChange={(v) => setDetailsDraft((d) => ({ ...d, ticket_type: v }))}
-                    options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
-                  />
+                  {/* FE-05: freeze the editor while the save is in flight — a
+                      success closes the editor and would wipe in-flight edits. */}
+                  <div className={cn(saveDetails.isPending && 'pointer-events-none opacity-60')} aria-disabled={saveDetails.isPending}>
+                    <Select
+                      ariaLabel="Ticket type"
+                      className="w-full"
+                      value={detailsDraft.ticket_type}
+                      onChange={(v) => setDetailsDraft((d) => ({ ...d, ticket_type: v }))}
+                      options={TICKET_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls} htmlFor="ticket-edit-description">Description</label>
@@ -765,6 +812,7 @@ export default function Tickets() {
                     rows={3}
                     maxLength={4000}
                     value={detailsDraft.description}
+                    disabled={saveDetails.isPending}
                     onChange={(e) => setDetailsDraft((d) => ({ ...d, description: e.target.value }))}
                   />
                 </div>
@@ -850,7 +898,13 @@ export default function Tickets() {
                         onChange={(v) => editTicket.mutate({ assignee_id: v || null })}
                         options={[
                           { value: '', label: 'Unassigned' },
-                          ...(users.data?.items ?? []).map((u) => ({
+                          // FE-10: pin the current assignee (NewTicketForm requester
+                          // pattern) — past the first 200 users the Select would
+                          // otherwise fall back to the placeholder.
+                          ...(selected.assignee_id && !staffUsers.some((u) => u.id === selected.assignee_id)
+                            ? [{ value: selected.assignee_id, label: selected.assignee_name ?? 'Current assignee' }]
+                            : []),
+                          ...staffUsers.map((u) => ({
                             value: u.id,
                             label: `${u.name} (${u.department})`,
                           })),
@@ -1039,6 +1093,35 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
 
       {deleteErr && <FieldError id="ticket-delete-error" error={deleteErr} />}
 
+      {/* FE-04: a failed thread fetch must not render as an empty "No
+          activity yet" — skeleton while loading, TFE-01 error block with
+          Retry (refetch) on failure. The composer below stays mounted. */}
+      {tl.isLoading ? (
+        <div
+          data-testid="thread-skeleton"
+          aria-busy="true"
+          aria-label="Loading activity"
+          className="mb-3 space-y-2"
+        >
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="animate-pulse rounded-lg glass-dense p-2">
+              <div className="h-3 w-1/3 rounded bg-elevated" />
+              <div className="mt-2 h-3 w-2/3 rounded bg-elevated" />
+            </div>
+          ))}
+        </div>
+      ) : tl.isError ? (
+        <div role="alert" className="mb-3 rounded-lg glass-card liquid-glass-subcard px-4 py-6 text-center">
+          <p className="text-sm font-semibold text-primary">Couldn&apos;t load activity</p>
+          <p className="mt-1 text-xs text-muted">
+            {tl.error instanceof Error ? tl.error.message : 'Something went wrong while fetching the ticket activity.'}
+          </p>
+          <Button type="button" variant="secondary" size="sm" onClick={() => tl.refetch()} className="mt-3">
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <>
       {/* attachments */}
       {attachments.length > 0 && (
         <div className="mb-3 flex flex-col gap-1.5">
@@ -1126,6 +1209,8 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           );
         })}
       </div>
+        </>
+      )}
 
       {/* new comment */}
       <div className="flex min-w-0 flex-col gap-2">
@@ -1137,6 +1222,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           aria-label="Add a comment"
           rows={2}
           maxLength={4000}
+          disabled={post.isPending}
           className={cn(inputCls, 'min-h-[60px] resize-y text-xs')}
         />
         {post.isError && (
@@ -1212,6 +1298,11 @@ function ConvertButton({ ticket }: { ticket: Ticket }) {
       navigate(`/kb?open=${a.id}`);
     },
   });
+  // FE-09: closing resets the mutation — a stale failure must not greet the next open.
+  const closeConfirm = () => {
+    convert.reset();
+    setConfirming(false);
+  };
   if (user?.role === 'EMPLOYEE') return null;
   if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') return null;
   return (
@@ -1227,20 +1318,25 @@ function ConvertButton({ ticket }: { ticket: Ticket }) {
       >
         Convert to KB article
       </Button>
-      {convert.isError && (
-        <FieldError
-          id="ticket-convert-error"
-          error={convert.error instanceof Error ? convert.error.message : 'Conversion failed.'}
-        />
-      )}
       {confirming && (
-        <Modal title="Convert to KB article" onClose={() => setConfirming(false)}>
+        // FE-01: nested over the z-70 drawer — render above it.
+        <Modal title="Convert to KB article" onClose={closeConfirm} zIndex={80}>
           <p className="text-sm text-secondary">
             Capture <span className="font-mono text-accent">{ticket.ticket_number}</span> as a
             knowledge-base article? You&apos;ll be taken to the new article.
           </p>
+          {/* FE-09: the failure lives INSIDE the confirm, above the buttons —
+              the old slot behind the trigger was hidden by the modal's own
+              scrim. A retry clears it (pending resets isError); closeConfirm
+              resets it on close. */}
+          {convert.isError && (
+            <FieldError
+              id="ticket-convert-error"
+              error={convert.error instanceof Error ? convert.error.message : 'Conversion failed.'}
+            />
+          )}
           <div className="mt-4 flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
+            <Button type="button" variant="secondary" onClick={closeConfirm}>
               Cancel
             </Button>
             <Button
@@ -1262,15 +1358,29 @@ function ConvertButton({ ticket }: { ticket: Ticket }) {
 function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
   const user = getCachedUser();
   const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const canned = useQuery({ queryKey: ['kb-canned'], queryFn: () => listCanned(), enabled: user?.role !== 'EMPLOYEE' });
-  // TFE-21: dismiss on outside-mousedown (trigger OR portaled menu) / Escape.
-  // Capture-phase + preventDefault so the drawer's own Escape handler (which
-  // yields on defaultPrevented, and on [role="listbox"]) stays shut. Scroll /
-  // resize closes: the menu is fixed, it must not float detached from the
-  // trigger while the drawer scrolls underneath.
+  const items = canned.data ?? [];
+  // Latest onPick without resubscribing the key handler every render.
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+  const focusTrigger = () => {
+    wrapRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+  };
+  // FE-08: focus moves into the menu on open (Escape/select return it).
+  useEffect(() => {
+    if (!open) return;
+    setActiveIdx(0);
+    menuRef.current?.focus();
+  }, [open]);
+  // FE-08: arrows/Home/End move the active option, Enter/Space picks it —
+  // focus stays on the menu with aria-activedescendant (the Select.tsx
+  // pattern). TFE-21 dismiss rules stay: outside-mousedown / Escape (capture
+  // + stopPropagation so the drawer's own Escape handler stays shut),
+  // scroll/resize close since the fixed menu must not float detached.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -1283,6 +1393,36 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
         e.preventDefault();
         e.stopPropagation();
         setOpen(false);
+        focusTrigger();
+        return;
+      }
+      const len = items.length;
+      if (len === 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveIdx((i) => (i + 1) % len);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveIdx((i) => (i - 1 + len) % len);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveIdx(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveIdx(len - 1);
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        const c = items[activeIdx] ?? items[0];
+        if (c) {
+          onPickRef.current(c.body);
+          setOpen(false);
+          focusTrigger();
+        }
       }
     };
     const onScroll = () => setOpen(false);
@@ -1296,7 +1436,7 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
       window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', onScroll);
     };
-  }, [open ]);
+  }, [open, activeIdx, items]);
   // TFE-21: measure + place synchronously after commit (Select pattern) so the
   // fixed menu lands exactly above the trigger before paint. role="listbox"
   // lets it share the drawer/Modal Escape + focus-trap guards with Select.
@@ -1313,6 +1453,7 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
   }, [open]);
   if (user?.role === 'EMPLOYEE') return null;
   if (!canned.data?.length) return null;
+  const activeId = items[activeIdx] ? `canned-opt-${items[activeIdx].id}` : undefined;
   return (
     <div className="relative" ref={wrapRef}>
       <Button
@@ -1320,6 +1461,9 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
         onClick={() => setOpen((v) => !v)}
         variant="secondary"
         size="sm"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls="canned-menu"
         className="border-edge px-2 py-1 text-[11px] text-accent"
         leftIcon={<Zap className="h-3 w-3" />}
       >
@@ -1331,17 +1475,25 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
             ref={menuRef}
             role="listbox"
             aria-label="Canned responses"
+            id="canned-menu"
+            tabIndex={-1}
+            aria-activedescendant={activeId}
             style={{ position: 'fixed', left: pos?.left ?? 0, bottom: pos?.bottom ?? 0 }}
             className="z-[70] max-h-56 w-80 max-w-[calc(100dvw-2.5rem)] overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl"
           >
-            {canned.data.map((c) => (
+            {items.map((c, i) => (
               <button
                 key={c.id}
                 type="button"
                 role="option"
-                aria-selected={false}
+                id={`canned-opt-${c.id}`}
+                aria-selected={i === activeIdx}
+                onMouseEnter={() => setActiveIdx(i)}
                 onClick={() => { onPick(c.body); setOpen(false); }}
-                className="block w-full rounded-lg px-2.5 py-2 text-left hover:bg-elevated"
+                className={cn(
+                  'block w-full rounded-lg px-2.5 py-2 text-left hover:bg-elevated',
+                  i === activeIdx && 'bg-elevated',
+                )}
               >
                 <span className="block text-xs font-semibold text-primary">{c.title}</span>
                 <span className="block truncate text-[11px] text-muted">{c.body}</span>

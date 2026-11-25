@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Search, Ticket, X } from 'lucide-react';
-import { listTickets, patchTicketStatus, getSlaPolicy } from '@/api/client';
+import { getCachedUser, listTickets, patchTicketStatus, getSlaPolicy } from '@/api/client';
 import { ALLOWED_TICKET_TRANSITIONS } from '@/api/types';
 import type { Ticket as TicketRecord, TicketStatus } from '@/api/types';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
@@ -16,6 +16,10 @@ const FALLBACK_SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM:
 
 /** Server-side live statuses for the queue query (C2 multi-status). */
 const QUEUE_STATUS = 'OPEN,IN_PROGRESS';
+
+// FE-03 (#147): focusable selector for the drawer trap (mirrors Tickets TFE-32 / Modal.tsx).
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Live service queue (Task 9): OPEN/IN_PROGRESS tickets with client-side
@@ -30,6 +34,20 @@ export default function ServiceQueue() {
   // TFE-30: last-selected snapshot so the drawer survives refetches that drop
   // the ticket from the live window.
   const [snapshot, setSnapshot] = useState<TicketRecord | null>(null);
+  // FE-06 (#150): status-update error is per-ticket local state (id-gated at
+  // render) so a mid-flight failure can't bleed onto another ticket.
+  const [statusError, setStatusError] = useState<{ id: string; message: string } | null>(null);
+
+  // CT-01 (#155): EMPLOYEE is read-only — the staff-only status mutation is
+  // gated on this (mirrors Tickets.tsx isStaff).
+  const user = getCachedUser();
+  const isStaff = user?.role !== 'EMPLOYEE';
+
+  // FE-06 (#150): latest open selection for mutation callbacks. Assigned
+  // during render (not in an effect) so a mutation settling between render
+  // and passive effects still compares against the current selection.
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['service-queue'],
@@ -71,6 +89,8 @@ export default function ServiceQueue() {
     setSelectedId(null);
     setConfirmed(null);
     setSnapshot(null);
+    // FE-06 (#150): never carry the update error to the next ticket.
+    setStatusError(null);
   };
 
   useEffect(() => {
@@ -84,14 +104,68 @@ export default function ServiceQueue() {
     return () => document.removeEventListener('keydown', onKey);
   }, [selected]);
 
+  // FE-03 (#147): drawer focus trap + return focus (mirrors Tickets TFE-32 /
+  // Modal.tsx). The listbox guard lets an open Select menu own keyboard
+  // handling; cleanup returns focus to the invoking row.
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerOpen = selected !== null;
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const container = drawerRef.current;
+    if (!container) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!document.querySelector('[role="listbox"]')) {
+      const first = container.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (first ?? container).focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      if (document.querySelector('[role="listbox"]')) return;
+      const scope = drawerRef.current;
+      if (!scope) return;
+      const items = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !scope.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !scope.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      previouslyFocused?.focus();
+    };
+  }, [drawerOpen]);
+
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: TicketStatus }) =>
       patchTicketStatus(id, status),
+    // FE-06 (#150): only surface the outcome when the mutated ticket is still
+    // the open selection — invalidations still run so caches stay fresh.
     onSuccess: (t) => {
       qc.invalidateQueries({ queryKey: ['service-queue'] });
       qc.invalidateQueries({ queryKey: ['tickets'] });
       qc.invalidateQueries({ queryKey: ['metrics'] });
-      setConfirmed(t.status);
+      if (t.id === selectedIdRef.current) {
+        setConfirmed(t.status);
+      }
+    },
+    onError: (err, vars) => {
+      if (vars.id === selectedIdRef.current) {
+        setStatusError({
+          id: vars.id,
+          message: err instanceof Error ? err.message : 'Failed to update status.',
+        });
+      }
     },
   });
 
@@ -141,6 +215,7 @@ export default function ServiceQueue() {
                   setSelectedId(t.id);
                   setSnapshot(t);
                   setConfirmed(null);
+                  setStatusError(null);
                 }}
                 className="liquid-glass-subcard w-full cursor-pointer rounded-[20px] p-3.5 transition"
               >
@@ -179,7 +254,10 @@ export default function ServiceQueue() {
             />
             <div
               data-testid="service-queue-drawer"
+              ref={drawerRef}
               role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
               aria-label={`Inspect ${selected.ticket_number}`}
               className="liquid-glass-panel fixed inset-y-0 right-0 z-[60] w-full max-w-md overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
             >
@@ -212,34 +290,37 @@ export default function ServiceQueue() {
                   <PriorityBadge priority={selected.priority} />
                   <SlaChip dueAt={selected.sla_due_at} policyHours={slaHours[selected.priority]} />
                 </div>
-                <div>
-                  <label className="mb-1 block text-[11px] text-muted">Update Status</label>
-                  <Select
-                    className="w-full"
-                    value={displayStatus}
-                    ariaLabel="Update Status"
-                    onChange={(v) => {
-                      // TFE-20: selecting the current status is a no-op (no pointless PATCH).
-                      if (v === displayStatus) return;
-                      setConfirmed(null);
-                      updateStatus.mutate({ id: selected.id, status: v as TicketStatus });
-                    }}
-                    options={[displayStatus, ...(ALLOWED_TICKET_TRANSITIONS[displayStatus] ?? [])].map((s) => ({ value: s, label: s }))}
-                  />
-                  {confirmed && (
-                    <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Status updated to {confirmed}
-                    </p>
-                  )}
-                  {updateStatus.isError && (
-                    <p className="mt-2 text-xs text-red-700 dark:text-red-400">
-                      {updateStatus.error instanceof Error
-                        ? updateStatus.error.message
-                        : 'Failed to update status.'}
-                    </p>
-                  )}
-                </div>
+                {/* CT-01 (#155): staff-only mutation — EMPLOYEE keeps the
+                    read-only StatusBadge above and never sees this Select. */}
+                {isStaff && (
+                  <div>
+                    <label className="mb-1 block text-[11px] text-muted">Update Status</label>
+                    <Select
+                      className="w-full"
+                      value={displayStatus}
+                      ariaLabel="Update Status"
+                      onChange={(v) => {
+                        // TFE-20: selecting the current status is a no-op (no pointless PATCH).
+                        if (v === displayStatus) return;
+                        setConfirmed(null);
+                        setStatusError(null);
+                        updateStatus.mutate({ id: selected.id, status: v as TicketStatus });
+                      }}
+                      options={[displayStatus, ...(ALLOWED_TICKET_TRANSITIONS[displayStatus] ?? [])].map((s) => ({ value: s, label: s }))}
+                    />
+                    {confirmed && (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Status updated to {confirmed}
+                      </p>
+                    )}
+                    {statusError && statusError.id === selected.id && (
+                      <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-400">
+                        {statusError.message}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <Link
                 to={`/tickets?open=${selected.id}`}

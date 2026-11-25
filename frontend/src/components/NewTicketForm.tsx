@@ -63,12 +63,18 @@ export default function NewTicketForm({
   const set = <K extends keyof CreateTicketInput>(k: K, v: CreateTicketInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  // CT-03: the backend 422s tickets filed with an inactive requester — only
+  // offer active users. The "(You)" fallback covers a self missing from the
+  // page, unless the page knows self as inactive.
+  const allUsers = users.data?.items ?? [];
+  const activeUsers = allUsers.filter((u) => u.active);
+  const meKnownInactive = me ? allUsers.some((u) => u.id === me.id && !u.active) : false;
   const requesterOptions = [
     { value: '', label: 'Current user (default)' },
-    ...(me && !(users.data?.items ?? []).some((u) => u.id === me.id)
+    ...(me && !meKnownInactive && !activeUsers.some((u) => u.id === me.id)
       ? [{ value: me.id, label: `${me.name} (You)` }]
       : []),
-    ...(users.data?.items ?? []).map((u) => ({
+    ...activeUsers.map((u) => ({
       value: u.id,
       label: `${u.name} (${u.department})`,
     })),
@@ -178,9 +184,9 @@ export default function NewTicketForm({
               options={requesterOptions}
               ariaLabel="Requester"
             />
-            {users.data && users.data.total > users.data.items.length && (
+            {users.data && users.data.total > activeUsers.length && (
               <p className="mt-1 text-[11px] text-muted">
-                Showing first {users.data.items.length} of {users.data.total} users
+                Showing first {activeUsers.length} of {users.data.total} users
               </p>
             )}
           </div>
