@@ -215,7 +215,10 @@ export default function DataTable<T extends { id: string }>({
                 type="button"
                 onClick={() => cycleSort(c)}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded transition-colors hover:text-primary',
+                  // Task 18 (UI-17): explicit uppercase — preflight sets
+                  // text-transform:none on buttons, which used to leave
+                  // sortable headers Title Case next to ALL-CAPS plain ones.
+                  'inline-flex items-center gap-1 rounded uppercase transition-colors hover:text-primary',
                   sort?.key === (c.sortKey ?? c.key) && 'text-accent',
                 )}
               >

@@ -1,11 +1,35 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Repeat, TriangleAlert } from 'lucide-react';
+import { CalendarClock, Download, Repeat, TrendingUp, TriangleAlert } from 'lucide-react';
 import { getRepeatIncidents } from '@/api/client';
+import type { RepeatIncident } from '@/api/types';
+import { Button } from '@/components/Button';
 import EmptyState from '@/components/EmptyState';
 import FilterBar from '@/components/FilterBar';
 import PageHeader from '@/components/PageHeader';
 import Select from '@/components/Select';
+
+/** CSV-escape one cell (quote-wrapping + doubled quotes). */
+function csvCell(v: string | number | null): string {
+  const s = v === null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Client-side CSV of the rendered repeat-incident findings — no new endpoint. */
+function repeatIncidentsCsv(rows: RepeatIncident[]): string {
+  const header = ['Title', 'Type', 'Count', 'Last occurrence', 'Asset tag', 'Tickets'].join(',');
+  const lines = rows.map((r) =>
+    [
+      csvCell(r.title),
+      csvCell(r.ticketType),
+      csvCell(r.count),
+      csvCell(new Date(r.lastAt).toISOString().slice(0, 10)),
+      csvCell(r.assetTag),
+      csvCell(r.ticketNumbers.join('; ')),
+    ].join(','),
+  );
+  return [header, ...lines].join('\n');
+}
 
 /**
  * Reports hub — Phase 2 (#49 repeat-incident detection, problem-lite).
@@ -20,11 +44,37 @@ export default function Reports() {
     queryFn: () => getRepeatIncidents({ days, min_count: minCount }),
   });
 
+  const findings = report.data ?? [];
+
+  const exportCsv = () => {
+    if (findings.length === 0) return;
+    const blob = new Blob([repeatIncidentsCsv(findings)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `repeat-incidents-${days}d.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
       <PageHeader
         title="Reports"
         description="Repeat-incident detection — tickets grouped by title + asset to surface recurring issues (no problem records, just insight)."
+        actions={
+          <Button
+            type="button"
+            onClick={exportCsv}
+            disabled={findings.length === 0 || report.isLoading}
+            variant="secondary"
+            size="sm"
+            leftIcon={<Download className="h-4 w-4" />}
+            title={findings.length === 0 ? 'No findings to export' : 'Download these findings as CSV'}
+          >
+            Export CSV
+          </Button>
+        }
       />
 
       <FilterBar>
@@ -96,6 +146,32 @@ export default function Reports() {
           />
         )}
       </div>
+
+      {/* Planned canned reports (#56) — non-interactive stubs so the hub
+          reads as one live report plus a roadmap, not an empty page. */}
+      <section aria-label="Planned reports" className="space-y-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Planned</h2>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div aria-disabled="true" className="flex items-center gap-3 rounded-xl glass-card p-4 opacity-60">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+              <TrendingUp className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-primary">Ticket volume trends</p>
+              <p className="text-[11px] text-muted">Coming soon</p>
+            </div>
+          </div>
+          <div aria-disabled="true" className="flex items-center gap-3 rounded-xl glass-card p-4 opacity-60">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+              <CalendarClock className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-primary">SLA compliance</p>
+              <p className="text-[11px] text-muted">Coming soon</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

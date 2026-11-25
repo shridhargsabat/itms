@@ -124,6 +124,12 @@ export default function Layout() {
       const href = anchor.getAttribute('href');
       if (!href || href.startsWith('http')) return;
       e.preventDefault();
+      // Task 18 (UI-19): reduced-motion users skip the crossfade entirely
+      // (plain navigation; the CSS guard is the backstop).
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        navigate(href);
+        return;
+      }
       document.startViewTransition(() => {
         navigate(href);
       });

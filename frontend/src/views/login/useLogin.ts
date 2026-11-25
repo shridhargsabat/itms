@@ -90,11 +90,9 @@ export function useLogin(): UseLoginResult {
     submit,
     onDemoClick,
     loginPending: mutation.isPending,
-    loginError: mutation.isError
-      ? mutation.error instanceof Error
-        ? mutation.error.message
-        : 'Sign-in failed. Try again.'
-      : null,
+    // Task 18 (UI-18): every auth failure shows the same generic sentence —
+    // never leak raw server codes (invalid_credentials) or network details.
+    loginError: mutation.isError ? 'Invalid email or password.' : null,
     demoPending: demoMutation.isPending,
   };
 }
