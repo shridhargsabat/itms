@@ -3,17 +3,19 @@ import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Search, Ticket, X } from 'lucide-react';
-import { listTickets, patchTicketStatus } from '@/api/client';
+import { listTickets, patchTicketStatus, getSlaPolicy } from '@/api/client';
 import { ALLOWED_TICKET_TRANSITIONS } from '@/api/types';
-import type { TicketStatus } from '@/api/types';
+import type { Ticket as TicketRecord, TicketStatus } from '@/api/types';
 import { PriorityBadge, StatusBadge } from '@/components/TicketBadge';
 import SlaChip from '@/components/SlaChip';
 import Select from '@/components/Select';
 import EmptyState from '@/components/EmptyState';
 
-const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
+// TFE-28: fallback only — live values come from GET /sla/policy (slaHours below).
+const FALLBACK_SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
-const LIVE_STATUSES: TicketStatus[] = ['OPEN', 'IN_PROGRESS'];
+/** Server-side live statuses for the queue query (C2 multi-status). */
+const QUEUE_STATUS = 'OPEN,IN_PROGRESS';
 
 /**
  * Live service queue (Task 9): OPEN/IN_PROGRESS tickets with client-side
@@ -24,27 +26,34 @@ export default function ServiceQueue() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<TicketStatus | null>(null);
+  // TFE-30: last-selected snapshot so the drawer survives refetches that drop
+  // the ticket from the live window.
+  const [snapshot, setSnapshot] = useState<TicketRecord | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['service-queue'],
-    queryFn: async () => {
-      const [open, inProgress] = await Promise.all([
-        listTickets({ status: 'OPEN', limit: 25 }),
-        listTickets({ status: 'IN_PROGRESS', limit: 25 }),
-      ]);
-      return { items: [...open.items, ...inProgress.items], total: open.total + inProgress.total };
-    },
+    // TFE-02: server-side live-status filter (C2) — no more newest-25 window.
+    queryFn: () => listTickets({ status: QUEUE_STATUS, limit: 50 }),
     refetchInterval: 60_000,
   });
 
+  // TFE-28: live SLA policy with const fallback (policy rarely changes).
+  const slaPolicy = useQuery({ queryKey: ['sla-policy'], queryFn: getSlaPolicy, staleTime: 5 * 60_000 });
+  const slaHours = useMemo<Record<string, number>>(() => {
+    if (!slaPolicy.data) return FALLBACK_SLA_HOURS;
+    const hours = { ...FALLBACK_SLA_HOURS };
+    for (const [k, v] of Object.entries(slaPolicy.data)) {
+      if (v && typeof v.hours === 'number') hours[k] = v.hours;
+    }
+    return hours;
+  }, [slaPolicy.data]);
+
   const rows = useMemo(() => {
-    const live = (data?.items ?? []).filter((t) =>
-      (LIVE_STATUSES as string[]).includes(t.status),
-    );
+    const items = data?.items ?? [];
     const q = filter.trim().toLowerCase();
-    if (!q) return live;
-    return live.filter(
+    if (!q) return items;
+    return items.filter(
       (t) =>
         t.title.toLowerCase().includes(q) ||
         t.ticket_number.toLowerCase().includes(q) ||
@@ -52,11 +61,16 @@ export default function ServiceQueue() {
     );
   }, [data, filter]);
 
-  const selected = (data?.items ?? []).find((t) => t.id === selectedId) ?? null;
+  const liveSelected = (data?.items ?? []).find((t) => t.id === selectedId) ?? null;
+  const selected = liveSelected ?? (selectedId && snapshot?.id === selectedId ? snapshot : null);
+  const selectionStale = selected !== null && liveSelected === null;
+  // TFE-19: badges/Select render the post-mutation status (cache lags behind).
+  const displayStatus: TicketStatus = confirmed ?? selected?.status ?? 'OPEN';
 
   const close = () => {
     setSelectedId(null);
     setConfirmed(null);
+    setSnapshot(null);
   };
 
   useEffect(() => {
@@ -125,6 +139,7 @@ export default function ServiceQueue() {
                 type="button"
                 onClick={() => {
                   setSelectedId(t.id);
+                  setSnapshot(t);
                   setConfirmed(null);
                 }}
                 className="liquid-glass-subcard w-full cursor-pointer rounded-[20px] p-3.5 transition"
@@ -145,7 +160,7 @@ export default function ServiceQueue() {
                   </span>
                   <span className="flex items-center gap-2">
                     <PriorityBadge priority={t.priority} />
-                    <SlaChip dueAt={t.sla_due_at} policyHours={SLA_HOURS[t.priority]} />
+                    <SlaChip dueAt={t.sla_due_at} policyHours={slaHours[t.priority]} />
                   </span>
                 </span>
               </button>
@@ -184,24 +199,32 @@ export default function ServiceQueue() {
                   </button>
                 </div>
                 <h3 className="text-base font-semibold text-primary">{selected.title}</h3>
+                {selectionStale && (
+                  <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-400">
+                    This ticket is no longer in the queue — showing its last-known details.
+                  </p>
+                )}
                 <p className="text-xs leading-relaxed text-secondary">
                   {selected.description || 'No description provided.'}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <StatusBadge status={selected.status} />
+                  <StatusBadge status={displayStatus} />
                   <PriorityBadge priority={selected.priority} />
-                  <SlaChip dueAt={selected.sla_due_at} policyHours={SLA_HOURS[selected.priority]} />
+                  <SlaChip dueAt={selected.sla_due_at} policyHours={slaHours[selected.priority]} />
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] text-muted">Update Status</label>
                   <Select
                     className="w-full"
-                    value={selected.status}
+                    value={displayStatus}
+                    ariaLabel="Update Status"
                     onChange={(v) => {
+                      // TFE-20: selecting the current status is a no-op (no pointless PATCH).
+                      if (v === displayStatus) return;
                       setConfirmed(null);
                       updateStatus.mutate({ id: selected.id, status: v as TicketStatus });
                     }}
-                    options={[selected.status, ...(ALLOWED_TICKET_TRANSITIONS[selected.status] ?? [])].map((s) => ({ value: s, label: s }))}
+                    options={[displayStatus, ...(ALLOWED_TICKET_TRANSITIONS[displayStatus] ?? [])].map((s) => ({ value: s, label: s }))}
                   />
                   {confirmed && (
                     <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-400">

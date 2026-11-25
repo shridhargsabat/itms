@@ -20,7 +20,6 @@ import { Button } from '@/components/Button';
 import { useServerPagination } from '@/lib/usePagination';
 import Modal from '@/components/Modal';
 import PaginationFooter from '@/components/PaginationFooter';
-import ScrollX from '@/components/ScrollX';
 import Select from '@/components/Select';
 import { getCachedUser } from '@/api/client';
 import {
@@ -373,12 +372,16 @@ function CreateEventModal({
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Full name</span>
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Priya Sharma" />
+            <span className={labelCls}>
+              Full name <span aria-hidden="true" className="text-red-400">*</span>
+            </span>
+            <input className={inputCls} value={name} aria-required="true" onChange={(e) => setName(e.target.value)} placeholder="e.g. Priya Sharma" />
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Email</span>
-            <input className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. priya@company.com" />
+            <span className={labelCls}>
+              Email <span aria-hidden="true" className="text-red-400">*</span>
+            </span>
+            <input className={inputCls} value={email} aria-required="true" onChange={(e) => setEmail(e.target.value)} placeholder="e.g. priya@company.com" />
           </label>
         </div>
         <label className="flex flex-col gap-1">
@@ -399,35 +402,35 @@ function CreateEventModal({
               Add row
             </Button>
           </div>
-          <ScrollX>
-            <div className="flex min-w-[560px] flex-col gap-2">
-              {tasks.map((t, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    className={cn(inputCls, 'flex-1')}
-                    value={t.title}
-                    onChange={(e) => setTask(i, { title: e.target.value })}
-                    placeholder="Task title"
-                  />
-                  <Select
-                    value={t.category ?? 'OTHER'}
-                    onChange={(v) => setTask(i, { category: v as OnboardingTaskCategory })}
-                    options={CATS.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
-                    className="w-36"
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => setTasks((ts) => ts.filter((_, idx) => idx !== i))}
-                    variant="ghost"
-                    size="icon"
-                    className="p-1.5 text-muted hover:text-red-400"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </ScrollX>
+          <div className="flex flex-col gap-2">
+            {tasks.map((t, i) => (
+              <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                <input
+                  className={cn(inputCls, 'min-w-0 flex-1')}
+                  value={t.title}
+                  onChange={(e) => setTask(i, { title: e.target.value })}
+                  placeholder="Task title"
+                  aria-label={`Task ${i + 1} title`}
+                />
+                <Select
+                  value={t.category ?? 'OTHER'}
+                  onChange={(v) => setTask(i, { category: v as OnboardingTaskCategory })}
+                  options={CATS.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
+                  className="w-32 sm:w-36"
+                />
+                <Button
+                  type="button"
+                  onClick={() => setTasks((ts) => ts.filter((_, idx) => idx !== i))}
+                  variant="ghost"
+                  size="icon"
+                  className="p-1.5 text-muted hover:text-red-400"
+                  aria-label={`Delete task ${i + 1}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
 
         {create.isError && (

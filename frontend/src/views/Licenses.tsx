@@ -41,6 +41,8 @@ const TYPE_STYLE: Record<LicenseType, string> = {
   OPEN_SOURCE: 'bg-elevated/10 text-secondary border-edge2/30',
 };
 
+const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'AED'];
+
 const fmtMoney = (n: number | null | undefined, cur: string) =>
   n == null ? '—' : `${cur} ${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
@@ -566,17 +568,21 @@ function LicenseFormModal({ license, onClose, onSaved }: { license: License | nu
           </label>
           <label className="flex flex-col gap-1">
             <span className={labelCls}>Currency</span>
-            <input className={inputCls} value={currency} onChange={(e) => setCurrency(e.target.value)} />
+            <Select
+              value={currency}
+              onChange={setCurrency}
+              options={CURRENCIES.map((c) => ({ value: c, label: c }))}
+            />
           </label>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
             <span className={labelCls}>Cost / seat / yr</span>
-            <input className={inputCls} type="number" min={0} value={costPerSeat} onChange={(e) => setCostPerSeat(e.target.value)} placeholder="6120" />
+            <input className={inputCls} type="number" min={0} value={costPerSeat} onChange={(e) => setCostPerSeat(e.target.value)} placeholder="e.g. 6,120" />
           </label>
           <label className="flex flex-col gap-1">
             <span className={labelCls}>Total cost / yr</span>
-            <input className={inputCls} type="number" min={0} value={costTotal} onChange={(e) => setCostTotal(e.target.value)} placeholder="153000" />
+            <input className={inputCls} type="number" min={0} value={costTotal} onChange={(e) => setCostTotal(e.target.value)} placeholder="e.g. 153,000" />
           </label>
         </div>
         <div className="grid grid-cols-2 gap-3">

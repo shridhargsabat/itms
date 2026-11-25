@@ -321,29 +321,27 @@ export default function DataTable<T extends { id: string }>({
             {rows.map((row, i) => {
               const expanded = expandedId === row.id;
               const clickable = onRowClick !== undefined || renderExpanded !== undefined;
-              const activateRow = () => {
-                if (renderExpanded) setExpandedId(expanded ? null : row.id);
-                else if (onRowClick) onRowClick(row);
-              };
+              const activate = renderExpanded
+                ? () => setExpandedId(expanded ? null : row.id)
+                : onRowClick
+                  ? () => onRowClick(row)
+                  : undefined;
               const rowRec = row as Record<string, unknown>;
               const rowLabel = String(rowRec.asset_tag ?? rowRec.title ?? rowRec.name ?? row.id);
               return (
                 <Fragment key={row.id}>
                   <tr
-                    onClick={
-                      renderExpanded
-                        ? () => setExpandedId(expanded ? null : row.id)
-                        : onRowClick
-                          ? () => onRowClick(row)
-                          : undefined
-                    }
+                    onClick={activate}
+                    // TFE-04: keyboard access for clickable rows — focusable + Enter/Space.
+                    // Interactive children (checkboxes, links, buttons) keep their own keys.
                     onKeyDown={
-                      clickable
+                      activate
                         ? (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              activateRow();
-                            }
+                            if (e.key !== 'Enter' && e.key !== ' ') return;
+                            const t = e.target as HTMLElement;
+                            if (t.closest('button, a, input, select, textarea, [role="button"], [role="option"], [role="link"]')) return;
+                            e.preventDefault();
+                            activate();
                           }
                         : undefined
                     }
@@ -354,7 +352,7 @@ export default function DataTable<T extends { id: string }>({
                       // Perf: entrance animation on the first screenful only —
                       // animating every row in a long table janks scroll.
                       i < 12 && 'animate-list-in',
-                      clickable && 'cursor-pointer hover:bg-elevated/60',
+                      clickable && 'cursor-pointer hover:bg-elevated/60 focus-visible:bg-elevated focus-visible:outline-none',
                       highlightId === row.id && 'ring-2 ring-inset ring-accent',
                     )}
                     style={i < 12 ? { animationDelay: `${Math.min(i, 8) * 35}ms` } : undefined}

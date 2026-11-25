@@ -6,12 +6,13 @@
 use std::path::PathBuf;
 
 use axum::{
-    extract::{DefaultBodyLimit, Extension, Multipart, Path, State},
+    extract::{DefaultBodyLimit, Extension, Multipart, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Json, Response},
     routing::{delete, get, post},
     Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -20,9 +21,14 @@ use crate::{
     db::AppState,
     models::{CreateCommentRequest, TicketAttachment, TicketComment},
 };
-use super::{notifications::notify, AppError};
+use super::{notifications::notify, AppError, UuidPath};
 
 const MAX_ATTACHMENT_BYTES: i64 = 10 * 1024 * 1024; // 10 MB
+/// TBE-13: bounded thread/timeline reads (pageable, ~100 default).
+const DEFAULT_THREAD_LIMIT: i64 = 100;
+const MAX_THREAD_LIMIT: i64 = 500;
+/// Comment body mirrors CHECK(char_length(body) <= 4000) (TBE-22: 422).
+const MAX_COMMENT_CHARS: usize = 4000;
 
 /// Strict allowlist for attachment content types. Deliberately excludes
 /// `text/html` / scripts: a stored MIME is later reflected as the download
@@ -73,33 +79,74 @@ pub fn router() -> Router<AppState> {
         .layer(DefaultBodyLimit::max(MAX_ATTACHMENT_BYTES as usize + 1024 * 1024))
 }
 
-async fn ensure_ticket(pool: &sqlx::PgPool, ticket_id: Uuid) -> Result<Option<String>, AppError> {
-    let row: Option<(String,)> = sqlx::query_as::<_, (String,)>(
-        "SELECT title FROM tickets WHERE id = $1",
+/// TBE-13: `?limit=&offset=` for thread/timeline reads; default 100, max 500.
+#[derive(Debug, Deserialize)]
+pub struct ThreadListParams {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+fn parse_thread_page(p: &ThreadListParams) -> Result<(i64, i64), AppError> {
+    let limit = match p.limit {
+        None => DEFAULT_THREAD_LIMIT,
+        Some(n) if n <= 0 => {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "limit must be a positive integer",
+            ))
+        }
+        Some(n) => n.min(MAX_THREAD_LIMIT),
+    };
+    Ok((limit, p.offset.unwrap_or(0).max(0)))
+}
+
+async fn ensure_ticket(pool: &sqlx::PgPool, ticket_id: Uuid) -> Result<Option<(String, String)>, AppError> {
+    let row: Option<(String, String)> = sqlx::query_as::<_, (String, String)>(
+        "SELECT title, status FROM tickets WHERE id = $1",
     )
     .bind(ticket_id)
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(|r| r.0))
+    Ok(row)
+}
+
+/// TBE-05: CLOSED tickets reject comment/attachment mutations (422);
+/// RESOLVED stays mutable.
+fn reject_when_closed(status: &str) -> Result<(), AppError> {
+    if status == "CLOSED" {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "ticket is closed — reopen it before adding comments or attachments",
+        ));
+    }
+    Ok(())
 }
 
 // ── comments ────────────────────────────────────────────────────────────────
 
 async fn list_comments(
     State(state): State<AppState>,
-    Path(ticket_id): Path<Uuid>,
+    Extension(actor_id): Extension<Uuid>,
+    Extension(role): Extension<String>,
+    UuidPath(ticket_id): UuidPath<Uuid>,
+    Query(params): Query<ThreadListParams>,
 ) -> Result<Json<Vec<TicketComment>>, AppError> {
     let pool = &state.pool;
+    // TBE-06: non-staff see threads only on their own/participated tickets.
+    super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
     if ensure_ticket(pool, ticket_id).await?.is_none() {
         return Err(AppError::not_found("ticket not found"));
     }
+    let (limit, offset) = parse_thread_page(&params)?;
     let rows = sqlx::query_as::<_, TicketComment>(
         "SELECT c.id, c.ticket_id, c.author_id, c.body, c.mentions, c.created_at, \
                 u.name AS author_name, u.role AS author_role \
          FROM ticket_comments c JOIN users u ON u.id = c.author_id \
-         WHERE c.ticket_id = $1 ORDER BY c.created_at ASC",
+         WHERE c.ticket_id = $1 ORDER BY c.created_at ASC, c.id ASC LIMIT $2 OFFSET $3",
     )
     .bind(ticket_id)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
     Ok(Json(rows))
@@ -108,35 +155,49 @@ async fn list_comments(
 async fn create_comment(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
-    Path(ticket_id): Path<Uuid>,
+    Extension(role): Extension<String>,
+    UuidPath(ticket_id): UuidPath<Uuid>,
     Json(body): Json<CreateCommentRequest>,
 ) -> Result<(StatusCode, Json<TicketComment>), AppError> {
     let pool = &state.pool;
+    super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
     let subject = ensure_ticket(pool, ticket_id).await?;
-    let Some(subject) = subject else {
+    let Some((subject, status)) = subject else {
         return Err(AppError::not_found("ticket not found"));
     };
+    reject_when_closed(&status)?;
     let body_text = body.body.trim();
+    // TBE-22: body-validation failures are 422 (were 400).
     if body_text.is_empty() {
-        return Err(AppError::new(StatusCode::BAD_REQUEST, "comment body is required"));
+        return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "comment body is required"));
     }
-    if body_text.chars().count() > 4000 {
-        return Err(AppError::new(StatusCode::BAD_REQUEST, "comment exceeds 4000 chars"));
+    if body_text.chars().count() > MAX_COMMENT_CHARS {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("comment exceeds {MAX_COMMENT_CHARS} chars"),
+        ));
     }
-    // mentions must reference existing users
-    let mentions_json = if body.mentions.is_empty() {
+    // TBE-12: dedupe first — `mentions:[u,u]` must not false-400 on the
+    // COUNT check — then union mentions into the notify list below.
+    let mut mentions = body.mentions.clone();
+    mentions.sort();
+    mentions.dedup();
+    let mentions_json = if mentions.is_empty() {
         json!([])
     } else {
         let found: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM users WHERE id = ANY($1::uuid[])",
         )
-        .bind(&body.mentions)
+        .bind(&mentions)
         .fetch_one(pool)
         .await?;
-        if found as usize != body.mentions.len() {
-            return Err(AppError::new(StatusCode::BAD_REQUEST, "one or more mentioned users do not exist"));
+        if found as usize != mentions.len() {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "one or more mentioned users do not exist",
+            ));
         }
-        json!(body.mentions.iter().map(|u| u.to_string()).collect::<Vec<_>>())
+        json!(mentions.iter().map(|u| u.to_string()).collect::<Vec<_>>())
     };
 
     let comment = sqlx::query_as::<_, TicketComment>(
@@ -151,7 +212,19 @@ async fn create_comment(
     .bind(body_text)
     .bind(&mentions_json)
     .fetch_one(pool)
-    .await?;
+    .await
+    .map_err(|e| {
+        // TBE-26: author/ticket FK race → 422, not 500.
+        if let sqlx::Error::Database(db) = &e {
+            if db.code().as_deref() == Some("23503") {
+                return AppError::new(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "ticket or author no longer exists",
+                );
+            }
+        }
+        AppError::from(e)
+    })?;
 
     write(
         pool,
@@ -159,12 +232,13 @@ async fn create_comment(
         "TICKET_COMMENT",
         "ticket",
         ticket_id,
-        json!({"subject": subject, "comment": comment.id.to_string(), "mentions": body.mentions.len()}),
+        json!({"subject": subject, "comment": comment.id.to_string(), "mentions": mentions.len()}),
     )
     .await?;
 
-    // P1-2: notify requester + assignee + prior commenters (skip the author)
-    let participants: Vec<Uuid> = sqlx::query_scalar(
+    // P1-2: notify requester + assignee + prior commenters + mentioned users
+    // (skip the author). TBE-12: mentions were previously never notified.
+    let mut recipients: Vec<Uuid> = sqlx::query_scalar(
         "SELECT DISTINCT user_id FROM (
             SELECT requester_id AS user_id FROM tickets WHERE id = $1
             UNION SELECT assignee_id FROM tickets WHERE id = $1 AND assignee_id IS NOT NULL
@@ -175,7 +249,12 @@ async fn create_comment(
     .bind(actor_id)
     .fetch_all(pool)
     .await?;
-    for uid in participants {
+    for m in &mentions {
+        if *m != actor_id && !recipients.contains(m) {
+            recipients.push(*m);
+        }
+    }
+    for uid in recipients {
         notify(
             pool,
             uid,
@@ -194,25 +273,28 @@ async fn create_comment(
 async fn delete_comment(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
-    Path((ticket_id, comment_id)): Path<(Uuid, Uuid)>,
+    Extension(role): Extension<String>,
+    UuidPath((ticket_id, comment_id)): UuidPath<(Uuid, Uuid)>,
 ) -> Result<StatusCode, AppError> {
     let pool = &state.pool;
-    let row: Option<(String, String, Uuid,)> = sqlx::query_as::<_, (String, String, Uuid)>(
-        "SELECT c.body, t.title, c.author_id FROM ticket_comments c \
+    super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
+    let row: Option<(String, String, Uuid, String,)> = sqlx::query_as::<_, (String, String, Uuid, String)>(
+        "SELECT c.body, t.title, c.author_id, t.status FROM ticket_comments c \
          JOIN tickets t ON t.id = c.ticket_id WHERE c.id = $1 AND c.ticket_id = $2",
     )
     .bind(comment_id)
     .bind(ticket_id)
     .fetch_optional(pool)
     .await?;
-    let Some((body, subject, author)) = row else {
+    let Some((body, subject, author, status)) = row else {
         return Err(AppError::not_found("comment not found"));
     };
-    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+    reject_when_closed(&status)?;
+    let user_role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
         .bind(actor_id)
         .fetch_one(pool)
         .await?;
-    if author != actor_id && role != "ADMIN" {
+    if author != actor_id && user_role != "ADMIN" {
         return Err(AppError::new(StatusCode::FORBIDDEN, "only the author or an admin can delete a comment"));
     }
     sqlx::query("DELETE FROM ticket_comments WHERE id = $1")
@@ -236,14 +318,17 @@ async fn delete_comment(
 async fn upload_attachment(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
-    Path(ticket_id): Path<Uuid>,
+    Extension(role): Extension<String>,
+    UuidPath(ticket_id): UuidPath<Uuid>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<TicketAttachment>), AppError> {
     let pool = &state.pool;
+    super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
     let subject = ensure_ticket(pool, ticket_id).await?;
-    let Some(subject) = subject else {
+    let Some((subject, status)) = subject else {
         return Err(AppError::not_found("ticket not found"));
     };
+    reject_when_closed(&status)?;
     let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "/app/uploads".to_string());
     tokio::fs::create_dir_all(&dir).await.map_err(|e| {
         AppError::new(StatusCode::INTERNAL_SERVER_ERROR, format!("cannot create upload dir: {e}"))
@@ -353,25 +438,28 @@ async fn upload_attachment(
 async fn delete_attachment(
     State(state): State<AppState>,
     Extension(actor_id): Extension<Uuid>,
-    Path((ticket_id, attachment_id)): Path<(Uuid, Uuid)>,
+    Extension(role): Extension<String>,
+    UuidPath((ticket_id, attachment_id)): UuidPath<(Uuid, Uuid)>,
 ) -> Result<StatusCode, AppError> {
     let pool = &state.pool;
-    let row: Option<(String, String, String, Uuid,)> = sqlx::query_as::<_, (String, String, String, Uuid)>(
-        "SELECT a.file_name, a.storage_key, t.title, a.uploader_id FROM ticket_attachments a \
+    super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
+    let row: Option<(String, String, String, Uuid, String,)> = sqlx::query_as::<_, (String, String, String, Uuid, String)>(
+        "SELECT a.file_name, a.storage_key, t.title, a.uploader_id, t.status FROM ticket_attachments a \
          JOIN tickets t ON t.id = a.ticket_id WHERE a.id = $1 AND a.ticket_id = $2",
     )
     .bind(attachment_id)
     .bind(ticket_id)
     .fetch_optional(pool)
     .await?;
-    let Some((file_name, storage_key, subject, uploader)) = row else {
+    let Some((file_name, storage_key, subject, uploader, status)) = row else {
         return Err(AppError::not_found("attachment not found"));
     };
-    let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
+    reject_when_closed(&status)?;
+    let user_role: String = sqlx::query_scalar("SELECT role FROM users WHERE id = $1")
         .bind(actor_id)
         .fetch_one(pool)
         .await?;
-    if uploader != actor_id && role != "ADMIN" {
+    if uploader != actor_id && user_role != "ADMIN" {
         return Err(AppError::new(StatusCode::FORBIDDEN, "only the uploader or an admin can delete an attachment"));
     }
     sqlx::query("DELETE FROM ticket_attachments WHERE id = $1")
@@ -396,20 +484,25 @@ async fn delete_attachment(
 }
 
 /// Stream a stored attachment (auth via Bearer header, not query param).
+/// TBE-06: scoped like every other ticket read — non-staff download only from
+/// tickets they can see.
 pub async fn download_attachment(
     State(state): State<AppState>,
-    Path(attachment_id): Path<Uuid>,
+    Extension(actor_id): Extension<Uuid>,
+    Extension(role): Extension<String>,
+    UuidPath(attachment_id): UuidPath<Uuid>,
 ) -> Result<Response, AppError> {
     let pool = &state.pool;
-    let row: Option<(String, String, Option<String>, i64,)> = sqlx::query_as::<_, (String, String, Option<String>, i64)>(
-        "SELECT file_name, storage_key, content_type, size_bytes FROM ticket_attachments WHERE id = $1",
+    let row: Option<(String, String, Option<String>, i64, Uuid,)> = sqlx::query_as::<_, (String, String, Option<String>, i64, Uuid)>(
+        "SELECT file_name, storage_key, content_type, size_bytes, ticket_id FROM ticket_attachments WHERE id = $1",
     )
     .bind(attachment_id)
     .fetch_optional(pool)
     .await?;
-    let Some((file_name, storage_key, content_type, size)) = row else {
+    let Some((file_name, storage_key, content_type, size, ticket_id)) = row else {
         return Err(AppError::not_found("attachment not found"));
     };
+    super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
     let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "/app/uploads".to_string());
     let abs = PathBuf::from(&dir).join(&storage_key);
     let bytes = tokio::fs::read(&abs).await.map_err(|_| {
@@ -444,19 +537,28 @@ pub async fn download_attachment(
 
 async fn ticket_timeline(
     State(state): State<AppState>,
-    Path(ticket_id): Path<Uuid>,
+    Extension(actor_id): Extension<Uuid>,
+    Extension(role): Extension<String>,
+    UuidPath(ticket_id): UuidPath<Uuid>,
+    Query(params): Query<ThreadListParams>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let pool = &state.pool;
+    super::tickets::ensure_ticket_visible(pool, ticket_id, actor_id, &role).await?;
     if ensure_ticket(pool, ticket_id).await?.is_none() {
         return Err(AppError::not_found("ticket not found"));
     }
+    // TBE-13: every section bounded + id-tiebroken (bulk/cron inserts can
+    // share a created_at, making created_at-only order nondeterministic).
+    let (limit, offset) = parse_thread_page(&params)?;
     let comments: Vec<TicketComment> = sqlx::query_as::<_, TicketComment>(
         "SELECT c.id, c.ticket_id, c.author_id, c.body, c.mentions, c.created_at, \
                 u.name AS author_name, u.role AS author_role \
          FROM ticket_comments c JOIN users u ON u.id = c.author_id \
-         WHERE c.ticket_id = $1 ORDER BY c.created_at ASC",
+         WHERE c.ticket_id = $1 ORDER BY c.created_at ASC, c.id ASC LIMIT $2 OFFSET $3",
     )
     .bind(ticket_id)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?;
     // who-changed-what: audit entries for this ticket (TICKET_* actions)
@@ -465,9 +567,11 @@ async fn ticket_timeline(
          FROM audit_logs al LEFT JOIN users u ON u.id = al.actor_id \
          WHERE al.target_type = 'ticket' AND al.target_id = $1 \
            AND (al.action LIKE 'TICKET_%' OR al.action = 'SLA_ESCALATE') \
-         ORDER BY al.created_at ASC",
+         ORDER BY al.created_at ASC, al.id ASC LIMIT $2 OFFSET $3",
     )
     .bind(ticket_id)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await?
     .into_iter()
@@ -490,9 +594,11 @@ async fn ticket_timeline(
             "SELECT a.id, a.ticket_id, a.uploader_id, a.file_name, a.content_type, a.size_bytes, a.storage_key, a.created_at, \
                     u.name AS uploader_name \
              FROM ticket_attachments a JOIN users u ON u.id = a.uploader_id \
-             WHERE a.ticket_id = $1 ORDER BY a.created_at ASC",
+             WHERE a.ticket_id = $1 ORDER BY a.created_at ASC, a.id ASC LIMIT $2 OFFSET $3",
         )
         .bind(ticket_id)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await?,
     })))
@@ -530,5 +636,26 @@ mod tests {
         assert_eq!(sanitize_content_type(Some("not a mime\ninjected: x")), "application/octet-stream");
         assert_eq!(sanitize_content_type(None), "application/octet-stream");
         assert_eq!(sanitize_content_type(Some("")), "application/octet-stream");
+    }
+
+    #[test]
+    fn thread_paging_defaults_caps_and_rejects_zero() {
+        let (l, o) = parse_thread_page(&ThreadListParams { limit: None, offset: None }).unwrap();
+        assert_eq!((l, o), (100, 0));
+        let (l, o) = parse_thread_page(&ThreadListParams { limit: Some(9999), offset: Some(-5) }).unwrap();
+        assert_eq!((l, o), (500, 0));
+        let err = parse_thread_page(&ThreadListParams { limit: Some(0), offset: None }).unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn closed_guard_blocks_mutations_but_allows_resolved() {
+        assert!(reject_when_closed("CLOSED").is_err());
+        assert_eq!(
+            reject_when_closed("CLOSED").unwrap_err().status,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert!(reject_when_closed("RESOLVED").is_ok());
+        assert!(reject_when_closed("OPEN").is_ok());
     }
 }

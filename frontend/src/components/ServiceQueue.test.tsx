@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ServiceQueue from './ServiceQueue';
-import { listTickets, patchTicketStatus } from '@/api/client';
+import { listTickets, patchTicketStatus, getSlaPolicy } from '@/api/client';
 import type { Ticket, TicketStatus } from '@/api/types';
 
 // RTL auto-cleanup needs globals (off in this repo), so clean up explicitly.
@@ -15,7 +15,7 @@ afterEach(() => {
 
 vi.mock('@/api/client', async (importOriginal) => {
   const mod = await importOriginal<typeof import('@/api/client')>();
-  return { ...mod, listTickets: vi.fn(), patchTicketStatus: vi.fn() };
+  return { ...mod, listTickets: vi.fn(), patchTicketStatus: vi.fn(), getSlaPolicy: vi.fn() };
 });
 
 // jsdom lacks Element.scrollIntoView (Select.toggle calls it on open).
@@ -73,13 +73,8 @@ const T3 = ticket({
 });
 
 beforeEach(() => {
-  // ServiceQueue fetches server-filtered: OPEN + IN_PROGRESS in parallel.
-  // T3 (RESOLVED) rides along to prove the client-side live-status filter.
-  vi.mocked(listTickets).mockImplementation((params?: { status?: string }) =>
-    Promise.resolve(
-      params?.status === 'IN_PROGRESS' ? { items: [T2], total: 1 } : { items: [T1, T3], total: 2 },
-    ),
-  );
+  vi.mocked(listTickets).mockResolvedValue({ items: [T1, T2, T3], total: 3 });
+  vi.mocked(getSlaPolicy).mockResolvedValue({});
   vi.mocked(patchTicketStatus).mockImplementation((id: string, status: string) =>
     Promise.resolve({ ...T1, id, status: status as TicketStatus }),
   );
@@ -100,18 +95,17 @@ function renderQueue() {
 }
 
 describe('ServiceQueue (task 9)', () => {
-  it('fetches server-filtered OPEN/IN_PROGRESS tickets and renders live rows with badges', async () => {
+  it('fetches live tickets server-side and renders rows with badges (TFE-02)', async () => {
+    // Server now filters to live statuses; the queue renders what it gets.
+    vi.mocked(listTickets).mockResolvedValue({ items: [T1, T2], total: 2 });
     renderQueue();
     const queue = await screen.findByTestId('service-queue');
     await within(queue).findByText('TKT-1048');
 
-    expect(listTickets).toHaveBeenCalledWith({ status: 'OPEN', limit: 25 });
-    expect(listTickets).toHaveBeenCalledWith({ status: 'IN_PROGRESS', limit: 25 });
+    expect(listTickets).toHaveBeenCalledWith({ status: 'OPEN,IN_PROGRESS', limit: 50 });
     expect(within(queue).getByText('TKT-1048')).toBeInTheDocument();
     expect(within(queue).getByText('PostgreSQL pool exhaustion on ITMS API')).toBeInTheDocument();
     expect(within(queue).getByText('TKT-1047')).toBeInTheDocument();
-    // Resolved tickets are filtered out of the live queue.
-    expect(within(queue).queryByText('TKT-1040')).not.toBeInTheDocument();
     // Badges per row.
     expect(within(queue).getByText('URGENT')).toBeInTheDocument();
     expect(within(queue).getByText('HIGH')).toBeInTheDocument();
@@ -174,7 +168,7 @@ describe('ServiceQueue (task 9)', () => {
 
     // App-native Select: open the trigger, then pick the portaled option.
     // T1 is OPEN → only IN_PROGRESS and CLOSED are legal transitions.
-    fireEvent.click(within(drawer).getByRole('button', { name: 'OPEN' }));
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
     expect(screen.queryByRole('option', { name: 'RESOLVED' })).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
 

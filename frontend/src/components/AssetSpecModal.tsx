@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CalendarDays, FileText, History, IndianRupee, MapPin, Pencil, User, Wrench, X } from 'lucide-react';
+import { ArrowRight, CalendarDays, FileText, History, IndianRupee, MapPin, Pencil, Plus, User, Wrench, X } from 'lucide-react';
 import { assignAsset, assetDocumentUrl, createClaim, getAssetLifecycle, getCachedUser, listAssetDocuments, listAssetMoves, listClaims, listLocations, listVendors, updateAsset } from '@/api/client';
 import type { Asset, AssetDocument, AssetMove, AssetStatus, LifecycleEvent, UpdateAssetInput, VendorClaim } from '@/api/types';
+import { ASSET_CATEGORIES } from '@/api/types';
 import { AssetStatusBadge } from '@/components/TicketBadge';
 import Select from '@/components/Select';
 import { Button } from '@/components/Button';
-import { formatDateOnly, inputCls, labelCls, pretty } from '@/lib/utils';
+import { cn, formatDateOnly, inputCls, labelCls, pretty } from '@/lib/utils';
 
 interface AssetSpecModalProps {
   asset: Asset | null;
@@ -37,6 +38,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
   const [userId, setUserId] = useState('');
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<UpdateAssetInput>({});
+  const [specRows, setSpecRows] = useState<Array<[string, string]>>([]);
   // Admin-only mutations (backend gated since PR #96) — hide the controls for other roles.
   const isAdmin = getCachedUser()?.role === 'ADMIN';
 
@@ -59,6 +61,7 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
       qc.invalidateQueries({ queryKey: ['lifecycle'] });
       setEditing(false);
       setForm({});
+      setSpecRows([]);
     },
   });
 
@@ -125,12 +128,18 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
       unit_cost: asset.unit_cost ?? undefined,
       expected_eol: asset.expected_eol,
     });
+    setSpecRows(
+      Object.entries(asset.specs ?? {}).map(([k, v]) => [
+        k,
+        typeof v === 'string' ? v : JSON.stringify(v ?? ''),
+      ]),
+    );
     setEditing(true);
   };
 
   return (
     <div className="fixed inset-0 z-[60]">
-      <div className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
       <div className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col glass-chrome">
         <div className="flex items-start justify-between border-b border-edge px-5 py-4">
           <div>
@@ -170,7 +179,12 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
               className="space-y-4"
               onSubmit={(ev) => {
                 ev.preventDefault();
-                save.mutate({ id: asset.id, input: form });
+                const specs: Record<string, string> = {};
+                for (const [k, v] of specRows) {
+                  const key = k.trim();
+                  if (key) specs[key] = v.trim();
+                }
+                save.mutate({ id: asset.id, input: { ...form, specs } });
               }}
             >
               <div>
@@ -184,10 +198,11 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Category</label>
-                  <input
-                    className={inputCls}
-                    value={form.category ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value.toUpperCase() }))}
+                  <Select
+                    className="w-full"
+                    value={form.category ?? asset.category}
+                    onChange={(v) => setForm((f) => ({ ...f, category: v }))}
+                    options={ASSET_CATEGORIES.map((c) => ({ value: c, label: c.replace('_', ' ') }))}
                   />
                 </div>
                 <div>
@@ -280,27 +295,68 @@ export default function AssetSpecModal({ asset, onClose }: AssetSpecModalProps) 
                   {save.error instanceof Error ? save.error.message : 'Update failed.'}
                 </p>
               )}
-              <div className="flex gap-2">
-                <Button
-                  type="submit"
-                  loading={save.isPending}
-                  variant="primary"
-                  size="lg"
-                  className="flex-1"
-                >
-                  Save changes
-                </Button>
+              <div>
+                <label className={labelCls}>Specifications</label>
+                <div className="space-y-2">
+                  {specRows.map(([k, v], i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        className={cn(inputCls, 'w-2/5')}
+                        placeholder="Key (e.g. processor)"
+                        value={k}
+                        onChange={(e) =>
+                          setSpecRows((rows) => rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))
+                        }
+                      />
+                      <input
+                        className={cn(inputCls, 'flex-1')}
+                        placeholder="Value (e.g. Intel i7-13700H)"
+                        value={v}
+                        onChange={(e) =>
+                          setSpecRows((rows) => rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))
+                        }
+                      />
+                      <Button
+                        type="button"
+                        aria-label={`Remove spec ${k || i + 1}`}
+                        onClick={() => setSpecRows((rows) => rows.filter((_, j) => j !== i))}
+                        variant="ghost"
+                        className="shrink-0 border border-edge p-2 hover:text-red-400"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    onClick={() => setSpecRows((rows) => [...rows, ['', '']])}
+                    variant="secondary"
+                    size="sm"
+                    className="border-dashed"
+                    leftIcon={<Plus className="h-3.5 w-3.5" />}
+                  >
+                    Add specification
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
                 <Button
                   type="button"
                   onClick={() => {
                     setEditing(false);
                     setForm({});
+                    setSpecRows([]);
                   }}
                   variant="secondary"
-                  size="lg"
-                  className="border-edge"
                 >
                   Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={save.isPending}
+                  variant="primary"
+                >
+                  Save changes
                 </Button>
               </div>
             </form>

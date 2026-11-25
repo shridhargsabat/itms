@@ -182,6 +182,7 @@ export interface UpdateAssetInput {
   category?: string;
   serial_number?: string;
   status?: string;
+  specs?: Record<string, unknown>;
   purchase_date?: string | null;
   warranty_expiry?: string | null;
   unit_cost?: number | null;
@@ -266,6 +267,8 @@ export interface CreateAssetInput {
   specs?: Record<string, unknown>;
   purchase_date?: string;
   warranty_expiry?: string;
+  unit_cost?: number;
+  expected_eol?: string;
   vendor_id?: string | null;
   location_id?: string | null;
 }
@@ -313,6 +316,10 @@ export interface CreateTicketInput {
 }
 
 export interface UpdateTicketInput {
+  // C1: PATCH accepts title/description/ticket_type (staff details edit, TFE-29).
+  title?: string;
+  description?: string;
+  ticket_type?: string;
   priority?: Priority;
   assignee_id?: string | null;
   asset_id?: string | null;

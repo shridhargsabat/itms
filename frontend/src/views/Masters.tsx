@@ -14,6 +14,7 @@ import { AssetStatusBadge } from '@/components/TicketBadge';
 import ScrollX from '@/components/ScrollX';
 import { Button } from '@/components/Button';
 import Select from '@/components/Select';
+import { FieldError, errProps } from '@/components/FieldError';
 import { getCachedUser } from '@/api/client';
 import {
   createMasterOption,
@@ -56,6 +57,8 @@ const TABS: { id: MasterFamily | 'users' | 'templates' | 'vendors' | 'locations'
 ];
 
 const ROLES = ['ADMIN', 'AGENT', 'EMPLOYEE'];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ROLE_STYLE: Record<string, string> = {
   ADMIN: 'bg-accent/10 text-accent border-accent/30',
@@ -134,6 +137,7 @@ function UsersTab() {
   const [editing, setEditing] = useState<UserRecord | null>(null);
   const [form, setForm] = useState({ name: '', email: '', role: 'EMPLOYEE', department: 'IT', password: '' });
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string }>({});
   const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
 
   const search = params.get('search') ?? '';
@@ -176,12 +180,14 @@ function UsersTab() {
     setEditing(null);
     setForm({ name: '', email: '', role: 'EMPLOYEE', department: departments[0]?.code ?? 'IT', password: '' });
     setFormError(null);
+    setFieldErrors({});
     setFormOpen(true);
   };
   const openEdit = (u: UserRecord) => {
     setEditing(u);
     setForm({ name: u.name, email: u.email, role: u.role, department: u.department, password: '' });
     setFormError(null);
+    setFieldErrors({});
     setFormOpen(true);
   };
 
@@ -347,9 +353,26 @@ function UsersTab() {
         <Modal title={editing ? 'Edit User' : 'New User'} onClose={() => setFormOpen(false)}>
           <form
             className="space-y-4"
+            noValidate
             onSubmit={(e) => {
               e.preventDefault();
               setFormError(null);
+              const errs: { name?: string; email?: string; password?: string } = {};
+              if (!form.name.trim()) errs.name = 'Full name is required';
+              if (!form.email.trim()) errs.email = 'Email is required';
+              else if (!EMAIL_RE.test(form.email.trim())) errs.email = 'Enter a valid email address';
+              if (!editing) {
+                if (!form.password) errs.password = 'Password is required';
+                else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters';
+              } else if (form.password && form.password.length < 8) {
+                errs.password = 'Password must be at least 8 characters';
+              }
+              setFieldErrors(errs);
+              const firstInvalid = (['name', 'email', 'password'] as const).find((k) => errs[k]);
+              if (firstInvalid) {
+                document.getElementById(`user-${firstInvalid}`)?.focus();
+                return;
+              }
               mutation.mutate({
                 id: editing?.id,
                 body: editing
@@ -366,12 +389,35 @@ function UsersTab() {
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className={labelCls} htmlFor="user-name">Full name</label>
-                <input id="user-name" className={inputCls} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <label className={labelCls} htmlFor="user-name">Full name<span aria-hidden="true" className="text-red-400"> *</span></label>
+                <input
+                  id="user-name"
+                  className={inputCls}
+                  aria-required="true"
+                  value={form.name}
+                  onChange={(e) => {
+                    setForm({ ...form, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: undefined }));
+                  }}
+                  {...errProps('user-name', fieldErrors.name)}
+                />
+                <FieldError id="user-name-error" error={fieldErrors.name} />
               </div>
               <div>
-                <label className={labelCls} htmlFor="user-email">Email</label>
-                <input id="user-email" className={inputCls} required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <label className={labelCls} htmlFor="user-email">Email<span aria-hidden="true" className="text-red-400"> *</span></label>
+                <input
+                  id="user-email"
+                  className={inputCls}
+                  type="email"
+                  aria-required="true"
+                  value={form.email}
+                  onChange={(e) => {
+                    setForm({ ...form, email: e.target.value });
+                    if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: undefined }));
+                  }}
+                  {...errProps('user-email', fieldErrors.email)}
+                />
+                <FieldError id="user-email-error" error={fieldErrors.email} />
               </div>
               <div>
                 <label className={labelCls}>Role</label>
@@ -388,17 +434,24 @@ function UsersTab() {
               </div>
             </div>
             <div>
-              <label className={labelCls} htmlFor="user-password">{editing ? 'New password (leave blank to keep)' : 'Password'}</label>
+              <label className={labelCls} htmlFor="user-password">
+                {editing ? 'New password (leave blank to keep)' : 'Password'}
+                {!editing && <span aria-hidden="true" className="text-red-400"> *</span>}
+              </label>
               <input
                 id="user-password"
                 className={inputCls}
                 type="password"
-                minLength={editing ? undefined : 8}
-                required={!editing}
-                placeholder={editing ? '••••••••' : 'At least 8 characters'}
+                aria-required={!editing}
+                placeholder={editing ? 'Leave blank to keep current password' : 'At least 8 characters'}
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, password: e.target.value });
+                  if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: undefined }));
+                }}
+                {...errProps('user-password', fieldErrors.password)}
               />
+              <FieldError id="user-password-error" error={fieldErrors.password} />
             </div>
             {formError && <p className="text-xs text-red-400">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
@@ -424,6 +477,14 @@ function UsersTab() {
 // ---------------------------------------------------------------------------
 // Lookup family tab (departments, categories, types, priorities, statuses)
 // ---------------------------------------------------------------------------
+
+const NEW_LABEL_PLACEHOLDERS: Record<MasterFamily, string> = {
+  department: 'e.g. Finance',
+  asset_category: 'e.g. Monitor',
+  ticket_type: 'e.g. Access Request',
+  ticket_priority: 'e.g. Blocker',
+  ticket_status: 'e.g. Pending Vendor',
+};
 
 function LookupTab({ family, options, loading }: { family: MasterFamily; options: LookupOption[]; loading: boolean }) {
   const qc = useQueryClient();
@@ -570,7 +631,7 @@ function LookupTab({ family, options, loading }: { family: MasterFamily; options
       <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-edge p-3">
         <div>
           <label className={labelCls}>New label</label>
-          <input className={cn(inputCls, 'w-48')} placeholder="e.g. Blocker" value={newRow.label} onChange={(e) => setNewRow({ ...newRow, label: e.target.value })} />
+          <input className={cn(inputCls, 'w-48')} placeholder={NEW_LABEL_PLACEHOLDERS[family]} value={newRow.label} onChange={(e) => setNewRow({ ...newRow, label: e.target.value })} />
         </div>
         <div>
           <label className={labelCls}>Code</label>
@@ -737,6 +798,7 @@ function VendorsTab() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState<VendorInput>({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; contact_email?: string }>({});
 
   const save = useMutation({
     mutationFn: (v: { id?: string; input: VendorInput }) =>
@@ -768,6 +830,7 @@ function VendorsTab() {
     setEditing(v);
     setForm({ name: v.name, contact_name: v.contact_name ?? '', contact_email: v.contact_email ?? '', contact_phone: v.contact_phone ?? '', support_link: v.support_link ?? '', amc_expiry: v.amc_expiry ?? '' });
     setError('');
+    setFieldErrors({});
     setOpen(true);
   };
 
@@ -775,7 +838,7 @@ function VendorsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted">Vendor records + AMC dates — asset detail shows the vendor and its claim/repair log</p>
-        <Button onClick={() => { setEditing(null); setForm({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' }); setError(''); setOpen(true); }}
+        <Button onClick={() => { setEditing(null); setForm({ name: '', contact_name: '', contact_email: '', contact_phone: '', support_link: '', amc_expiry: '' }); setError(''); setFieldErrors({}); setOpen(true); }}
           variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />}>
           Add vendor
         </Button>
@@ -815,10 +878,42 @@ function VendorsTab() {
 
       {open && (
         <Modal title={editing ? 'Edit vendor' : 'Add vendor'} onClose={() => setOpen(false)}>
-          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(editing ? { id: editing.id, input: form } : { input: form }); }}>
+          <form
+            className="space-y-3"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              setError('');
+              const errs: { name?: string; contact_email?: string } = {};
+              if (!form.name.trim()) errs.name = 'Name is required';
+              const contactEmail = (form.contact_email ?? '').trim();
+              if (contactEmail && !EMAIL_RE.test(contactEmail)) errs.contact_email = 'Enter a valid email address';
+              setFieldErrors(errs);
+              if (errs.name) {
+                document.getElementById('vendor-name')?.focus();
+                return;
+              }
+              if (errs.contact_email) {
+                document.getElementById('vendor-contact-email')?.focus();
+                return;
+              }
+              save.mutate(editing ? { id: editing.id, input: form } : { input: form });
+            }}
+          >
             <div>
-              <label className={labelCls}>Name *</label>
-              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
+              <label className={labelCls} htmlFor="vendor-name">Name<span aria-hidden="true" className="text-red-400"> *</span></label>
+              <input
+                id="vendor-name"
+                aria-required="true"
+                value={form.name}
+                onChange={(e) => {
+                  setForm({ ...form, name: e.target.value });
+                  if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: undefined }));
+                }}
+                className={inputCls}
+                {...errProps('vendor-name', fieldErrors.name)}
+              />
+              <FieldError id="vendor-name-error" error={fieldErrors.name} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -826,8 +921,19 @@ function VendorsTab() {
                 <input value={form.contact_name ?? ''} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Contact email</label>
-                <input type="email" value={form.contact_email ?? ''} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} className={inputCls} />
+                <label className={labelCls} htmlFor="vendor-contact-email">Contact email</label>
+                <input
+                  id="vendor-contact-email"
+                  type="email"
+                  value={form.contact_email ?? ''}
+                  onChange={(e) => {
+                    setForm({ ...form, contact_email: e.target.value });
+                    if (fieldErrors.contact_email) setFieldErrors((p) => ({ ...p, contact_email: undefined }));
+                  }}
+                  className={inputCls}
+                  {...errProps('vendor-contact-email', fieldErrors.contact_email)}
+                />
+                <FieldError id="vendor-contact-email-error" error={fieldErrors.contact_email} />
               </div>
               <div>
                 <label className={labelCls}>Contact phone</label>
@@ -1033,11 +1139,14 @@ function LocationsTab() {
                 <td className={cn(TABLE_SPEC.td, 'text-right tabular-nums text-secondary')}>{l.asset_count}</td>
                 <td className={cn(TABLE_SPEC.td, 'text-right')}>
                   <Button
+                    type="button"
                     onClick={() => { setEditing(l); setForm({ site: l.site, building: l.building, floor: l.floor, room: l.room }); setError(''); setOpen(true); }}
-                    variant="text"
-                    className="text-xs"
+                    aria-label={`Edit ${fmtLocation(l) || 'location'}`}
+                    title="Edit"
+                    variant="ghost"
+                    size="icon"
                   >
-                    Edit
+                    <Pencil className="h-4 w-4" />
                   </Button>
                   <DeleteButton onConfirm={() => remove.mutate(l.id)} label={fmtLocation(l)} />
                 </td>

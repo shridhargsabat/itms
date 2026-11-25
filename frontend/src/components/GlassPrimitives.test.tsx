@@ -30,7 +30,7 @@ describe('Task 6 glass primitives: pills, modal, frosted rows', () => {
     expect(chip.className).toContain('px-2.5');
   });
 
-  it('Modal panel carries liquid-glass-panel with 26px radii; scrim keeps backdrop-blur-sm', () => {
+  it('Modal panel carries liquid-glass-panel with 26px radii; scrim keeps backdrop-blur-md (FORM-01)', () => {
     const { container } = render(
       <Modal title="Glass Modal" onClose={() => {}}>
         <p>Body</p>
@@ -41,8 +41,9 @@ describe('Task 6 glass primitives: pills, modal, frosted rows', () => {
     expect(panel).not.toBeNull();
     expect(panel?.getAttribute('class')).toContain('sm:rounded-[26px]');
     expect(panel?.getAttribute('class')).toContain('rounded-t-[26px]');
-    const scrim = document.body.querySelector('.backdrop-blur-sm');
+    const scrim = document.body.querySelector('.backdrop-blur-md');
     expect(scrim).not.toBeNull();
+    expect(scrim?.getAttribute('class')).toContain('bg-black/70');
   });
 
   it('DataTable clickable rows carry a single token hover class', () => {

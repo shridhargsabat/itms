@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { forgotPassword, resetPassword } from '@/api/client';
 import { inputCls, labelCls } from '@/lib/utils';
 import { Button } from '@/components/Button';
+import AnimatedBackground from '@/components/AnimatedBackground';
 
 // P1-6: two public pages in one component.
 //  - /forgot-password: request a reset link (always "check your inbox")
@@ -17,6 +18,18 @@ export default function PasswordFlow() {
   return <ForgotForm onDone={() => setDone(true)} done={done} />;
 }
 
+/** Login-style backdrop mirroring LegacyLogin (bg-base + AnimatedBackground). */
+function AuthShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-base px-4">
+      <AnimatedBackground />
+      <div className="relative w-full max-w-md">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
   const [email, setEmail] = useState('');
   const mutation = useMutation({
@@ -26,7 +39,7 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
 
   if (done) {
     return (
-      <div className="mx-auto mt-24 w-full max-w-md px-4">
+      <AuthShell>
         <div className="rounded-2xl glass-card p-6 text-center">
           <p className="text-lg font-semibold text-primary">Check your notifications</p>
           <p className="mt-2 text-sm text-muted">
@@ -34,14 +47,14 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
             reset link is now in your in-app notifications (and will be emailed once SMTP is
             configured).
           </p>
-          <Link to="/login" className={`mt-6 ${'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 active:scale-[0.97] disabled:opacity-60'}`}>Back to sign in</Link>
+          <Link to="/login" className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent text-sm font-semibold text-on-accent transition-all hover:bg-accent/90 active:scale-[0.97] disabled:opacity-60">Back to sign in</Link>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="mx-auto mt-24 w-full max-w-md px-4">
+    <AuthShell>
       <div className="rounded-2xl glass-card p-6">
         <h1 className="text-xl font-bold text-primary">Reset your password</h1>
         <p className="mt-1 text-sm text-muted">
@@ -55,10 +68,11 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
           }}
         >
           <label className={labelCls}>
-            Email
+            Email *
             <input
               type="email"
               required
+              aria-required="true"
               className={inputCls}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -75,7 +89,7 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
           ← Back to sign in
         </Link>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
@@ -103,17 +117,17 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
 
   if (done) {
     return (
-      <div className="mx-auto mt-24 w-full max-w-md px-4">
+      <AuthShell>
         <div className="rounded-2xl glass-card p-6 text-center">
           <p className="text-lg font-semibold text-primary">Password updated 🎉</p>
           <p className="mt-2 text-sm text-muted">Signing you in shortly…</p>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="mx-auto mt-24 w-full max-w-md px-4">
+    <AuthShell>
       <div className="rounded-2xl glass-card p-6">
         <h1 className="text-xl font-bold text-primary">Set a new password</h1>
         <p className="mt-1 text-sm text-muted">At least 8 characters. Link valid 30 minutes.</p>
@@ -141,6 +155,6 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
           <Button type="submit" loading={mutation.isPending} variant="primary" size="lg" fullWidth>Update password</Button>
         </form>
       </div>
-    </div>
+    </AuthShell>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, FileUp } from 'lucide-react';
 import { createAsset, listVendors, listLocations } from '@/api/client';
@@ -17,11 +17,17 @@ import InvoiceAssetUpload from '@/components/InvoiceAssetUpload';
  * Single source of truth — a user sees the identical dialog + behavior
  * regardless of which page they add the asset from.
  */
-export default function AddAssetForm({ onDone }: { onDone: () => void }) {
+export default function AddAssetForm({
+  onDone,
+  defaultTab = 'manual',
+}: {
+  onDone: () => void;
+  defaultTab?: 'manual' | 'invoice';
+}) {
   const qc = useQueryClient();
   // manual (default) keeps the original form byte-for-byte; invoice
   // swaps in the PDF line-item upload flow.
-  const [mode, setMode] = useState<'manual' | 'invoice'>('manual');
+  const [mode, setMode] = useState<'manual' | 'invoice'>(defaultTab);
   const [form, setForm] = useState<CreateAssetInput>({
     name: '',
     asset_tag: '',
@@ -32,8 +38,19 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
   const [specRows, setSpecRows] = useState<Array<[string, string]>>([]);
   const [purchaseDate, setPurchaseDate] = useState('');
   const [warrantyExpiry, setWarrantyExpiry] = useState('');
+  const [unitCost, setUnitCost] = useState('');
+  const [expectedEol, setExpectedEol] = useState('');
   const [locationId, setLocationId] = useState('');
   const [vendorId, setVendorId] = useState('');
+  const manualTabRef = useRef<HTMLButtonElement>(null);
+  const invoiceTabRef = useRef<HTMLButtonElement>(null);
+  const onTabKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next = e.key === 'ArrowRight' ? 'invoice' : 'manual';
+    setMode(next);
+    (next === 'manual' ? manualTabRef : invoiceTabRef).current?.focus();
+  };
 
   const locationsQ = useQuery({ queryKey: ['locations'], queryFn: () => listLocations() });
   const vendorsQ = useQuery({ queryKey: ['vendors'], queryFn: () => listVendors() });
@@ -49,6 +66,8 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
         ...form,
         purchase_date: purchaseDate || undefined,
         warranty_expiry: warrantyExpiry || undefined,
+        unit_cost: unitCost === '' ? undefined : Number(unitCost),
+        expected_eol: expectedEol || undefined,
         specs: Object.keys(specs).length ? specs : undefined,
         location_id: locationId || null,
         vendor_id: vendorId || null,
@@ -68,10 +87,14 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
     <div className="space-y-4">
       {/* segmented mode toggle — the manual form below stays exactly
           as it was whenever 'manual' mode is active. */}
-      <div className="grid grid-cols-2 gap-1 rounded-lg glass-dense p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-lg glass-dense p-1" role="tablist" aria-label="Add asset mode">
         <button
           type="button"
+          ref={manualTabRef}
+          role="tab"
+          aria-selected={mode === 'manual'}
           onClick={() => setMode('manual')}
+          onKeyDown={onTabKeyDown}
           className={cn(
             'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
             mode === 'manual'
@@ -83,7 +106,11 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
         </button>
         <button
           type="button"
+          ref={invoiceTabRef}
+          role="tab"
+          aria-selected={mode === 'invoice'}
           onClick={() => setMode('invoice')}
+          onKeyDown={onTabKeyDown}
           className={cn(
             'flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
             mode === 'invoice'
@@ -178,6 +205,31 @@ export default function AddAssetForm({ onDone }: { onDone: () => void }) {
             className={inputCls}
             value={warrantyExpiry}
             onChange={(e) => setWarrantyExpiry(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className={labelCls} htmlFor="asset-unit-cost">Unit Cost (₹)</label>
+          <input
+            id="asset-unit-cost"
+            type="number"
+            min="0"
+            step="0.01"
+            className={inputCls}
+            value={unitCost}
+            onChange={(e) => setUnitCost(e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+        <div>
+          <label className={labelCls} htmlFor="asset-expected-eol">Expected EOL</label>
+          <input
+            id="asset-expected-eol"
+            type="date"
+            className={inputCls}
+            value={expectedEol}
+            onChange={(e) => setExpectedEol(e.target.value)}
           />
         </div>
       </div>
