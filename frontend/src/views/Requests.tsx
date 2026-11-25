@@ -22,6 +22,7 @@ import PageHeader from '@/components/PageHeader';
 import PaginationFooter from '@/components/PaginationFooter';
 import Select from '@/components/Select';
 import { Button } from '@/components/Button';
+import { FieldError, errProps } from '@/components/FieldError';
 import { getCachedUser } from '@/api/client';
 import {
   approveRequest,
@@ -350,6 +351,8 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [subjectDirty, setSubjectDirty] = useState(false);
   const [priority, setPriority] = useState<RequestPriority>('MEDIUM');
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // FORM-02: submit-time inline errors keyed by 'catalog' | 'subject' | `field:${key}`.
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: getCatalog, staleTime: 60_000 });
   const masters = useQuery({ queryKey: ['masters'], queryFn: getMasters, staleTime: 30_000 });
@@ -368,13 +371,17 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
     onSuccess: onCreated,
   });
 
-  const missingRequired = useMemo(() => {
-    if (!item) return false;
-    return item.form_fields.some((f) => f.required && !(answers[f.key] || '').trim());
-  }, [item, answers]);
+  const clearError = (key: string) =>
+    setErrors((e) => {
+      if (!(key in e)) return e;
+      const next = { ...e };
+      delete next[key];
+      return next;
+    });
 
   const pickItem = (id: string) => {
     setCatalogId(id);
+    setErrors({});
     const it = items.find((i) => i.id === id);
     if (it) {
       setAnswers(Object.fromEntries(it.form_fields.map((f) => [f.key, ''])));
@@ -384,8 +391,43 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
     }
   };
 
+  // FORM-02: submit-time inline validation replaces disabled-button-only
+  // gating — an empty/invalid submit shows FieldErrors and focuses the
+  // first invalid field, never silent.
+  const submit = () => {
+    const e: Record<string, string> = {};
+    if (!catalogId) e.catalog = 'Request type is required';
+    if (item) {
+      if (!subject.trim()) e.subject = 'Subject is required';
+      for (const f of item.form_fields) {
+        if (f.required && !(answers[f.key] || '').trim()) {
+          e[`field:${f.key}`] = `${f.label} is required`;
+        }
+      }
+    }
+    setErrors(e);
+    const order: [string, string][] = [
+      ['catalog', 'req-catalog'],
+      ['subject', 'req-subject'],
+      ...(item?.form_fields.map((f): [string, string] => [`field:${f.key}`, `req-field-${f.key}`]) ?? []),
+    ];
+    for (const [key, id] of order) {
+      if (e[key]) {
+        document.getElementById(id)?.focus();
+        return;
+      }
+    }
+    create.mutate();
+  };
+
+  const setAnswer = (key: string, v: string) => {
+    setAnswers((a) => ({ ...a, [key]: v }));
+    clearError(`field:${key}`);
+  };
+
   const fieldInput = (f: CatalogFormField) => {
     const fieldId = `req-field-${f.key}`;
+    const error = errors[`field:${f.key}`];
     // FORM-06: the `department` key (migration 0007 NEW_LAPTOP seed) renders
     // a Masters-backed Select instead of free text.
     if (f.key === 'department') {
@@ -393,7 +435,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
         <Select
           id={fieldId}
           value={answers[f.key] ?? ''}
-          onChange={(v) => setAnswers((a) => ({ ...a, [f.key]: v }))}
+          onChange={(v) => setAnswer(f.key, v)}
           options={
             departments.length > 0
               ? departments.map((d) => ({ value: d.code, label: d.label }))
@@ -409,7 +451,9 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
           id={fieldId}
           className={cn(inputCls, 'min-h-[72px]')}
           value={answers[f.key] ?? ''}
-          onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
+          aria-required={f.required || undefined}
+          {...errProps(fieldId, error)}
+          onChange={(e) => setAnswer(f.key, e.target.value)}
         />
       );
     }
@@ -418,7 +462,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
         <Select
           id={fieldId}
           value={answers[f.key] ?? ''}
-          onChange={(v) => setAnswers((a) => ({ ...a, [f.key]: v }))}
+          onChange={(v) => setAnswer(f.key, v)}
           options={(f.options ?? []).map((o) => ({ value: o, label: o }))}
           placeholder={f.required ? 'Select…' : 'Optional'}
         />
@@ -431,7 +475,9 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
           type="date"
           className={inputCls}
           value={answers[f.key] ?? ''}
-          onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
+          aria-required={f.required || undefined}
+          {...errProps(fieldId, error)}
+          onChange={(e) => setAnswer(f.key, e.target.value)}
         />
       );
     }
@@ -440,7 +486,9 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
         id={fieldId}
         className={inputCls}
         value={answers[f.key] ?? ''}
-        onChange={(e) => setAnswers((a) => ({ ...a, [f.key]: e.target.value }))}
+        aria-required={f.required || undefined}
+        {...errProps(fieldId, error)}
+        onChange={(e) => setAnswer(f.key, e.target.value)}
         placeholder={f.label}
       />
     );
@@ -460,6 +508,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
             options={items.map((i) => ({ value: i.id, label: `${i.name}${i.approval_required ? ' · needs approval' : ''}` }))}
             placeholder="Choose a request type…"
           />
+          <FieldError id="req-catalog-error" error={errors.catalog} />
         </label>
 
         {item && (
@@ -482,12 +531,15 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
                 className={inputCls}
                 value={subject}
                 aria-required="true"
+                {...errProps('req-subject', errors.subject)}
                 onChange={(e) => {
                   setSubject(e.target.value);
                   setSubjectDirty(true);
+                  clearError('subject');
                 }}
                 placeholder="Short summary"
               />
+              <FieldError id="req-subject-error" error={errors.subject} />
             </label>
 
             {item.form_fields.map((f) => (
@@ -496,6 +548,7 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
                   {f.label} {f.required && <span className="text-red-400">*</span>}
                 </span>
                 {fieldInput(f)}
+                <FieldError id={`req-field-${f.key}-error`} error={errors[`field:${f.key}`]} />
               </label>
             ))}
 
@@ -511,12 +564,12 @@ function CreateRequestModal({ onClose, onCreated }: { onClose: () => void; onCre
           </>
         )}
 
-        {create.isError && <p className="text-xs text-red-400">Failed to submit. Please try again.</p>}
+        {create.isError && <p role="alert" className="text-xs text-red-400">Failed to submit. Please try again.</p>}
         <div className="sticky bottom-0 -mx-5 -mb-4 flex justify-end gap-2 border-t border-edge bg-surface px-5 py-3">
           <Button onClick={onClose} variant="secondary">Cancel</Button>
           <Button
-            onClick={() => create.mutate()}
-            disabled={!catalogId || !subject.trim() || missingRequired}
+            onClick={submit}
+            disabled={create.isPending}
             loading={create.isPending}
             variant="primary"
           >

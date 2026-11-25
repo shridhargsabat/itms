@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -58,6 +58,10 @@ import { useServerPagination } from '@/lib/usePagination';
 const SLA_HOURS: Record<string, number> = { URGENT: 4, HIGH: 8, MEDIUM: 24, LOW: 72 };
 
 const KANBAN_LIMIT = 200;
+
+// TFE-32: focusable selector for the drawer trap (mirrors Modal.tsx).
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // Mirrors backend MAX_ATTACHMENT_BYTES (10 MB) and ALLOWED_CONTENT_TYPES
 // (comments.rs) as picker extensions (TFE-25).
@@ -179,6 +183,47 @@ export default function Tickets() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selected]);
 
+  // TFE-32: drawer focus trap + return focus (mirrors Modal.tsx). The listbox
+  // guard lets an open Select/Canned menu own keyboard handling.
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerOpen = selected !== null;
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const container = drawerRef.current;
+    if (!container) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!document.querySelector('[role="listbox"]')) {
+      const first = container.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (first ?? container.querySelector<HTMLElement>('[role="dialog"]'))?.focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      if (document.querySelector('[role="listbox"]')) return;
+      const scope = drawerRef.current;
+      if (!scope) return;
+      const items = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !scope.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !scope.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      previouslyFocused?.focus();
+    };
+  }, [drawerOpen]);
+
   // any filter change or view switch resets to page 1
   useEffect(() => {
     reset();
@@ -210,7 +255,46 @@ export default function Tickets() {
 
   const editTicket = useMutation({
     mutationFn: (input: UpdateTicketInput) => updateTicket(selected!.id, input),
-    onSuccess: () => {
+    // TFE-26: optimistic priority/assignee — apply immediately, roll back on
+    // failure (the FieldError below surfaces the error).
+    onMutate: async (input) => {
+      if (!selected) return undefined;
+      const ticketId = selected.id;
+      await qc.cancelQueries({ queryKey: ['tickets'] });
+      await qc.cancelQueries({ queryKey: ['ticket', ticketId] });
+      const prevLists = qc.getQueriesData<{ items: Ticket[]; total: number }>({ queryKey: ['tickets'] });
+      const prevSingle = qc.getQueryData<Ticket>(['ticket', ticketId]);
+      const optimisticAssignee =
+        input.assignee_id === undefined
+          ? undefined
+          : {
+              assignee_id: input.assignee_id,
+              assignee_name:
+                input.assignee_id === null
+                  ? null
+                  : (users.data?.items.find((u) => u.id === input.assignee_id)?.name ?? selected.assignee_name),
+            };
+      const apply = (t: Ticket): Ticket =>
+        t.id !== ticketId
+          ? t
+          : {
+              ...t,
+              ...(input.priority !== undefined ? { priority: input.priority } : {}),
+              ...(optimisticAssignee ?? {}),
+            };
+      qc.setQueriesData<{ items: Ticket[]; total: number }>({ queryKey: ['tickets'] }, (old) =>
+        old ? { ...old, items: old.items.map(apply) } : old,
+      );
+      qc.setQueryData<Ticket>(['ticket', ticketId], (old) => (old ? apply(old) : old));
+      return { ticketId, prevLists, prevSingle };
+    },
+    onError: (_err, _input, context) => {
+      context?.prevLists.forEach(([key, data]) => qc.setQueryData(key, data));
+      if (context && context.prevSingle !== undefined) {
+        qc.setQueryData(['ticket', context.ticketId], context.prevSingle);
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['tickets'] });
       if (selected) {
         qc.invalidateQueries({ queryKey: ['ticket', selected.id] });
@@ -583,7 +667,7 @@ export default function Tickets() {
 
         {selected &&
           createPortal(
-            <div className="fixed inset-0 z-[70]">
+            <div ref={drawerRef} className="fixed inset-0 z-[70]">
             <div
               aria-hidden="true"
               className="animate-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -593,6 +677,7 @@ export default function Tickets() {
               role="dialog"
               aria-modal="true"
               aria-label={`Ticket ${selected.ticket_number}`}
+              tabIndex={-1}
               className="animate-slide-in-right absolute inset-y-0 right-0 flex w-full max-w-md flex-col liquid-glass-panel modal-panel"
             >
               <div className="flex items-start justify-between border-b border-edge px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
@@ -1177,14 +1262,21 @@ function ConvertButton({ ticket }: { ticket: Ticket }) {
 function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
   const user = getCachedUser();
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const canned = useQuery({ queryKey: ['kb-canned'], queryFn: () => listCanned(), enabled: user?.role !== 'EMPLOYEE' });
-  // TFE-21: dismiss on outside-click / Escape. Capture-phase + preventDefault so
-  // the drawer's own Escape handler (which yields on defaultPrevented) stays shut.
+  // TFE-21: dismiss on outside-mousedown (trigger OR portaled menu) / Escape.
+  // Capture-phase + preventDefault so the drawer's own Escape handler (which
+  // yields on defaultPrevented, and on [role="listbox"]) stays shut. Scroll /
+  // resize closes: the menu is fixed, it must not float detached from the
+  // trigger while the drawer scrolls underneath.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -1193,13 +1285,32 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
         setOpen(false);
       }
     };
+    const onScroll = () => setOpen(false);
     document.addEventListener('mousedown', onDown);
     window.addEventListener('keydown', onKey, true);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
     return () => {
       document.removeEventListener('mousedown', onDown);
       window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
     };
   }, [open ]);
+  // TFE-21: measure + place synchronously after commit (Select pattern) so the
+  // fixed menu lands exactly above the trigger before paint. role="listbox"
+  // lets it share the drawer/Modal Escape + focus-trap guards with Select.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const menuW = Math.min(320, window.innerWidth - 40);
+    setPos({
+      left: Math.max(8, Math.min(r.left, window.innerWidth - menuW - 8)),
+      bottom: Math.max(8, window.innerHeight - r.top + 4),
+    });
+  }, [open]);
   if (user?.role === 'EMPLOYEE') return null;
   if (!canned.data?.length) return null;
   return (
@@ -1214,21 +1325,31 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
       >
         Canned response
       </Button>
-      {open && (
-        <div className="absolute bottom-full left-0 z-20 mb-1 max-h-56 w-80 max-w-[calc(100dvw-2.5rem)] overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl">
-          {canned.data.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => { onPick(c.body); setOpen(false); }}
-              className="block w-full rounded-lg px-2.5 py-2 text-left hover:bg-elevated"
-            >
-              <span className="block text-xs font-semibold text-primary">{c.title}</span>
-              <span className="block truncate text-[11px] text-muted">{c.body}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="listbox"
+            aria-label="Canned responses"
+            style={{ position: 'fixed', left: pos?.left ?? 0, bottom: pos?.bottom ?? 0 }}
+            className="z-[70] max-h-56 w-80 max-w-[calc(100dvw-2.5rem)] overflow-y-auto rounded-xl glass-chrome p-1 shadow-xl"
+          >
+            {canned.data.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="option"
+                aria-selected={false}
+                onClick={() => { onPick(c.body); setOpen(false); }}
+                className="block w-full rounded-lg px-2.5 py-2 text-left hover:bg-elevated"
+              >
+                <span className="block text-xs font-semibold text-primary">{c.title}</span>
+                <span className="block truncate text-[11px] text-muted">{c.body}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

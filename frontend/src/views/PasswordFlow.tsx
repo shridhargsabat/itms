@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { forgotPassword, resetPassword } from '@/api/client';
 import { inputCls, labelCls } from '@/lib/utils';
 import { Button } from '@/components/Button';
+import { FieldError, errProps } from '@/components/FieldError';
 import AnimatedBackground from '@/components/AnimatedBackground';
 
 // P1-6: two public pages in one component.
@@ -32,6 +33,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 
 function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
   const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
   const mutation = useMutation({
     mutationFn: (e: string) => forgotPassword(e),
     onSuccess: onDone,
@@ -62,27 +64,46 @@ function ForgotForm({ onDone, done }: { onDone: () => void; done: boolean }) {
         </p>
         <form
           className="mt-6 space-y-4"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            if (email.trim()) mutation.mutate(email.trim());
+            // FORM-02: submit-time inline validation — never a silent no-op.
+            const v = email.trim();
+            if (!v) {
+              setError('Email is required');
+              document.getElementById('forgot-email')?.focus();
+              return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+              setError('Enter a valid email address');
+              document.getElementById('forgot-email')?.focus();
+              return;
+            }
+            setError('');
+            mutation.mutate(v);
           }}
         >
-          <label className={labelCls}>
-            Email *
+          <label className={labelCls} htmlFor="forgot-email">
+            Email <span aria-hidden="true">*</span>
             <input
+              id="forgot-email"
               type="email"
-              required
               aria-required="true"
+              {...errProps('forgot-email', error)}
               className={inputCls}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError('');
+              }}
               placeholder="you@company.com"
               autoFocus
             />
+            <FieldError id="forgot-email-error" error={error} />
           </label>
           <Button type="submit" loading={mutation.isPending} variant="primary" size="lg" fullWidth>Send reset link</Button>
           {mutation.isError && (
-            <p className="text-sm text-red-500">Something went wrong — please try again.</p>
+            <p role="alert" className="text-sm text-red-500">Something went wrong — please try again.</p>
           )}
         </form>
         <Link to="/login" className="mt-4 inline-block text-sm text-accent hover:underline">
@@ -97,6 +118,7 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [err, setErr] = useState('');
+  const [errors, setErrors] = useState<{ pw?: string; pw2?: string }>({});
   const navigate = useNavigate();
   // Wave 2-C: never leave the new password in memory — cleared on success
   // and on unmount.
@@ -135,23 +157,65 @@ function ResetForm({ token, onDone, done }: { token: string; onDone: () => void;
           className="mt-6 space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (pw.length < 8) { setErr('Password must be at least 8 characters.'); return; }
-            if (pw !== pw2) { setErr('Passwords do not match.'); return; }
+            // FORM-02: submit-time inline validation with focus-first-invalid.
+            const errs: { pw?: string; pw2?: string } = {};
+            if (!pw) {
+              errs.pw = 'New password is required';
+            } else if (pw.length < 8) {
+              errs.pw = 'Password must be at least 8 characters.';
+            }
+            if (!pw2) {
+              errs.pw2 = 'Please confirm your new password.';
+            } else if (pw !== pw2) {
+              errs.pw2 = 'Passwords do not match.';
+            }
+            setErrors(errs);
+            if (errs.pw) {
+              document.getElementById('reset-pw')?.focus();
+              return;
+            }
+            if (errs.pw2) {
+              document.getElementById('reset-pw2')?.focus();
+              return;
+            }
             setErr('');
             mutation.mutate(pw);
           }}
         >
-          <label className={labelCls}>
-            New password
-            <input type="password" required className={inputCls} value={pw}
-              onChange={(e) => setPw(e.target.value)} autoFocus />
+          <label className={labelCls} htmlFor="reset-pw">
+            New password <span aria-hidden="true">*</span>
+            <input
+              id="reset-pw"
+              type="password"
+              aria-required="true"
+              {...errProps('reset-pw', errors.pw)}
+              className={inputCls}
+              value={pw}
+              onChange={(e) => {
+                setPw(e.target.value);
+                if (errors.pw) setErrors((er) => ({ ...er, pw: undefined }));
+              }}
+              autoFocus
+            />
+            <FieldError id="reset-pw-error" error={errors.pw} />
           </label>
-          <label className={labelCls}>
-            Confirm new password
-            <input type="password" required className={inputCls} value={pw2}
-              onChange={(e) => setPw2(e.target.value)} />
+          <label className={labelCls} htmlFor="reset-pw2">
+            Confirm new password <span aria-hidden="true">*</span>
+            <input
+              id="reset-pw2"
+              type="password"
+              aria-required="true"
+              {...errProps('reset-pw2', errors.pw2)}
+              className={inputCls}
+              value={pw2}
+              onChange={(e) => {
+                setPw2(e.target.value);
+                if (errors.pw2) setErrors((er) => ({ ...er, pw2: undefined }));
+              }}
+            />
+            <FieldError id="reset-pw2-error" error={errors.pw2} />
           </label>
-          {err && <p className="text-sm text-red-500">{err}</p>}
+          {err && <p role="alert" className="text-sm text-red-500">{err}</p>}
           <Button type="submit" loading={mutation.isPending} variant="primary" size="lg" fullWidth>Update password</Button>
         </form>
       </div>
