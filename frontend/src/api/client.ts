@@ -809,8 +809,14 @@ export const createTicketComment = (ticketId: string, input: { body: string; men
 export const deleteTicketComment = (ticketId: string, commentId: string) =>
   apiFetch<void>(`/tickets/${ticketId}/comments/${commentId}`, { method: 'DELETE' });
 
-export const getTicketTimeline = (ticketId: string) =>
-  apiFetch<TicketTimeline>(`/tickets/${ticketId}/timeline`);
+export const getTicketTimeline = (ticketId: string, params?: { limit?: number; offset?: number }) => {
+  // CT-07: explicit limit/offset passthrough (backend TBE-13: default 100, max 500).
+  const q = new URLSearchParams();
+  if (params?.limit) q.set('limit', String(params.limit));
+  if (params?.offset) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return apiFetch<TicketTimeline>(`/tickets/${ticketId}/timeline${qs ? `?${qs}` : ''}`);
+};
 
 export const uploadTicketAttachment = async (ticketId: string, file: File) => {
   const form = new FormData();

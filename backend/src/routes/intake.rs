@@ -155,11 +155,17 @@ fn clean_subject(raw: &str) -> String {
     }
     // drop bracketed ticket number prefix: "[INC-0123] actual title"
     // (case-insensitive — "[inc-0123]" is the same ticket).
+    // R2-BE-12 (#159): strip on a digit run after the prefix (even "[INC-1]"),
+    // not on tag length — the old len>=8 kept short tags.
     let trimmed = s.trim();
     if let Some(rest) = trimmed.strip_prefix('[') {
         if let Some(end) = rest.find(']') {
-            let tag = rest[..end].to_uppercase();
-            if tag.len() >= 8 && tag.starts_with("INC-") || tag.len() >= 8 && tag.starts_with("REQ-") {
+            let tag = rest[..end].trim().to_uppercase();
+            let is_ticket_tag = |prefix: &str| {
+                tag.strip_prefix(prefix)
+                    .is_some_and(|suffix| suffix.chars().next().is_some_and(|c| c.is_ascii_digit()))
+            };
+            if is_ticket_tag("INC-") || is_ticket_tag("REQ-") {
                 s = rest[end + 1..].trim().trim_start_matches(':').trim().to_string();
             }
         }
@@ -184,6 +190,12 @@ fn extract_ticket_number(subject: &str) -> Option<String> {
         let is_inc = chars[i] == 'I' && chars[i + 1] == 'N' && chars[i + 2] == 'C' && chars[i + 3] == '-';
         let is_req = chars[i] == 'R' && chars[i + 1] == 'E' && chars[i + 2] == 'Q' && chars[i + 3] == '-';
         if !is_inc && !is_req {
+            i += 1;
+            continue;
+        }
+        // R2-BE-12 (#159): require a non-alnum boundary before the prefix —
+        // "PRINC-123" must not match as "INC-123".
+        if i > 0 && chars[i - 1].is_alphanumeric() {
             i += 1;
             continue;
         }
@@ -818,6 +830,40 @@ mod tickets_audit_tests {
         assert_eq!(clean_subject("[inc-0042] printer down"), "printer down");
         assert_eq!(clean_subject("Re: [REQ-2026-1] hi"), "hi");
         assert_eq!(clean_subject("plain subject"), "plain subject");
+    }
+
+    #[test]
+    fn be12_extract_requires_non_alnum_boundary() {
+        // R2-BE-12 (#159): PRINC-123 must not match as INC-123.
+        assert_eq!(extract_ticket_number("PRINC-123"), None);
+        assert_eq!(extract_ticket_number("MYREQ-1"), None);
+        assert_eq!(extract_ticket_number("XINC-5"), None);
+        assert_eq!(extract_ticket_number("abcINC-7"), None);
+        assert_eq!(extract_ticket_number("1INC-9"), None);
+        // Valid boundaries still match: start, space, bracket, paren, colon.
+        assert_eq!(extract_ticket_number("INC-123").as_deref(), Some("INC-123"));
+        assert_eq!(extract_ticket_number("see INC-42 please").as_deref(), Some("INC-42"));
+        assert_eq!(extract_ticket_number("[INC-1] hi").as_deref(), Some("INC-1"));
+        assert_eq!(extract_ticket_number("(REQ-7)").as_deref(), Some("REQ-7"));
+        assert_eq!(extract_ticket_number("Re:INC-5").as_deref(), Some("INC-5"));
+        // First *valid* reference wins when an embedded one precedes it.
+        assert_eq!(
+            extract_ticket_number("PRINC-123 and INC-456").as_deref(),
+            Some("INC-456")
+        );
+    }
+
+    #[test]
+    fn be12_clean_strips_short_tags_on_digit_run() {
+        // R2-BE-12 (#159): short tags strip; non-digit tags stay.
+        assert_eq!(clean_subject("[INC-1] hi"), "hi");
+        assert_eq!(clean_subject("[REQ-1] hi"), "hi");
+        assert_eq!(clean_subject("[inc-42] x"), "x");
+        assert_eq!(clean_subject("Re: [INC-7] help"), "help");
+        assert_eq!(clean_subject("[INC-] z"), "[INC-] z");
+        assert_eq!(clean_subject("[INC-ABC] z"), "[INC-ABC] z");
+        assert_eq!(clean_subject("[URGENT] hi"), "[URGENT] hi");
+        assert_eq!(clean_subject("[REQ-2026-0001] laptop"), "laptop");
     }
 
     #[test]

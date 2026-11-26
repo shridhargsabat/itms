@@ -29,6 +29,8 @@ const DEFAULT_THREAD_LIMIT: i64 = 100;
 const MAX_THREAD_LIMIT: i64 = 500;
 /// Comment body mirrors CHECK(char_length(body) <= 4000) (TBE-22: 422).
 const MAX_COMMENT_CHARS: usize = 4000;
+/// R2-BE-15 (#162): mentions capped at 20 (422 past the cap).
+const MAX_MENTIONS: usize = 20;
 
 /// Strict allowlist for attachment content types. Deliberately excludes
 /// `text/html` / scripts: a stored MIME is later reflected as the download
@@ -80,24 +82,40 @@ pub fn router() -> Router<AppState> {
 }
 
 /// TBE-13: `?limit=&offset=` for thread/timeline reads; default 100, max 500.
+/// R2-BE-13 (#160): raw strings parsed manually so `?limit=abc` is a 422 with
+/// a message (tickets-list pattern), not axum's bare 400.
 #[derive(Debug, Deserialize)]
 pub struct ThreadListParams {
-    pub limit: Option<i64>,
-    pub offset: Option<i64>,
+    pub limit: Option<String>,
+    pub offset: Option<String>,
 }
 
 fn parse_thread_page(p: &ThreadListParams) -> Result<(i64, i64), AppError> {
-    let limit = match p.limit {
+    let limit = match p.limit.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         None => DEFAULT_THREAD_LIMIT,
-        Some(n) if n <= 0 => {
-            return Err(AppError::new(
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "limit must be a positive integer",
-            ))
-        }
-        Some(n) => n.min(MAX_THREAD_LIMIT),
+        Some(s) => match s.parse::<i64>() {
+            Ok(n) if n >= 1 => n.min(MAX_THREAD_LIMIT),
+            _ => {
+                return Err(AppError::new(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("invalid limit: {s} (expected a positive integer)"),
+                ))
+            }
+        },
     };
-    Ok((limit, p.offset.unwrap_or(0).max(0)))
+    let offset = match p.offset.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        None => 0,
+        Some(s) => match s.parse::<i64>() {
+            Ok(n) => n.max(0),
+            Err(_) => {
+                return Err(AppError::new(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("invalid offset: {s} (expected an integer >= 0)"),
+                ))
+            }
+        },
+    };
+    Ok((limit, offset))
 }
 
 async fn ensure_ticket(pool: &sqlx::PgPool, ticket_id: Uuid) -> Result<Option<(String, String)>, AppError> {
@@ -245,9 +263,16 @@ async fn create_comment(
     }
     // TBE-12: dedupe first — `mentions:[u,u]` must not false-400 on the
     // COUNT check — then union mentions into the notify list below.
+    // R2-BE-15 (#162): cap at 20 + active-only (422 on inactive).
     let mut mentions = body.mentions.clone();
     mentions.sort();
     mentions.dedup();
+    if mentions.len() > MAX_MENTIONS {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("too many mentions (maximum {MAX_MENTIONS})"),
+        ));
+    }
     let mentions_json = if mentions.is_empty() {
         json!([])
     } else {
@@ -261,6 +286,18 @@ async fn create_comment(
             return Err(AppError::new(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "one or more mentioned users do not exist",
+            ));
+        }
+        let active: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM users WHERE id = ANY($1::uuid[]) AND active = TRUE",
+        )
+        .bind(&mentions)
+        .fetch_one(pool)
+        .await?;
+        if active as usize != mentions.len() {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "one or more mentioned users are inactive",
             ));
         }
         json!(mentions.iter().map(|u| u.to_string()).collect::<Vec<_>>())
@@ -749,10 +786,59 @@ mod tests {
     fn thread_paging_defaults_caps_and_rejects_zero() {
         let (l, o) = parse_thread_page(&ThreadListParams { limit: None, offset: None }).unwrap();
         assert_eq!((l, o), (100, 0));
-        let (l, o) = parse_thread_page(&ThreadListParams { limit: Some(9999), offset: Some(-5) }).unwrap();
+        let (l, o) = parse_thread_page(&ThreadListParams {
+            limit: Some("9999".to_string()),
+            offset: Some("-5".to_string()),
+        })
+        .unwrap();
         assert_eq!((l, o), (500, 0));
-        let err = parse_thread_page(&ThreadListParams { limit: Some(0), offset: None }).unwrap_err();
+        let err = parse_thread_page(&ThreadListParams {
+            limit: Some("0".to_string()),
+            offset: None,
+        })
+        .unwrap_err();
         assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn be13_thread_paging_rejects_garbage_with_422() {
+        // R2-BE-13 (#160): ?limit=abc / ?offset=abc are 422, not axum 400.
+        // The struct itself accepts arbitrary strings (Query won't 400 first).
+        let p: ThreadListParams = serde_json::from_value(serde_json::json!({"limit": "abc"})).unwrap();
+        assert_eq!(p.limit.as_deref(), Some("abc"));
+        let p: ThreadListParams =
+            serde_json::from_value(serde_json::json!({"limit": "abc", "offset": "abc"})).unwrap();
+        assert!(parse_thread_page(&p).unwrap_err().status == StatusCode::UNPROCESSABLE_ENTITY);
+        for bad in ["abc", "10x", "1.5", "all", "-3", "0"] {
+            let err = parse_thread_page(&ThreadListParams {
+                limit: Some(bad.to_string()),
+                offset: None,
+            })
+            .unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "limit={bad:?}");
+        }
+        for bad in ["abc", "1.5", "10x"] {
+            let err = parse_thread_page(&ThreadListParams {
+                limit: None,
+                offset: Some(bad.to_string()),
+            })
+            .unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "offset={bad:?}");
+        }
+        // Empty/whitespace behave as absent (defaults).
+        let (l, o) = parse_thread_page(&ThreadListParams {
+            limit: Some("".to_string()),
+            offset: Some("   ".to_string()),
+        })
+        .unwrap();
+        assert_eq!((l, o), (100, 0));
+        // Valid strings still work (trimmed).
+        let (l, o) = parse_thread_page(&ThreadListParams {
+            limit: Some(" 25 ".to_string()),
+            offset: Some(" 3 ".to_string()),
+        })
+        .unwrap();
+        assert_eq!((l, o), (25, 3));
     }
 
     #[test]
@@ -1094,5 +1180,258 @@ mod r2_p2_regression_tests {
             map_attachment_fk_violation(raw).status,
             StatusCode::UNPROCESSABLE_ENTITY
         );
+    }
+}
+
+/// R2 P3 regression tests (issues #160 R2-BE-13, #162 R2-BE-15): DB-backed
+/// handler tests. Same TEST_DATABASE_URL-with-skip pattern as
+/// routes::intake::r2_regression_tests.
+#[cfg(test)]
+mod r2_p3_regression_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+
+    const DEFAULT_TEST_DB_URL: &str = "postgres://itms_test:itms_test_pw@127.0.0.1:55434/itms_test";
+
+    async fn test_pool() -> Option<sqlx::PgPool> {
+        let url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| DEFAULT_TEST_DB_URL.to_string());
+        match PgPoolOptions::new().max_connections(5).connect(&url).await {
+            Ok(pool) => {
+                sqlx::migrate!("./migrations")
+                    .run(&pool)
+                    .await
+                    .expect("test DB migrations must apply");
+                Some(pool)
+            }
+            Err(e) => {
+                eprintln!("r2_p3_regression_tests(comments): skipping — no test DB at {url} ({e})");
+                None
+            }
+        }
+    }
+
+    fn test_state(pool: sqlx::PgPool) -> AppState {
+        AppState { pool, login_attempts: Default::default(), opencode_api_key: None }
+    }
+
+    async fn create_user(pool: &sqlx::PgPool, role: &str, active: bool) -> Uuid {
+        let email = format!("r2p3-c-{}@example.com", Uuid::new_v4().simple());
+        sqlx::query_scalar(
+            "INSERT INTO users (name, email, role, department, password_hash, active) \
+             VALUES ('R2P3 Comments', $1, $2, 'IT', 'test-hash', $3) RETURNING id",
+        )
+        .bind(&email)
+        .bind(role)
+        .bind(active)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn create_ticket(pool: &sqlx::PgPool, requester: Uuid) -> Uuid {
+        let number = format!("INC-6{:09}", rand::random::<u32>() % 1_000_000_000);
+        sqlx::query_scalar(
+            "INSERT INTO tickets (ticket_number, title, description, requester_id, status) \
+             VALUES ($1, 'r2p3', 'r2p3', $2, 'OPEN') RETURNING id",
+        )
+        .bind(&number)
+        .bind(requester)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    fn thread_query(limit: Option<&str>, offset: Option<&str>) -> Query<ThreadListParams> {
+        Query(ThreadListParams {
+            limit: limit.map(|s| s.to_string()),
+            offset: offset.map(|s| s.to_string()),
+        })
+    }
+
+    fn comment_req(mentions: Vec<Uuid>) -> Json<CreateCommentRequest> {
+        Json(CreateCommentRequest { body: "r2p3 mention test".to_string(), mentions })
+    }
+
+    // ── R2-BE-13: thread/timeline garbage paging is 422 at the handler ──────
+
+    #[tokio::test]
+    async fn thread_limit_garbage_returns_422() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT", true).await;
+        let requester = create_user(&pool, "EMPLOYEE", true).await;
+        let tid = create_ticket(&pool, requester).await;
+
+        for limit in [Some("abc"), Some("10x"), Some("1.5")] {
+            let err = list_comments(
+                State(test_state(pool.clone())),
+                Extension(staff),
+                Extension("AGENT".to_string()),
+                UuidPath(tid),
+                thread_query(limit, None),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "limit={limit:?}");
+        }
+        let err = list_comments(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            thread_query(None, Some("abc")),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn timeline_limit_garbage_returns_422() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT", true).await;
+        let requester = create_user(&pool, "EMPLOYEE", true).await;
+        let tid = create_ticket(&pool, requester).await;
+
+        let err = ticket_timeline(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            thread_query(Some("abc"), None),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+
+        // Valid paging still works.
+        let out = ticket_timeline(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            thread_query(Some("10"), Some("0")),
+        )
+        .await
+        .unwrap();
+        assert!(out.0.get("comments").is_some());
+    }
+
+    // ── R2-BE-15: mentions active-only + capped at 20 ────────────────────────
+
+    #[tokio::test]
+    async fn mentions_inactive_user_rejected() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT", true).await;
+        let requester = create_user(&pool, "EMPLOYEE", true).await;
+        let inactive = create_user(&pool, "EMPLOYEE", false).await;
+        let tid = create_ticket(&pool, requester).await;
+
+        let err = create_comment(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            comment_req(vec![inactive]),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("inactive"), "message: {}", err.message);
+
+        // Mixed active + inactive is also rejected.
+        let active = create_user(&pool, "EMPLOYEE", true).await;
+        let err = create_comment(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            comment_req(vec![active, inactive]),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ticket_comments WHERE ticket_id = $1")
+            .bind(tid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(0, n);
+    }
+
+    #[tokio::test]
+    async fn mentions_over_cap_rejected() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT", true).await;
+        let requester = create_user(&pool, "EMPLOYEE", true).await;
+        let tid = create_ticket(&pool, requester).await;
+        let mut ids = Vec::new();
+        for _ in 0..21 {
+            ids.push(create_user(&pool, "EMPLOYEE", true).await);
+        }
+
+        let err = create_comment(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            comment_req(ids),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("20"), "message: {}", err.message);
+
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ticket_comments WHERE ticket_id = $1")
+            .bind(tid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(0, n);
+    }
+
+    #[tokio::test]
+    async fn mentions_twenty_active_accepted() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT", true).await;
+        let requester = create_user(&pool, "EMPLOYEE", true).await;
+        let tid = create_ticket(&pool, requester).await;
+        let mut ids = Vec::new();
+        for _ in 0..20 {
+            ids.push(create_user(&pool, "EMPLOYEE", true).await);
+        }
+
+        let (code, Json(c)) = create_comment(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            comment_req(ids),
+        )
+        .await
+        .unwrap();
+        assert_eq!(code, StatusCode::CREATED);
+        assert_eq!(c.ticket_id, tid);
+        assert_eq!(20, c.mentions.as_array().map(|a| a.len()).unwrap_or(0));
+    }
+
+    #[tokio::test]
+    async fn mentions_nonexistent_still_rejected() {
+        let Some(pool) = test_pool().await else { return };
+        let staff = create_user(&pool, "AGENT", true).await;
+        let requester = create_user(&pool, "EMPLOYEE", true).await;
+        let tid = create_ticket(&pool, requester).await;
+
+        let err = create_comment(
+            State(test_state(pool.clone())),
+            Extension(staff),
+            Extension("AGENT".to_string()),
+            UuidPath(tid),
+            comment_req(vec![Uuid::new_v4()]),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("do not exist"), "message: {}", err.message);
     }
 }

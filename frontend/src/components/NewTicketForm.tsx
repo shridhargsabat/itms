@@ -16,7 +16,8 @@ import { FieldError, errProps } from '@/components/FieldError';
 import Select from '@/components/Select';
 import { inputCls, labelCls } from '@/lib/utils';
 
-const TITLE_MAX = 200;
+// CT-06: backend title cap is 255 — the UI must allow the same.
+const TITLE_MAX = 255;
 const DESCRIPTION_MAX = 4000;
 
 export default function NewTicketForm({

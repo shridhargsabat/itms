@@ -233,9 +233,11 @@ export default function Tickets() {
   }, [drawerOpen]);
 
   // any filter change or view switch resets to page 1
+  // FE-11: overdue is a filter too — omitting it left page 2+ active with a
+  // narrowed result set (often an empty page).
   useEffect(() => {
     reset();
-  }, [status, priority, type, search, view, sort, order]);
+  }, [status, priority, type, search, view, sort, order, overdueOnly]);
 
   const onSortChange = (s: { key: string; dir: 'asc' | 'desc' } | null) => {
     const next = new URLSearchParams(params);
@@ -785,7 +787,8 @@ export default function Tickets() {
                     id="ticket-edit-title"
                     className={inputCls}
                     value={detailsDraft.title}
-                    maxLength={200}
+                    // CT-06: backend allows 255 — the old 200 cap rejected valid titles client-side.
+                    maxLength={255}
                     disabled={saveDetails.isPending}
                     onChange={(e) => setDetailsDraft((d) => ({ ...d, title: e.target.value }))}
                   />
@@ -883,7 +886,12 @@ export default function Tickets() {
                         ariaLabel="Ticket priority"
                         className="w-full"
                         value={selected.priority}
-                        onChange={(v) => editTicket.mutate({ priority: v as Priority })}
+                        // FE-12: TFE-20-style guard — re-selecting the current
+                        // value is a no-op (no pointless PATCH + invalidation storm).
+                        onChange={(v) => {
+                          if (v === selected.priority) return;
+                          editTicket.mutate({ priority: v as Priority });
+                        }}
                         options={PRIORITIES.map((p) => ({ value: p, label: p }))}
                       />
                     </div>
@@ -895,7 +903,12 @@ export default function Tickets() {
                         ariaLabel="Ticket assignee"
                         className="w-full"
                         value={selected.assignee_id ?? ''}
-                        onChange={(v) => editTicket.mutate({ assignee_id: v || null })}
+                        // FE-12: TFE-20-style guard — re-selecting the current
+                        // assignee (or Unassigned when already unassigned) is a no-op.
+                        onChange={(v) => {
+                          if (v === (selected.assignee_id ?? '')) return;
+                          editTicket.mutate({ assignee_id: v || null });
+                        }}
                         options={[
                           { value: '', label: 'Unassigned' },
                           // FE-10: pin the current assignee (NewTicketForm requester
@@ -1020,8 +1033,38 @@ const CHANGE_LABEL: Record<string, string> = {
   TICKET_ATTACH_DELETE: 'removed a file',
   TICKET_EMAIL_INTAKE: 'created ticket via email',
   TICKET_EMAIL_REPLY: 'replied via email',
+  // CT-08: backend emits these — without labels the thread rendered raw
+  // action slugs (e.g. "edit", "asset", "convert").
+  TICKET_EDIT: 'edited the ticket',
+  TICKET_ASSET: 'updated the linked asset',
+  TICKET_CONVERT: 'converted to KB article',
   SLA_ESCALATE: 'escalated SLA breach',
 };
+
+// CT-07: explicit thread window — matches the backend default (100). Any
+// section hitting it is truncated, and the thread says so (below).
+const TIMELINE_LIMIT = 100;
+
+// CT-08: TICKET_EDIT diffs are per-field { from, to } pairs (title,
+// ticket_type, description previews) — flatten them into the same from → to
+// style as status/priority changes.
+function editDiffs(details: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const fields = [
+    ['title', 'title'],
+    ['ticket_type', 'type'],
+    ['description', 'description'],
+  ] as const;
+  for (const [key, label] of fields) {
+    const pair = details[key] as { from?: unknown; to?: unknown } | undefined;
+    if (pair && typeof pair === 'object' && ('from' in pair || 'to' in pair)) {
+      const from = pair.from == null || pair.from === '' ? '—' : String(pair.from);
+      const to = pair.to == null || pair.to === '' ? '—' : String(pair.to);
+      out.push(`${label}: ${from} → ${to}`);
+    }
+  }
+  return out;
+}
 
 function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolean }) {
   const qc = useQueryClient();
@@ -1033,7 +1076,12 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadErr, setUploadErr] = useState('');
 
-  const tl = useQuery({ queryKey: ['ticket-timeline', ticketId], queryFn: () => getTicketTimeline(ticketId) });
+  const tl = useQuery({
+    queryKey: ['ticket-timeline', ticketId],
+    // CT-07: pin the window explicitly — the backend default is also 100, but
+    // an explicit limit lets the thread honestly report truncation (below).
+    queryFn: () => getTicketTimeline(ticketId, { limit: TIMELINE_LIMIT }),
+  });
 
   const post = useMutation({
     mutationFn: (body: string) => createTicketComment(ticketId, { body }),
@@ -1078,6 +1126,13 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
   const comments = tl.data?.comments ?? [];
   const changes = tl.data?.changes ?? [];
   const attachments = tl.data?.attachments ?? [];
+
+  // CT-07: any section at the window edge means older rows were cut — say so
+  // instead of silently showing a partial thread.
+  const timelineTruncated =
+    comments.length >= TIMELINE_LIMIT ||
+    changes.length >= TIMELINE_LIMIT ||
+    attachments.length >= TIMELINE_LIMIT;
 
   const entries = [
     ...comments.map((c) => ({ kind: 'comment' as const, at: c.created_at, key: `c-${c.id}`, comment: c })),
@@ -1153,8 +1208,10 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
               {(isAdmin || me?.id === a.uploader_id) &&
                 (confirmAttDel === a.id ? (
                   <span className="flex gap-1">
-                    <button type="button" onClick={() => delAtt.mutate(a.id)} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">Confirm</button>
-                    <button type="button" onClick={() => setConfirmAttDel(null)} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5 text-[10px] text-secondary">No</button>
+                    {/* FE-13: freeze the confirm while the DELETE is in flight — a
+                        double-click otherwise fires a second DELETE at a gone row. */}
+                    <button type="button" onClick={() => delAtt.mutate(a.id)} disabled={delAtt.isPending} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white disabled:opacity-60">Confirm</button>
+                    <button type="button" onClick={() => setConfirmAttDel(null)} disabled={delAtt.isPending} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5 text-[10px] text-secondary disabled:opacity-60">No</button>
                   </span>
                 ) : (
                   <button type="button" onClick={() => setConfirmAttDel(a.id)} aria-label="Delete attachment" className="inline-flex h-6 w-6 items-center justify-center text-red-400 hover:opacity-80" title="Delete attachment">
@@ -1180,8 +1237,9 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
                   {(isAdmin || me?.id === c.author_id) &&
                     (confirmDel === c.id ? (
                       <span className="ml-auto flex gap-1">
-                        <button type="button" onClick={() => delComment.mutate(c.id)} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 font-semibold text-white">Confirm</button>
-                        <button type="button" onClick={() => setConfirmDel(null)} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5">No</button>
+                        {/* FE-13: freeze the confirm while the DELETE is in flight. */}
+                        <button type="button" onClick={() => delComment.mutate(c.id)} disabled={delComment.isPending} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 font-semibold text-white disabled:opacity-60">Confirm</button>
+                        <button type="button" onClick={() => setConfirmDel(null)} disabled={delComment.isPending} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5 disabled:opacity-60">No</button>
                       </span>
                     ) : (
                       <button type="button" onClick={() => setConfirmDel(c.id)} aria-label="Delete comment" className="ml-auto inline-flex h-6 w-6 items-center justify-center text-red-400 hover:opacity-80" title="Delete comment">
@@ -1194,6 +1252,8 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
             );
           }
           const h = e.change;
+          // CT-08: precompute the EDIT field diffs once per row.
+          const edit = h.action === 'TICKET_EDIT' ? editDiffs(h.details ?? {}) : [];
           return (
             <div key={e.key} className="flex items-baseline gap-2 text-[11px] text-muted">
               <span className="h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full bg-accent/60" />
@@ -1203,12 +1263,27 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
                 {(h.action === 'TICKET_STATUS' || h.action === 'TICKET_PRIORITY') && Boolean(h.details?.from && h.details?.to) && (
                   <span> ({String(h.details.from).replace('_', ' ')} → {String(h.details.to).replace('_', ' ')})</span>
                 )}
+                {/* CT-08: asset (un)links carry nullable id endpoints — either
+                    side may be missing, so key off presence, not truthiness. */}
+                {h.action === 'TICKET_ASSET' && h.details && ('from' in h.details || 'to' in h.details) && (
+                  <span> ({h.details.from == null ? 'none' : String(h.details.from)} → {h.details.to == null ? 'none' : String(h.details.to)})</span>
+                )}
+                {h.action === 'TICKET_EDIT' && edit.length > 0 && (
+                  <span> ({edit.join('; ')})</span>
+                )}
               </span>
               <span className="shrink-0 font-mono text-[9px]">{formatDate(h.at)}</span>
             </div>
           );
         })}
       </div>
+      {/* CT-07: the thread window is 100 per section — when a section hits it,
+          older rows were cut server-side, so say so instead of implying completeness. */}
+      {timelineTruncated && (
+        <p className="mb-3 text-[10px] text-muted">
+          {`Showing first ${TIMELINE_LIMIT} entries — older activity is hidden.`}
+        </p>
+      )}
         </>
       )}
 
@@ -1265,7 +1340,9 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           />
           <Button
             type="button"
-            onClick={() => draft.trim() && post.mutate(draft)}
+            // FE-14: the gate checks draft.trim() — post the trimmed text, not
+            // the padded original (leading/trailing blank lines in the thread).
+            onClick={() => draft.trim() && post.mutate(draft.trim())}
             disabled={!draft.trim() || post.isPending}
             loading={post.isPending}
             variant="primary"
