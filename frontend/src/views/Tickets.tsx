@@ -39,7 +39,7 @@ import {
   uploadTicketAttachment,
 } from '@/api/client';
 import { ALLOWED_TICKET_TRANSITIONS, PRIORITIES, TICKET_STATUSES, TICKET_TYPES } from '@/api/types';
-import type { Priority, Ticket, TicketStatus, UpdateTicketInput } from '@/api/types';
+import type { Priority, Ticket, TicketAttachment, TicketStatus, UpdateTicketInput } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
 import { FieldError, errProps } from '@/components/FieldError';
@@ -90,10 +90,96 @@ const KANBAN_SORT_OPTIONS = [
   { value: 'ticket_type:desc', label: 'Type ↓' },
 ];
 
+// UX-21 (#195): compact relative stamp for the Updated column (absolute date
+// stays available via title).
+export function formatRelative(value: string | null): string {
+  if (!value) return '—';
+  const t = new Date(value).getTime();
+  if (Number.isNaN(t)) return value;
+  const diff = Date.now() - t;
+  if (diff < 0) return 'just now';
+  const m = Math.floor(diff / 60_000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return formatDate(value);
+}
+
+// UX-19 (#193): recent ticket searches, persisted across sessions.
+const RECENT_SEARCHES_KEY = 'itms-ticket-recent-searches';
+const MAX_RECENT_SEARCHES = 5;
+
+function loadRecentSearches(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+// UX-27 (#201): the ONE delete-confirm snippet — Cancel left, red Delete
+// right — shared by comment + attachment deletes. UX-14a (#188): 44pt targets.
+function DeleteConfirm({
+  onCancel,
+  onConfirm,
+  pending,
+  className,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  pending: boolean;
+  className?: string;
+}) {
+  return (
+    <span className={cn('flex items-center gap-2', className)}>
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={pending}
+        className="inline-flex min-h-[44px] items-center rounded border border-edge px-3 text-xs text-secondary disabled:opacity-60"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={onConfirm}
+        disabled={pending}
+        className="inline-flex min-h-[44px] items-center rounded bg-red-500 px-3 text-xs font-semibold text-white disabled:opacity-60"
+      >
+        Delete
+      </button>
+    </span>
+  );
+}
+
 export default function Tickets() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const [view, setView] = useState<'table' | 'kanban'>('table');
+  // UX-20 (#194): the table/kanban view persists in ?view= (table is the
+  // default and omits the param).
+  const [view, setView] = useState<'table' | 'kanban'>(() => (params.get('view') === 'kanban' ? 'kanban' : 'table'));
+  const setViewAndPersist = (v: 'table' | 'kanban') => {
+    setView(v);
+    const next = new URLSearchParams(params);
+    if (v === 'kanban') {
+      next.set('view', 'kanban');
+    } else {
+      next.delete('view');
+    }
+    setParams(next, { replace: true });
+  };
+  // Back/forward support: an external ?view= change flips the view.
+  const viewParam = params.get('view');
+  useEffect(() => {
+    const v = viewParam === 'kanban' ? 'kanban' : 'table';
+    setView((cur) => (cur === v ? cur : v));
+  }, [viewParam]);
   const openParam = params.get('open');
   const [selectedId, setSelectedId] = useState<string | null>(() => params.get('open'));
   const [newOpen, setNewOpen] = useState(false);
@@ -125,6 +211,16 @@ export default function Tickets() {
   // TFE-05: debounced search — the box is local state; the param (and the API
   // call) follows ~300ms after the user stops typing.
   const [searchInput, setSearchInput] = useState(search);
+  // UX-19 (#193): recent searches committed from this box.
+  const [recentSearches, setRecentSearches] = useState<string[]>(loadRecentSearches);
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem(RECENT_SEARCHES_KEY);
+    } catch {
+      // storage unavailable (private mode) — the list is already cleared in state.
+    }
+  };
   useEffect(() => {
     setSearchInput(search);
   }, [search]);
@@ -134,6 +230,19 @@ export default function Tickets() {
       const next = new URLSearchParams(params);
       if (searchInput) {
         next.set('search', searchInput);
+        // UX-19 (#193): remember committed searches (dedupe, newest first).
+        const term = searchInput.trim();
+        if (term) {
+          setRecentSearches((prev) => {
+            const nextRecent = [term, ...prev.filter((r) => r !== term)].slice(0, MAX_RECENT_SEARCHES);
+            try {
+              localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(nextRecent));
+            } catch {
+              // storage unavailable — recent searches just won't persist.
+            }
+            return nextRecent;
+          });
+        }
       } else {
         next.delete('search');
       }
@@ -169,7 +278,8 @@ export default function Tickets() {
     order: order ?? undefined,
   };
   // TFE-01: capture the list error — a failed fetch must not render as "No tickets found".
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  // UX-17 (#191): isFetching drives the subtle background-update indicator.
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['tickets', filters, view === 'table' ? { page, pageSize } : 'all'],
     queryFn: () =>
       view === 'table'
@@ -486,7 +596,9 @@ export default function Tickets() {
       render: (t) => (
         <div>
           <span className="whitespace-nowrap font-mono text-xs text-accent">{t.ticket_number}</span>
-          <p className="max-w-[220px] truncate font-medium text-primary">{t.title}</p>
+          {/* UX-15a (#189): the visible title truncates — the full title stays
+              available as a tooltip. */}
+          <p className="max-w-[220px] truncate font-medium text-primary" title={t.title}>{t.title}</p>
         </div>
       ),
     },
@@ -495,18 +607,19 @@ export default function Tickets() {
       <span className="flex items-center gap-1.5">
         <StatusBadge status={t.status} />
         {t.source === 'EMAIL' && (
-          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-400">
+          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-violet-400">
             Email
           </span>
         )}
       </span>
     ) },
-    { key: 'sla', header: 'SLA', sortable: true, sortKey: 'sla_due_at', render: (t) => <span className="whitespace-nowrap"><SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} /></span> },
+    { key: 'sla', header: 'SLA', sortable: true, sortKey: 'sla_due_at', render: (t) => <span className="whitespace-nowrap"><SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} status={t.status} /></span> },
     {
       key: 'ticket_type',
       header: 'Type',
       sortable: true,
-      render: (t) => <span className="text-xs text-secondary">{t.ticket_type.replace('_', ' ')}</span>,
+      // UX-24 (#198): type names never wrap mid-word.
+      render: (t) => <span className="whitespace-nowrap text-xs text-secondary">{t.ticket_type.replace('_', ' ')}</span>,
     },
     {
       key: 'requester_name',
@@ -523,6 +636,17 @@ export default function Tickets() {
       header: 'Asset',
       render: (t) => (
         <span className="whitespace-nowrap font-mono text-xs text-secondary">{t.asset_tag ?? '—'}</span>
+      ),
+    },
+    // UX-21 (#195): relative stamp with the absolute date as a tooltip.
+    {
+      key: 'updated_at',
+      header: 'Updated',
+      sortable: true,
+      render: (t) => (
+        <span className="whitespace-nowrap text-xs text-secondary" title={formatDate(t.updated_at)}>
+          {formatRelative(t.updated_at)}
+        </span>
       ),
     },
   ];
@@ -568,13 +692,13 @@ export default function Tickets() {
           <>
             {/* CT-02: CSV export is staff-only — EMPLOYEE never sees the button. */}
             {isStaff && (
+            // UX-26 (#200): same size as New Ticket (both default md).
             <Button
               type="button"
               onClick={handleExport}
               disabled={exporting}
               loading={exporting}
               variant="secondary"
-              size="lg"
               leftIcon={!exporting ? <Download className="h-4 w-4" /> : undefined}
             >
               Export
@@ -593,12 +717,42 @@ export default function Tickets() {
       />
 
       <FilterBar>
-        <div className="relative min-w-0 flex-1 basis-full sm:basis-56"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={searchInput} type="search" inputMode="search" onChange={(e) => setSearchInput(e.target.value)} placeholder="Search tickets..." aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
+        {/* UX-18 (#192): the placeholder names the search scope (title + ticket
+            number + description). */}
+        <div className="min-w-0 flex-1 basis-full sm:basis-56">
+        <div className="relative"><Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" /><input value={searchInput} type="search" inputMode="search" onChange={(e) => setSearchInput(e.target.value)} placeholder="Search by title, ticket #, or description" aria-label="Search tickets" className={cn(inputCls, 'pl-9')} /></div>
+        {/* UX-19 (#193): recent searches — clickable chips + clear, persisted in
+            localStorage. Lives inside the search cell so the mobile grid's
+            4-cell pin (Mobile #4) is untouched. */}
+        {recentSearches.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted">Recent:</span>
+            {recentSearches.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setSearchInput(r)}
+                title={`Search for ${r}`}
+                className="inline-flex min-h-[32px] items-center rounded-full glass-dense px-2.5 py-1 text-xs text-secondary transition-colors hover:text-primary"
+              >
+                {r}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={clearRecentSearches}
+              className="inline-flex min-h-[32px] items-center px-1 text-xs text-accent hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+        </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:contents">
         <div className="flex w-full justify-center overflow-hidden rounded-lg glass-dense sm:w-auto">
           <button
             type="button"
-            onClick={() => setView('table')}
+            onClick={() => setViewAndPersist('table')}
             className={cn(
               'inline-flex h-9 items-center gap-1.5 px-3 text-sm transition-colors',
               view === 'table' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
@@ -608,7 +762,7 @@ export default function Tickets() {
           </button>
           <button
             type="button"
-            onClick={() => setView('kanban')}
+            onClick={() => setViewAndPersist('kanban')}
             className={cn(
               'inline-flex h-9 items-center gap-1.5 px-3 text-sm transition-colors',
               view === 'kanban' ? 'bg-elevated text-primary' : 'text-secondary hover:text-primary',
@@ -655,8 +809,9 @@ export default function Tickets() {
           aria-label="Show overdue only"
           className={cn(
             'inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors',
+            // UX-25 (#199): overdue is red everywhere (was amber here).
             overdueOnly
-              ? 'border-amber-500/40 bg-amber-500/15 font-medium text-amber-700 dark:text-amber-400'
+              ? 'border-red-500/40 bg-red-500/15 font-medium text-red-700 dark:text-red-400'
               : 'border-edge bg-surface text-secondary hover:text-primary',
           )}
         >
@@ -678,13 +833,15 @@ export default function Tickets() {
       {(overdueOnly || exportError) && (
         <div className="flex flex-wrap items-center gap-2">
           {overdueOnly && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 py-1 pl-3 pr-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            // UX-25 (#199): overdue is red everywhere (was amber here).
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 py-1 pl-3 pr-1.5 text-xs font-medium text-red-700 dark:text-red-400">
               Overdue only
               <button
                 type="button"
                 onClick={() => update('overdue', '')}
                 aria-label="Clear overdue filter"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-amber-500/25"
+                // UX-14a (#188): 44pt clear target (was h-6 w-6).
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full hover:bg-red-500/25"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -747,6 +904,14 @@ export default function Tickets() {
             }
           />
         ) : view === 'table' ? (
+            <div>
+              {/* UX-17 (#191): subtle non-blocking background-update note —
+                  the table stays interactive underneath. */}
+              {isFetching && !isLoading && (
+                <p role="status" className="mb-2 text-xs text-muted">
+                  Updating…
+                </p>
+              )}
             <DataTable
               columns={columns}
               rows={rows}
@@ -763,6 +928,7 @@ export default function Tickets() {
               highlightId={selectedId ?? undefined}
               onRowClick={(t) => selectTicket(t.id)}
             />
+            </div>
           ) : (
             /* UX-12 (#186): compact kanban sort above the board (table keeps
                its header sorting). */
@@ -777,7 +943,8 @@ export default function Tickets() {
                 />
               </div>
               {isLoading ? (
-            <ScrollX innerClassName="pb-2">
+            // UX-23 (#197): the board region is labelled for AT.
+            <ScrollX aria-label="Kanban board" innerClassName="pb-2">
               <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4" aria-busy="true" aria-label="Loading tickets">
                 {TICKET_STATUSES.map((st) => (
                   <div key={st} data-testid="kanban-skeleton" className="min-w-[240px] snap-start rounded-xl glass-dense liquid-glass-panel p-3 md:min-w-0">
@@ -800,21 +967,25 @@ export default function Tickets() {
               </div>
             </ScrollX>
           ) : (
-            <ScrollX innerClassName="pb-2">
+            // UX-23 (#197): the board region is labelled for AT.
+            <ScrollX aria-label="Kanban board" innerClassName="pb-2">
               <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4">
                 {TICKET_STATUSES.map((st) => {
                   const items = rows.filter((t) => t.status === st);
                   return (
                     <div key={st} className="min-w-[240px] snap-start rounded-xl glass-dense liquid-glass-panel p-3 md:min-w-0">
                       <div className="mb-3 flex items-center justify-between px-1">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                        {/* UX-23 (#197): real column headings (were spans). */}
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-secondary">
                           {st.replace('_', ' ')}
-                        </span>
+                        </h3>
+                        {/* UX-16 (#190): truncated counts are qualified
+                            ('86 of newest 200'), never a bare number. */}
                         <span
                           className="rounded-full bg-elevated px-2 py-0.5 text-xs text-secondary"
-                          title={kanbanTruncated ? `First ${rows.length} of ${data?.total} tickets loaded` : undefined}
+                          title={kanbanTruncated ? `${items.length} of newest ${rows.length} loaded` : `${items.length} tickets`}
                         >
-                          {items.length}
+                          {kanbanTruncated ? `${items.length} of newest ${rows.length}` : items.length}
                         </span>
                       </div>
                       <div className="max-h-[calc(100dvh-19rem)] space-y-2 overflow-y-auto pr-1">
@@ -832,10 +1003,11 @@ export default function Tickets() {
                             <div className="flex items-center justify-between gap-2">
                               {/* UX-10 (#184): SLA chip on the number row. */}
                               <span className="flex min-w-0 items-center gap-1.5">
-                                <span className="font-mono text-[10px] text-muted">
+                                {/* UX-13a (#187): 12px floor (was text-[10px]). */}
+                                <span className="font-mono text-xs text-muted">
                                   {t.ticket_number}
                                 </span>
-                                <SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} />
+                                <SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} status={t.status} />
                               </span>
                               <PriorityBadge priority={t.priority} />
                             </div>
@@ -856,6 +1028,22 @@ export default function Tickets() {
                 })}
               </div>
             </ScrollX>
+              )}
+              {/* UX-16 (#190): visible 200-cap hint with an escape hatch to the
+                  full (paginated) table. Worded to not collide with the
+                  PageHeader's 'Showing newest N of M tickets' banner. */}
+              {!isLoading && kanbanTruncated && (
+                <p className="text-xs text-muted">
+                  Kanban is capped at the newest {rows.length} of {data?.total} — refine the filters or{' '}
+                  <button
+                    type="button"
+                    onClick={() => setViewAndPersist('table')}
+                    className="text-accent hover:underline"
+                  >
+                    open in table view
+                  </button>{' '}
+                  for the full list.
+                </p>
               )}
             </div>
           )}
@@ -921,7 +1109,8 @@ export default function Tickets() {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); selectTicket(null); }}
-                  aria-label="Close"
+                  // UX-36 (#210): the close action names the ticket it closes.
+                  aria-label={`Close ticket ${selected.ticket_number}`}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg p-2 text-secondary transition-colors hover:bg-elevated hover:text-primary"
                 >
                   <X className="h-4 w-4" />
@@ -930,15 +1119,16 @@ export default function Tickets() {
               <div className="flex-1 space-y-4 overflow-y-auto px-5 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="mt-3 rounded-lg glass-card liquid-glass-subcard p-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                {/* UX-13a (#187): 12px floor (was text-[10px]). */}
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted">
                   SLA · {slaHours(selected.priority)}h policy
                 </span>
-                <SlaChip dueAt={selected.sla_due_at} policyHours={slaHours(selected.priority)} />
+                <SlaChip dueAt={selected.sla_due_at} policyHours={slaHours(selected.priority)} status={selected.status} />
               </div>
               <div className="mt-2">
                 <SlaBar dueAt={selected.sla_due_at} policyHours={slaHours(selected.priority)} />
               </div>
-              <p className="mt-1.5 text-[10px] text-muted">
+              <p className="mt-1.5 text-xs text-muted">
                 {selected.sla_due_at
                   ? `Due ${new Date(selected.sla_due_at).toLocaleString()}${selected.sla_escalated_at ? ' · escalated' : ''}`
                   : 'No active SLA'}
@@ -1003,6 +1193,8 @@ export default function Tickets() {
                     disabled={saveDetails.isPending}
                     onChange={(e) => setDetailsDraft((d) => ({ ...d, description: e.target.value }))}
                   />
+                  {/* UX-37 (#211): visible count against the 4000 cap. */}
+                  <p className="mt-1 text-right text-xs text-muted">{detailsDraft.description.length}/4000</p>
                 </div>
                 {saveDetails.isError && (
                   <FieldError
@@ -1056,7 +1248,7 @@ export default function Tickets() {
                       {' · '}
                       {selected.asset_name}
                     </p>
-                    <p className="text-[10px] uppercase tracking-wide text-muted">
+                    <p className="text-xs uppercase tracking-wide text-muted">
                       linked asset
                     </p>
                   </div>
@@ -1119,7 +1311,7 @@ export default function Tickets() {
                       />
                     </div>
                     {users.data && users.data.total > users.data.items.length && (
-                      <p className="mt-1 text-[10px] text-muted">
+                      <p className="mt-1 text-xs text-muted">
                         Showing first 200 of {users.data.total} users
                       </p>
                     )}
@@ -1143,7 +1335,7 @@ export default function Tickets() {
                       />
                     </div>
                     {assets.data && assets.data.total > assets.data.items.length && (
-                      <p className="mt-1 text-[10px] text-muted">
+                      <p className="mt-1 text-xs text-muted">
                         Showing first {assets.data.items.length} of {assets.data.total} assets
                       </p>
                     )}
@@ -1202,10 +1394,13 @@ export default function Tickets() {
                     No further status transition.
                   </p>
                 )}
+                {/* UX-28 (#202): status-advance failures are FieldErrors
+                    (role=alert), not bare red text. */}
                 {advance.isError && (
-                  <p className="mt-2 text-xs text-red-400">
-                    {advance.error instanceof Error ? advance.error.message : 'Status update failed.'}
-                  </p>
+                  <FieldError
+                    id="ticket-advance-error"
+                    error={advance.error instanceof Error ? advance.error.message : 'Status update failed.'}
+                  />
                 )}
               </div>
             )}
@@ -1293,6 +1488,8 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadErr, setUploadErr] = useState('');
+  // UX-31 (#205): which attachment row is mid-download (spinner + disabled).
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const tl = useQuery({
     queryKey: ['ticket-timeline', ticketId],
@@ -1357,11 +1554,36 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
     ...changes.map((c, idx) => ({ kind: 'change' as const, at: c.at, key: `h-${c.id ?? idx}-${c.at}-${c.action}`, change: c })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
+  // UX-31 (#205): tracked download — the row shows a spinner and disables
+  // while the blob fetch is in flight.
+  const downloadAttachment = async (a: TicketAttachment) => {
+    setDownloadingId(a.id);
+    try {
+      const blob = await downloadTicketAttachment(a.id);
+      // TFE-24: downloadBlob pattern (client.ts) — the anchor must be
+      // attached to the DOM before click() or the download can abort
+      // in Safari/Firefox.
+      const url = URL.createObjectURL(blob);
+      const el = document.createElement('a');
+      el.href = url;
+      el.download = a.file_name;
+      document.body.appendChild(el);
+      el.click();
+      el.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setUploadErr((e as Error).message || 'download failed');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <div className="mt-5 border-t border-edge pt-4">
       <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
         <MessageSquare className="h-3.5 w-3.5" /> Activity & Comments
-        <span className="ml-auto font-mono text-[10px] text-muted">{comments.length}</span>
+        {/* UX-34 (#208): the count is labelled; UX-13a (#187): 12px floor. */}
+        <span className="ml-auto text-xs font-medium normal-case tracking-normal text-muted">{comments.length} comments</span>
       </p>
 
       {deleteErr && <FieldError id="ticket-delete-error" error={deleteErr} />}
@@ -1396,71 +1618,88 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
       ) : (
         <>
       {/* attachments */}
-      {attachments.length > 0 && (
+      {/* UX-30 (#204): an explicit empty line when there is nothing to list. */}
+      {attachments.length === 0 ? (
+        <p className="mb-3 text-xs text-muted">No attachments yet.</p>
+      ) : (
         <div className="mb-3 flex flex-col gap-1.5">
-          {attachments.map((a) => (
+          {attachments.map((a) => {
+            const downloading = downloadingId === a.id;
+            return (
             <div key={a.id} className="flex items-center gap-2 rounded-lg glass-dense px-2.5 py-1.5">
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-accent" />
+              <div className="min-w-0 flex-1">
               <Button
                 type="button"
-                onClick={() => downloadTicketAttachment(a.id).then((blob) => {
-                  // TFE-24: downloadBlob pattern (client.ts) — the anchor must be
-                  // attached to the DOM before click() or the download can abort
-                  // in Safari/Firefox.
-                  const url = URL.createObjectURL(blob);
-                  const el = document.createElement('a');
-                  el.href = url;
-                  el.download = a.file_name;
-                  document.body.appendChild(el);
-                  el.click();
-                  el.remove();
-                  URL.revokeObjectURL(url);
-                }).catch((e: unknown) => setUploadErr((e as Error).message || 'download failed'))}
+                onClick={() => void downloadAttachment(a)}
+                // UX-31 (#205): Button's loading renders the spinner, sets
+                // aria-busy, and disables the row while downloading.
+                loading={downloading}
                 variant="text"
-                className="min-w-0 flex-1 truncate text-left text-xs"
-                title={`Download ${a.file_name}`}
+                className="flex w-full items-center gap-1.5 text-left text-xs"
+                title={downloading ? `Downloading ${a.file_name}…` : `Download ${a.file_name}`}
               >
-                {a.file_name}
+                <span className="min-w-0 flex-1 truncate">{a.file_name}</span>
               </Button>
-              <span className="text-[10px] text-muted">{fmtBytes(a.size_bytes)}</span>
+              {/* UX-32 (#206): who attached it and when. */}
+              <span className="block truncate text-xs text-muted">
+                by {a.uploader_name ?? 'Unknown'} · {formatDate(a.created_at)}
+              </span>
+              </div>
+              <span className="shrink-0 text-xs text-muted">{fmtBytes(a.size_bytes)}</span>
               {(isAdmin || me?.id === a.uploader_id) &&
                 (confirmAttDel === a.id ? (
-                  <span className="flex gap-1">
-                    {/* FE-13: freeze the confirm while the DELETE is in flight — a
-                        double-click otherwise fires a second DELETE at a gone row. */}
-                    <button type="button" onClick={() => delAtt.mutate(a.id)} disabled={delAtt.isPending} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white disabled:opacity-60">Confirm</button>
-                    <button type="button" onClick={() => setConfirmAttDel(null)} disabled={delAtt.isPending} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5 text-[10px] text-secondary disabled:opacity-60">No</button>
-                  </span>
+                  // UX-27 (#201): shared snippet; FE-13 freeze preserved via
+                  // pending (double-click fires one DELETE).
+                  <DeleteConfirm
+                    onCancel={() => setConfirmAttDel(null)}
+                    onConfirm={() => delAtt.mutate(a.id)}
+                    pending={delAtt.isPending}
+                  />
                 ) : (
-                  <button type="button" onClick={() => setConfirmAttDel(a.id)} aria-label="Delete attachment" className="inline-flex h-6 w-6 items-center justify-center text-red-400 hover:opacity-80" title="Delete attachment">
+                  // UX-14a (#188): 44pt delete target (was h-6 w-6).
+                  <button type="button" onClick={() => setConfirmAttDel(a.id)} aria-label="Delete attachment" className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-red-400 hover:opacity-80" title="Delete attachment">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 ))}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* timeline entries */}
       <div className="mb-3 flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
-        {entries.length === 0 && <p className="text-xs text-muted">No activity yet.</p>}
+        {/* UX-29 (#203): icon + heading + message empty state (keeps the
+            'No activity yet.' copy). */}
+        {entries.length === 0 && (
+          <div className="rounded-lg border border-dashed border-edge p-4 text-center">
+            <MessageSquare className="mx-auto h-5 w-5 text-muted" aria-hidden="true" />
+            <p className="mt-2 text-sm font-medium text-primary">No activity yet.</p>
+            <p className="mt-1 text-xs text-muted">Comments and ticket updates will appear here.</p>
+          </div>
+        )}
         {entries.map((e) => {
           if (e.kind === 'comment') {
             const c = e.comment;
             return (
               <div key={e.key} className="rounded-lg glass-dense p-2">
-                <div className="flex items-center gap-2 text-[10px] text-muted">
+                {/* UX-13a (#187): 12px floor (was text-[10px]). */}
+                <div className="flex items-center gap-2 text-xs text-muted">
                   <span className="font-medium text-secondary">{c.author_name ?? 'Unknown'}</span>
                   <span className="font-mono">{formatDate(c.created_at)}</span>
                   {(isAdmin || me?.id === c.author_id) &&
                     (confirmDel === c.id ? (
-                      <span className="ml-auto flex gap-1">
-                        {/* FE-13: freeze the confirm while the DELETE is in flight. */}
-                        <button type="button" onClick={() => delComment.mutate(c.id)} disabled={delComment.isPending} className="inline-flex min-h-6 items-center rounded bg-red-500 px-1.5 py-0.5 font-semibold text-white disabled:opacity-60">Confirm</button>
-                        <button type="button" onClick={() => setConfirmDel(null)} disabled={delComment.isPending} className="inline-flex min-h-6 items-center rounded border border-edge px-1.5 py-0.5 disabled:opacity-60">No</button>
-                      </span>
+                      // UX-27 (#201): shared snippet; FE-13 freeze via pending.
+                      <DeleteConfirm
+                        className="ml-auto"
+                        onCancel={() => setConfirmDel(null)}
+                        onConfirm={() => delComment.mutate(c.id)}
+                        pending={delComment.isPending}
+                      />
                     ) : (
-                      <button type="button" onClick={() => setConfirmDel(c.id)} aria-label="Delete comment" className="ml-auto inline-flex h-6 w-6 items-center justify-center text-red-400 hover:opacity-80" title="Delete comment">
+                      // UX-14a (#188): 44pt delete target (was h-6 w-6).
+                      <button type="button" onClick={() => setConfirmDel(c.id)} aria-label="Delete comment" className="ml-auto inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-red-400 hover:opacity-80" title="Delete comment">
                         <Trash2 className="h-3 w-3" />
                       </button>
                     ))}
@@ -1473,7 +1712,8 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           // CT-08: precompute the EDIT field diffs once per row.
           const edit = h.action === 'TICKET_EDIT' ? editDiffs(h.details ?? {}) : [];
           return (
-            <div key={e.key} className="flex items-baseline gap-2 text-[11px] text-muted">
+            // UX-13a (#187): 12px floor (was text-[11px] / text-[9px]).
+            <div key={e.key} className="flex items-baseline gap-2 text-xs text-muted">
               <span className="h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full bg-accent/60" />
               <span className="min-w-0 flex-1">
                 <span className="font-medium text-secondary">{h.actor || 'System'}</span>{' '}
@@ -1490,7 +1730,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
                   <span> ({edit.join('; ')})</span>
                 )}
               </span>
-              <span className="shrink-0 font-mono text-[9px]">{formatDate(h.at)}</span>
+              <span className="shrink-0 font-mono text-xs">{formatDate(h.at)}</span>
             </div>
           );
         })}
@@ -1498,7 +1738,7 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
       {/* CT-07: the thread window is 100 per section — when a section hits it,
           older rows were cut server-side, so say so instead of implying completeness. */}
       {timelineTruncated && (
-        <p className="mb-3 text-[10px] text-muted">
+        <p className="mb-3 text-xs text-muted">
           {`Showing first ${TIMELINE_LIMIT} entries — older activity is hidden.`}
         </p>
       )}
@@ -1518,13 +1758,16 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
           disabled={post.isPending}
           className={cn(inputCls, 'min-h-[60px] resize-y text-xs')}
         />
+        {/* UX-37 (#211): visible count against the 4000 cap. */}
+        <p className="text-right text-xs text-muted">{draft.length}/4000</p>
         {post.isError && (
           <FieldError
             id="ticket-comment-error"
             error={post.error instanceof Error ? post.error.message : 'Failed to post comment.'}
           />
         )}
-        {uploadErr && <p className="text-[10px] text-red-400">{uploadErr}</p>}
+        {/* UX-28 (#202): upload/download failures are FieldErrors (role=alert). */}
+        {uploadErr && <FieldError id="ticket-upload-error" error={uploadErr} />}
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
@@ -1532,11 +1775,12 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
             disabled={upload.isPending}
             variant="secondary"
             size="sm"
-            className="border-edge px-2.5 py-1.5 text-[11px]"
+            className="border-edge px-2.5 py-1.5 text-xs"
             title="Attach file (max 10 MB)"
             leftIcon={<Paperclip className="h-3.5 w-3.5" />}
           >
-            {upload.isPending ? 'Uploading…' : 'Attach'}
+            {/* UX-38 (#212): the action names what it attaches. */}
+            {upload.isPending ? 'Uploading…' : 'Attach file'}
           </Button>
           <input
             ref={fileRef}
@@ -1565,11 +1809,14 @@ function TicketThread({ ticketId, isAdmin }: { ticketId: string; isAdmin: boolea
             loading={post.isPending}
             variant="primary"
             size="sm"
-            className="ml-auto shrink-0 px-3 py-1.5 text-[11px]"
+            className="ml-auto shrink-0 px-3 py-1.5 text-xs"
           >
             Post comment
           </Button>
         </div>
+        {/* UX-30 (#204): the size/type limits are visible next to Attach, not
+            discoverable only via tooltip or trial upload. */}
+        <p className="text-xs text-muted">Max 10 MB · PDF, images, Office docs, text & archives</p>
       </div>
     </div>
   );
@@ -1759,7 +2006,7 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls="canned-menu"
-        className="border-edge px-2 py-1 text-[11px] text-accent"
+        className="border-edge px-2 py-1 text-xs text-accent"
         leftIcon={<Zap className="h-3 w-3" />}
       >
         Canned response
@@ -1785,13 +2032,16 @@ function CannedPicker({ onPick }: { onPick: (text: string) => void }) {
                 aria-selected={i === activeIdx}
                 onMouseEnter={() => setActiveIdx(i)}
                 onClick={() => { onPick(c.body); setOpen(false); }}
+                title={c.body}
                 className={cn(
                   'block w-full rounded-lg px-2.5 py-2 text-left hover:bg-elevated',
                   i === activeIdx && 'bg-elevated',
                 )}
               >
                 <span className="block text-xs font-semibold text-primary">{c.title}</span>
-                <span className="block truncate text-[11px] text-muted">{c.body}</span>
+                {/* UX-33 (#207): previews wrap multiline and expand fully for
+                    the active option (full body also in the tooltip). */}
+                <span className={cn('block whitespace-pre-wrap break-words text-xs text-muted', i !== activeIdx && 'line-clamp-2')}>{c.body}</span>
               </button>
             ))}
           </div>,

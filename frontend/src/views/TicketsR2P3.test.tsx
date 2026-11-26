@@ -228,8 +228,8 @@ describe('FE-12 re-selecting the current priority/assignee fires no PATCH (issue
   });
 });
 
-describe('FE-13 delete Confirm/No freeze while the DELETE is pending (issue 165)', () => {
-  it('comment Confirm + No are disabled until the delete lands', async () => {
+describe('FE-13 delete Cancel/Delete freeze while the DELETE is pending (issue 165)', () => {
+  it('comment Delete + Cancel are disabled until the delete lands', async () => {
     vi.mocked(api.getTicketTimeline).mockResolvedValue({
       comments: [comment({ id: 'c-1', body: 'remove me' })],
       changes: [],
@@ -243,18 +243,18 @@ describe('FE-13 delete Confirm/No freeze while the DELETE is pending (issue 165)
     await screen.findByText('remove me');
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete comment' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-    const confirm = await screen.findByRole('button', { name: 'Confirm' });
+    const confirm = await screen.findByRole('button', { name: 'Delete' });
     await waitFor(() => expect(confirm).toBeDisabled());
-    expect(screen.getByRole('button', { name: 'No' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(api.deleteTicketComment).toHaveBeenCalledTimes(1);
 
     d.resolve(undefined);
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull());
   });
 
-  it('attachment Confirm + No are disabled until the delete lands', async () => {
+  it('attachment Delete + Cancel are disabled until the delete lands', async () => {
     vi.mocked(api.getTicketTimeline).mockResolvedValue({
       comments: [],
       changes: [],
@@ -268,14 +268,14 @@ describe('FE-13 delete Confirm/No freeze while the DELETE is pending (issue 165)
     await screen.findByText('stale.log');
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete attachment' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-    const confirm = await screen.findByRole('button', { name: 'Confirm' });
+    const confirm = await screen.findByRole('button', { name: 'Delete' });
     await waitFor(() => expect(confirm).toBeDisabled());
-    expect(screen.getByRole('button', { name: 'No' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
 
     d.resolve(undefined);
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull());
   });
 });
 

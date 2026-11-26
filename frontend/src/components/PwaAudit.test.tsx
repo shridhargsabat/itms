@@ -110,7 +110,7 @@ describe('PWA audit regressions (Bugs #2, #6, #7 · P-102)', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const input = await screen.findByPlaceholderText('Search tickets...');
+    const input = await screen.findByPlaceholderText('Search by title, ticket #, or description');
     expect(input.getAttribute('type')).toBe('search');
     expect(input.getAttribute('inputmode')).toBe('search');
   });
@@ -136,7 +136,7 @@ describe('PWA audit regressions (Bugs #2, #6, #7 · P-102)', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const close = await screen.findByRole('button', { name: 'Close' });
+    const close = await screen.findByRole('button', { name: 'Close ticket INC-1001' });
     const tokens = close.className.split(/\s+/);
     expect(tokens).toContain('h-9');
     expect(tokens).toContain('w-9');

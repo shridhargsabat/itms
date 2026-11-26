@@ -183,16 +183,22 @@ export default function ServiceQueue() {
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-primary">Live Service Queue</h2>
-          <div className="relative">
-            <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-            <input
-              type="text"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter tickets..."
-              aria-label="Filter service queue"
-              className="liquid-glass-pill rounded-full py-1.5 pr-4 pl-8 text-xs text-primary focus:outline-none"
-            />
+          {/* UX-44 (#218): visible label (was placeholder + aria-label only). */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="service-queue-filter" className="shrink-0 text-xs font-medium text-secondary">
+              Filter
+            </label>
+            <div className="relative">
+              <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+              <input
+                id="service-queue-filter"
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Filter tickets..."
+                className="liquid-glass-pill rounded-full py-1.5 pr-4 pl-8 text-xs text-primary focus:outline-none"
+              />
+            </div>
           </div>
         </div>
         {isLoading ? (
@@ -232,11 +238,11 @@ export default function ServiceQueue() {
                       <span className="font-mono text-xs font-semibold text-[#007AFF]">
                         {t.ticket_number}
                       </span>
-                      <span className="truncate text-xs font-medium text-primary sm:text-sm">
+                      <span className="truncate text-xs font-medium text-primary sm:text-sm" title={t.title}>
                         {t.title}
                       </span>
                     </span>
-                    <span className="mt-0.5 block text-[11px] text-muted">
+                    <span className="mt-0.5 block text-xs text-muted">
                       CI: {t.asset_tag ?? '—'} · Assignee: {t.assignee_name ?? 'Unassigned'}
                     </span>
                   </span>
@@ -283,11 +289,12 @@ export default function ServiceQueue() {
                   <span className="font-mono text-xs font-bold text-[#007AFF]">
                     {selected.ticket_number}
                   </span>
+                  {/* UX-14b (#188): 44px close hit area; icon stays h-4 (16px). */}
                   <button
                     type="button"
                     onClick={close}
                     aria-label="Close ticket details"
-                    className="liquid-glass-subcard rounded-full p-1.5"
+                    className="liquid-glass-subcard flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-1.5"
                   >
                     <X className="h-4 w-4 text-secondary" />
                   </button>
@@ -311,6 +318,7 @@ export default function ServiceQueue() {
                 {isStaff && (
                   <div>
                     <label className="mb-1 block text-[11px] text-muted">Update Status</label>
+                    {/* UX-43 (#217): menu labels prettified like StatusBadge; values stay raw enums. */}
                     <Select
                       className="w-full"
                       value={displayStatus}
@@ -322,7 +330,7 @@ export default function ServiceQueue() {
                         setStatusError(null);
                         updateStatus.mutate({ id: selected.id, status: v as TicketStatus });
                       }}
-                      options={[displayStatus, ...(ALLOWED_TICKET_TRANSITIONS[displayStatus] ?? [])].map((s) => ({ value: s, label: s }))}
+                      options={[displayStatus, ...(ALLOWED_TICKET_TRANSITIONS[displayStatus] ?? [])].map((s) => ({ value: s, label: s.replace('_', ' ') }))}
                     />
                     {confirmed && (
                       <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
