@@ -210,7 +210,7 @@ describe('TFE-09 two-way ?open= sync (issue 71)', () => {
     await openDrawer();
     expect(screen.getByTestId('location-probe')).toHaveTextContent('/tickets?open=t-page1');
 
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Ticket INC-1001' })).getByRole('button', { name: 'Close' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Ticket INC-1001' })).getByRole('button', { name: 'Close ticket INC-1001' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Ticket INC-1001' })).toBeNull();
     });

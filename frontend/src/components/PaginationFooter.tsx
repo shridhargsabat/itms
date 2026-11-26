@@ -47,9 +47,10 @@ export default function PaginationFooter({
   // chevron so they can never read as a blank icon-only square — the arrow is
   // a hint, the word is the affordance. `BUTTON.ghost` + semantic tokens keep
   // them theme-aware (no fixed accent fill, so no filled-empty-button glitch).
+  // UX-14b (#188): 44px touch targets (was h-8) on every footer control.
   const navBtn =
     BUTTON.ghost +
-    ' h-8 rounded-lg border border-edge2 text-secondary hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
+    ' min-h-[44px] rounded-lg border border-edge2 text-secondary hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
   // Next is the forward CTA: accent-filled (`primary`) when there's a next
   // page, ghost/disabled on the last page. Prev stays ghost (disabled on p1).
@@ -59,7 +60,7 @@ export default function PaginationFooter({
   const canFirst = page > 1;
   const canLast = pages > 0 && page < pages;
   const nextBtn = canNext
-    ? BUTTON.primary + ' h-8 rounded-lg px-2'
+    ? BUTTON.primary + ' min-h-[44px] rounded-lg px-2'
     : `${navBtn} px-2`;
 
   // Commit the go-to draft: leading-integer parse, clamped into [1, pages];
@@ -83,7 +84,7 @@ export default function PaginationFooter({
       <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5 min-w-0">
         <Select
           className="w-auto shrink-0"
-          triggerClassName="h-8 px-1.5 py-0 text-xs"
+          triggerClassName="min-h-[44px] px-1.5 py-0 text-xs"
           aria-label="Rows per page"
           value={String(pageSize)}
           onChange={(v) => onPageSizeChange?.(Number(v))}
@@ -128,7 +129,7 @@ export default function PaginationFooter({
               autoComplete="off"
               spellCheck={false}
               maxLength={7}
-              className="h-8 w-12 rounded-lg border border-edge2 bg-transparent px-1.5 text-center text-xs tabular-nums text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="min-h-[44px] w-12 rounded-lg border border-edge2 bg-transparent px-1.5 text-center text-xs tabular-nums text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
               value={draft ?? String(page)}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={() => setDraft(null)}

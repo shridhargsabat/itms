@@ -25,6 +25,16 @@ export default function BottomNav() {
     setMore(false);
   }, [pathname]);
 
+  // UX-45 (#219): the floating capsule overlays document-scrolled content on
+  // mobile — bottom scroll-padding (matching Layout's pb-24 end clearance)
+  // so scrollIntoView/anchor rests clear the capsule mid-scroll too.
+  useEffect(() => {
+    document.documentElement.style.scrollPaddingBottom = '6rem';
+    return () => {
+      document.documentElement.style.scrollPaddingBottom = '';
+    };
+  }, []);
+
   // Primaries follow the FROZEN pre-grouping order (never the tree order), so
   // grouping can never reshuffle the bar. The sheet shows the same groups as
   // the desktop sidebar minus the primaries (no empty sections).

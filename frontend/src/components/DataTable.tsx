@@ -236,7 +236,9 @@ export default function DataTable<T extends { id: string }>({
                     // Task 18 (UI-17): explicit uppercase — preflight sets
                     // text-transform:none on buttons, which used to leave
                     // sortable headers Title Case next to ALL-CAPS plain ones.
-                    'inline-flex min-h-[24px] min-w-[24px] items-center gap-1 rounded uppercase transition-colors hover:text-primary',
+                    // UX-14a (#188): 44pt touch target; -my-3 absorbs the th's
+                    // own py-3 so the header row stays the same height.
+                    'inline-flex min-h-[44px] min-w-[44px] -my-3 items-center gap-1 rounded px-1 uppercase transition-colors hover:text-primary',
                     sort?.key === sortKey && 'text-accent',
                   )}
                 >
@@ -270,7 +272,9 @@ export default function DataTable<T extends { id: string }>({
           innerClassName={cn(TABLE_SPEC.tableScroll, 'flex-1 min-h-0')}
         >
           <table className={cn(TABLE_SPEC.table, minWidth)}>
-            {caption ? <caption>{caption}</caption> : null}
+            {/* UX-24 (#198): the caption is for AT (the scroll region already
+                carries it as its label) — sr-only, not a visible second title. */}
+            {caption ? <caption className="sr-only">{caption}</caption> : null}
             {head}
             <tbody className={TABLE_SPEC.tbody}>
               {Array.from({ length: 5 }).map((_, i) => (
@@ -328,7 +332,7 @@ export default function DataTable<T extends { id: string }>({
         innerClassName={cn(TABLE_SPEC.tableScroll, 'flex-1 min-h-0')}
       >
         <table className={cn(TABLE_SPEC.table, minWidth)}>
-          {caption ? <caption>{caption}</caption> : null}
+          {caption ? <caption className="sr-only">{caption}</caption> : null}
           {head}
           <tbody className={TABLE_SPEC.tbody}>
             <AnimatePresence>
@@ -378,7 +382,8 @@ export default function DataTable<T extends { id: string }>({
                     aria-expanded={renderExpanded ? expanded : undefined}
                     className={cn(
                       'transition-colors',
-                      clickable && 'cursor-pointer hover:bg-elevated/60 focus-visible:bg-elevated focus-visible:outline-none',
+                      // UX-22 (#196): a visible focus ring, not just a bg tint.
+                      clickable && 'cursor-pointer hover:bg-elevated/60 focus-visible:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent',
                       highlightId === row.id && 'ring-2 ring-inset ring-accent',
                     )}
                   >

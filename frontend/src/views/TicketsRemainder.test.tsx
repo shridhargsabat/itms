@@ -261,7 +261,7 @@ describe('TFE-34/35/36/38/39 P3 sweep (issue 110)', () => {
     expect(screen.getByRole('textbox', { name: 'Add a comment' })).toBeInTheDocument();
   });
 
-  it('TFE-35: delete controls are 24px+ targets', async () => {
+  it('TFE-35: delete controls are 44px targets', async () => {
     vi.mocked(api.getTicketTimeline).mockResolvedValue({
       comments: [
         { id: 'c1', ticket_id: 't-page1', author_id: 'u-admin', body: 'needs deletion', mentions: [], created_at: '2026-11-23T10:00:00Z', author_name: 'IT Admin' },
@@ -276,14 +276,15 @@ describe('TFE-34/35/36/38/39 P3 sweep (issue 110)', () => {
 
     const delComment = await screen.findByRole('button', { name: 'Delete comment' });
     const delAtt = await screen.findByRole('button', { name: 'Delete attachment' });
-    // h-6/w-6 = 24px targets.
-    expect(delComment.className).toContain('h-6');
-    expect(delComment.className).toContain('w-6');
-    expect(delAtt.className).toContain('h-6');
-    expect(delAtt.className).toContain('w-6');
+    // UX-14a (#188): min-h/min-w 44px targets (were h-6/w-6).
+    expect(delComment.className).toContain('min-h-[44px]');
+    expect(delComment.className).toContain('min-w-[44px]');
+    expect(delAtt.className).toContain('min-h-[44px]');
+    expect(delAtt.className).toContain('min-w-[44px]');
 
     fireEvent.click(delComment);
-    expect(screen.getByRole('button', { name: 'Confirm' }).className).toContain('min-h-6');
+    // UX-27 (#201): the shared snippet reads Cancel/Delete.
+    expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('min-h-[44px]');
   });
 
   it('TFE-36: header shows Loading tickets while the list is fetching', () => {

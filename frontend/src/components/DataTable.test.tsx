@@ -53,3 +53,60 @@ describe('DataTable header ARIA (task 11)', () => {
     icons.forEach((svg) => expect(svg).toHaveAttribute('aria-hidden', 'true'));
   });
 });
+
+describe('UX minors (issues 188/196/198)', () => {
+  it('UX-14a (#188): sortable header buttons are 44pt targets', () => {
+    render(
+      <DataTable
+        columns={[{ key: 'name', header: 'Name', sortable: true }]}
+        rows={[{ id: '1', name: 'Ada' }]}
+        sort={null}
+        onSortChange={() => {}}
+      />,
+    );
+    const btn = screen.getByRole('button', { name: /name/i });
+    expect(btn.className).toContain('min-h-[44px]');
+    expect(btn.className).toContain('min-w-[44px]');
+  });
+
+  it('UX-22 (#196): clickable rows show a focus ring in addition to the bg tint', () => {
+    const { container } = render(
+      <DataTable
+        columns={[{ key: 'name', header: 'Name' }]}
+        rows={[{ id: '1', name: 'Ada' }]}
+        onRowClick={() => {}}
+      />,
+    );
+    const row = container.querySelector('tbody tr')!;
+    expect(row.getAttribute('tabindex')).toBe('0');
+    expect(row.className).toContain('focus-visible:ring-2');
+    expect(row.className).toContain('focus-visible:ring-accent');
+    expect(row.className).toContain('focus-visible:bg-elevated');
+  });
+
+  it('UX-24 (#198): the table caption is sr-only', () => {
+    render(
+      <DataTable
+        columns={[{ key: 'name', header: 'Name' }]}
+        rows={[{ id: '1', name: 'Ada' }]}
+        caption="Tickets"
+      />,
+    );
+    const caption = document.querySelector('caption')!;
+    expect(caption.textContent).toBe('Tickets');
+    expect(caption.className).toContain('sr-only');
+  });
+
+  it('UX-24 (#198): the loading skeleton caption is sr-only too', () => {
+    render(
+      <DataTable
+        columns={[{ key: 'name', header: 'Name' }]}
+        rows={[]}
+        loading
+        caption="Tickets"
+      />,
+    );
+    const caption = document.querySelector('caption')!;
+    expect(caption.className).toContain('sr-only');
+  });
+});

@@ -71,8 +71,11 @@ export default function NewTicketForm({
   const allUsers = users.data?.items ?? [];
   const activeUsers = allUsers.filter((u) => u.active);
   const meKnownInactive = me ? allUsers.some((u) => u.id === me.id && !u.active) : false;
+  // UX-41 (#215): exactly ONE self option — the '' "Current user (default)"
+  // row submitted requester=self just like the preselected self row, so it
+  // was dropped. Self resolves via its explicit row (or the (You) fallback
+  // when off-page).
   const requesterOptions = [
-    { value: '', label: 'Current user (default)' },
     ...(me && !meKnownInactive && !activeUsers.some((u) => u.id === me.id)
       ? [{ value: me.id, label: `${me.name} (You)` }]
       : []),
@@ -212,8 +215,8 @@ export default function NewTicketForm({
               searchable
             />
             {users.data && users.data.total > activeUsers.length && (
-              <p className="mt-1 text-[11px] text-muted">
-                Showing first {activeUsers.length} of {users.data.total} users
+              <p className="mt-1 text-xs text-muted">
+                Showing {activeUsers.length} active of {users.data.total} users
               </p>
             )}
           </div>
@@ -232,7 +235,7 @@ export default function NewTicketForm({
             searchable
           />
           {assets.data && assets.data.total > assets.data.items.length && (
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-xs text-muted">
               Showing first {assets.data.items.length} of {assets.data.total} assets
             </p>
           )}
@@ -243,11 +246,13 @@ export default function NewTicketForm({
           {mutation.error instanceof Error ? mutation.error.message : 'Failed to create ticket.'}
         </p>
       )}
+      {/* UX-14b (#188): 44px modal-action targets at 390px. */}
       <div className="flex justify-end gap-2 pt-1">
         <Button
           type="button"
           onClick={onDone}
           variant="secondary"
+          className="min-h-[44px]"
         >
           Cancel
         </Button>
@@ -256,6 +261,7 @@ export default function NewTicketForm({
           disabled={mutation.isPending}
           loading={mutation.isPending}
           variant="primary"
+          className="min-h-[44px]"
         >
           Create Ticket
         </Button>
@@ -293,6 +299,9 @@ function TemplatePicker({ onApply }: { onApply: (t: TicketTemplate) => void }) {
     );
   }
   if (!templates.data?.length) return null;
+  // UX-42 (#216): the applied template stays visible — persistent Select
+  // value plus a caption naming it (was: reset to '' leaving no trace).
+  const applied = templates.data.find((x) => x.id === selected) ?? null;
   return (
     <div>
       <label className={labelCls} htmlFor="new-ticket-template">
@@ -310,10 +319,11 @@ function TemplatePicker({ onApply }: { onApply: (t: TicketTemplate) => void }) {
             const normalizedType = (t.ticket_type === 'REQUEST' ? 'SERVICE_REQUEST' : t.ticket_type) as CreateTicketInput['ticket_type'];
             onApply({ ...t, ticket_type: normalizedType });
           }
-          setSelected('');
+          setSelected(v);
         }}
         options={templates.data.map((t) => ({ value: t.id, label: `${t.name} — ${t.ticket_type} / ${t.priority}` }))}
       />
+      {applied && <p className="mt-1 text-xs text-muted">Applied template: {applied.name}</p>}
     </div>
   );
 }

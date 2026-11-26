@@ -169,3 +169,14 @@ describe('pagination footer jump controls (UX-09 #183)', () => {
     expect(gotoValue()).toBe('3');
   });
 });
+
+describe('pagination footer touch targets (UX-14b #188)', () => {
+  it('every footer control reaches the 44px target', () => {
+    render(<PaginationFooter page={3} pageSize={20} total={100} rowsLength={20} />);
+    for (const name of ['First page', 'Previous page', 'Go', 'Next page', 'Last page']) {
+      expect(screen.getByRole('button', { name }).className).toContain('min-h-[44px]');
+    }
+    expect(screen.getByLabelText('Rows per page').className).toContain('min-h-[44px]');
+    expect(screen.getByLabelText('Go to page').className).toContain('min-h-[44px]');
+  });
+});

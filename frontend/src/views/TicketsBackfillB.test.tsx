@@ -231,13 +231,13 @@ describe('Tickets backfill B — issue 122 (TFE-18/19/22/23/24/25/27/28/30)', ()
     const drawer = await screen.findByTestId('service-queue-drawer');
 
     fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN PROGRESS' }));
 
     expect(await within(drawer).findByText('Status updated to IN_PROGRESS')).toBeInTheDocument();
     expect(vi.mocked(api.patchTicketStatus).mock.calls[0]).toEqual(['t1', 'IN_PROGRESS']);
-    // Badge renders the humanised status; the Select trigger keeps the raw code.
-    expect(within(drawer).getByText('IN PROGRESS')).toBeInTheDocument();
-    expect(within(drawer).getByRole('button', { name: 'Update Status' }).textContent).toContain('IN_PROGRESS');
+    // Badge renders the humanised status; since UX-43 the Select trigger does too.
+    expect(within(drawer).getAllByText('IN PROGRESS')).toHaveLength(2);
+    expect(within(drawer).getByRole('button', { name: 'Update Status' }).textContent).toContain('IN PROGRESS');
   });
 
   it('TFE-22: overdue filter chip renders with a working clear button', async () => {
@@ -261,15 +261,15 @@ describe('Tickets backfill B — issue 122 (TFE-18/19/22/23/24/25/27/28/30)', ()
     const dialog = await screen.findByRole('dialog');
 
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Delete comment' }));
-    expect(within(dialog).getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     expect(await within(dialog).findByText('comment delete failed')).toBeInTheDocument();
     expect(vi.mocked(api.deleteTicketComment).mock.calls[0][0]).toBe('t-page1');
     expect(vi.mocked(api.deleteTicketComment).mock.calls[0][1]).toBe('c-1');
-    // Confirm state reset: the delete trigger is back, the Confirm pair is gone.
+    // Confirm state reset: the delete trigger is back, the Delete pair is gone.
     expect(within(dialog).getByRole('button', { name: 'Delete comment' })).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
   it('TFE-23: attachment delete failure shows FieldError and resets confirm state', async () => {
@@ -284,13 +284,13 @@ describe('Tickets backfill B — issue 122 (TFE-18/19/22/23/24/25/27/28/30)', ()
     const dialog = await screen.findByRole('dialog');
 
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Delete attachment' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     expect(await within(dialog).findByText('attachment delete failed')).toBeInTheDocument();
     expect(vi.mocked(api.deleteTicketAttachment).mock.calls[0][0]).toBe('t-page1');
     expect(vi.mocked(api.deleteTicketAttachment).mock.calls[0][1]).toBe('att-1');
     expect(within(dialog).getByRole('button', { name: 'Delete attachment' })).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
   it('TFE-24: attachment download appends the anchor to the DOM before click and removes it after', async () => {

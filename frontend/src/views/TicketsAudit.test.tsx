@@ -217,7 +217,7 @@ describe('Tickets Module 14-bug audit regressions', () => {
       </QueryClientProvider>,
     );
 
-    const searchInput = await screen.findByPlaceholderText('Search tickets...');
+    const searchInput = await screen.findByPlaceholderText('Search by title, ticket #, or description');
     fireEvent.change(searchInput, { target: { value: 'flickering' } });
 
     await waitFor(() =>

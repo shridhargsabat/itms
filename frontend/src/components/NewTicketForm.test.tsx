@@ -249,6 +249,96 @@ describe('NewTicketForm searchable pickers (UX-04 core, issue 178)', () => {
     vi.mocked(listUsers).mockResolvedValue({ items: [user({ id: 'u-1', name: 'Ana' })], total: 42 });
     renderForm();
 
-    expect(await screen.findByText('Showing first 1 of 42 users')).toBeInTheDocument();
+    expect(await screen.findByText('Showing 1 active of 42 users')).toBeInTheDocument();
+  });
+});
+
+describe('NewTicketForm UX minors (issues 187/188/214-216)', () => {
+  function tpl(): TicketTemplate {
+    return {
+      id: 'tpl-1',
+      name: 'VPN fix',
+      ticket_type: 'INCIDENT',
+      priority: 'HIGH',
+      description: 'Template-provided steps',
+      active: true,
+      created_by: null,
+      updated_by: null,
+      created_at: '2026-11-20T00:00:00Z',
+      updated_at: '2026-11-20T00:00:00Z',
+    };
+  }
+
+  it('UX-40 (#214): users note counts the active subset against the total', async () => {
+    setUser('ADMIN');
+    vi.mocked(listUsers).mockResolvedValue({
+      items: [user({ id: 'u-1', name: 'Ana' }), user({ id: 'u-2', name: 'Ian', active: false })],
+      total: 2,
+    });
+    renderForm();
+
+    // 1 active shown of 2 total — the copy matches the filtered math.
+    expect(await screen.findByText('Showing 1 active of 2 users')).toBeInTheDocument();
+  });
+
+  it('UX-13b (#187): count notes render at the 12px floor', async () => {
+    setUser('ADMIN');
+    vi.mocked(listUsers).mockResolvedValue({ items: [user({ id: 'u-1', name: 'Ana' })], total: 42 });
+    vi.mocked(listAssets).mockResolvedValue({ items: [], total: 5 });
+    renderForm();
+
+    const usersNote = await screen.findByText('Showing 1 active of 42 users');
+    const assetsNote = await screen.findByText('Showing first 0 of 5 assets');
+    for (const note of [usersNote, assetsNote]) {
+      expect(note.className).toContain('text-xs');
+      expect(note.className).not.toContain('text-[11px]');
+    }
+  });
+
+  it('UX-41 (#215): exactly one self option when self is on the page', async () => {
+    setUser('ADMIN', 'u-self');
+    vi.mocked(listUsers).mockResolvedValue({
+      items: [user({ id: 'u-self', name: 'T User' }), user({ id: 'u-1', name: 'Ana' })],
+      total: 2,
+    });
+    renderForm();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Requester' }));
+    expect(await screen.findAllByRole('option', { name: /T User/ })).toHaveLength(1);
+    expect(screen.queryByRole('option', { name: /Current user/ })).not.toBeInTheDocument();
+  });
+
+  it('UX-41 (#215): the (You) fallback is the single self option when self is off-page', async () => {
+    setUser('ADMIN', 'u-self');
+    vi.mocked(listUsers).mockResolvedValue({ items: [user({ id: 'u-1', name: 'Ana' })], total: 1 });
+    renderForm();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Requester' }));
+    expect(await screen.findByRole('option', { name: /T User \(You\)/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Current user/ })).not.toBeInTheDocument();
+  });
+
+  it('UX-42 (#216): the applied template name stays visible', async () => {
+    setUser('ADMIN');
+    vi.mocked(listUsers).mockResolvedValue({ items: [], total: 0 });
+    vi.mocked(listTemplates).mockResolvedValue([tpl()]);
+    renderForm();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Choose a template' }));
+    fireEvent.click(await screen.findByRole('option', { name: /VPN fix/ }));
+
+    // Persistent select value + caption name the applied template.
+    expect(await screen.findByText('Applied template: VPN fix')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose a template' })).toHaveTextContent('VPN fix');
+  });
+
+  it('UX-14b (#188): modal actions reach the 44px target', async () => {
+    setUser('ADMIN');
+    vi.mocked(listUsers).mockResolvedValue({ items: [], total: 0 });
+    renderForm();
+
+    for (const name of ['Cancel', 'Create Ticket']) {
+      expect((await screen.findByRole('button', { name })).className).toContain('min-h-[44px]');
+    }
   });
 });

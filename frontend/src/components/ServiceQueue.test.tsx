@@ -185,7 +185,7 @@ describe('ServiceQueue (task 9)', () => {
     // T1 is OPEN → only IN_PROGRESS and CLOSED are legal transitions.
     fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
     expect(screen.queryByRole('option', { name: 'RESOLVED' })).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN PROGRESS' }));
 
     expect(await within(drawer).findByText('Status updated to IN_PROGRESS')).toBeInTheDocument();
     expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS');
@@ -247,7 +247,7 @@ describe('ServiceQueue (task 9)', () => {
     const drawer = await screen.findByTestId('service-queue-drawer');
 
     fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN PROGRESS' }));
 
     const ok = await within(drawer).findByText('Status updated to IN_PROGRESS');
     expect(ok.className).toContain('text-emerald-700');
@@ -263,7 +263,7 @@ describe('ServiceQueue (task 9)', () => {
     const drawer = await screen.findByTestId('service-queue-drawer');
 
     fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN PROGRESS' }));
 
     const err = await within(drawer).findByText('update failed');
     expect(err.className).toContain('text-red-700');
@@ -346,7 +346,7 @@ describe('ServiceQueue FE-06 status outcome scoping (#150)', () => {
     fireEvent.click(within(queue).getByText('TKT-1048'));
     const drawer1 = await screen.findByTestId('service-queue-drawer');
     fireEvent.click(within(drawer1).getByRole('button', { name: 'Update Status' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN PROGRESS' }));
     // Mutation execution is async — wait for the call rather than asserting sync.
     await waitFor(() => expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS'));
 
@@ -376,7 +376,7 @@ describe('ServiceQueue FE-06 status outcome scoping (#150)', () => {
     fireEvent.click(within(queue).getByText('TKT-1048'));
     const drawer1 = await screen.findByTestId('service-queue-drawer');
     fireEvent.click(within(drawer1).getByRole('button', { name: 'Update Status' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN PROGRESS' }));
     // Ensure the mutation is genuinely in-flight before switching tickets.
     await waitFor(() => expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS'));
 
@@ -399,7 +399,7 @@ describe('ServiceQueue FE-06 status outcome scoping (#150)', () => {
     fireEvent.click(within(queue).getByText('TKT-1048'));
     const drawer = await screen.findByTestId('service-queue-drawer');
     fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
-    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN PROGRESS' }));
     expect(await within(drawer).findByText('close clears me')).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -439,5 +439,64 @@ describe('ServiceQueue CT-01 staff-only status mutation (#155)', () => {
     fireEvent.click(within(queue).getByText('TKT-1048'));
     const drawer = await screen.findByTestId('service-queue-drawer');
     expect(within(drawer).getByRole('button', { name: 'Update Status' })).toBeInTheDocument();
+  });
+});
+
+describe('ServiceQueue UX minors (issues 187-189/217/218)', () => {
+  it('UX-13b (#187): row sub-line renders at the 12px floor', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    const sub = await within(queue).findByText(/CI: SRV-MUM-001/);
+    expect(sub.className).toContain('text-xs');
+    expect(sub.className).not.toContain('text-[11px]');
+  });
+
+  it('UX-15b (#189): truncated row titles carry the full title as a tooltip', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    const title = await within(queue).findByText('PostgreSQL pool exhaustion on ITMS API');
+    expect(title).toHaveAttribute('title', 'PostgreSQL pool exhaustion on ITMS API');
+  });
+
+  it('UX-43 (#217): status menu labels are prettified like StatusBadge', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
+    expect(await screen.findByRole('option', { name: 'IN PROGRESS' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'IN_PROGRESS' })).not.toBeInTheDocument();
+    // The submitted value stays the raw enum.
+    fireEvent.click(screen.getByRole('option', { name: 'IN PROGRESS' }));
+    await waitFor(() => expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS'));
+  });
+
+  it('UX-44 (#218): the queue filter has a visible label', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    const input = await within(queue).findByPlaceholderText('Filter tickets...');
+    const label = within(queue).getByText('Filter');
+    expect(label.tagName).toBe('LABEL');
+    expect(label).toHaveAttribute('for', 'service-queue-filter');
+    expect(label.className).not.toContain('sr-only');
+    expect(input).toHaveAttribute('id', 'service-queue-filter');
+    expect(within(queue).getByLabelText('Filter')).toBe(input);
+  });
+
+  it('UX-14b (#188): drawer close is a 44px target with a 16px icon', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+
+    const close = within(drawer).getByRole('button', { name: 'Close ticket details' });
+    expect(close.className).toContain('min-h-[44px]');
+    expect(close.className).toContain('min-w-[44px]');
+    const iconClass = close.querySelector('svg')?.getAttribute('class') ?? '';
+    expect(iconClass).toContain('h-4');
+    expect(iconClass).toContain('w-4');
   });
 });
