@@ -1,10 +1,24 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ServiceQueue from './ServiceQueue';
 import { listTickets, patchTicketStatus, getSlaPolicy } from '@/api/client';
 import type { Ticket, TicketStatus } from '@/api/types';
+
+// FE-03 (#147): mirrors the drawer trap selector (Tickets TFE-32 / Modal.tsx).
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 // RTL auto-cleanup needs globals (off in this repo), so clean up explicitly.
 afterEach(cleanup);
@@ -84,14 +98,15 @@ function queryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
-function renderQueue() {
-  return render(
-    <QueryClientProvider client={queryClient()}>
+function renderQueue(client = queryClient()) {
+  const result = render(
+    <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={['/']}>
         <ServiceQueue />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { client, ...result };
 }
 
 describe('ServiceQueue (task 9)', () => {
@@ -253,5 +268,176 @@ describe('ServiceQueue (task 9)', () => {
     const err = await within(drawer).findByText('update failed');
     expect(err.className).toContain('text-red-700');
     expect(err.className).toContain('dark:text-red-400');
+  });
+});
+
+describe('ServiceQueue FE-03 inspect drawer focus management (#147)', () => {
+  it('drawer is modal with initial focus, traps Tab, and returns focus to the invoking row', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    const row = within(queue).getByText('TKT-1048').closest('button')!;
+    row.focus();
+    fireEvent.click(row);
+
+    const drawer = await screen.findByTestId('service-queue-drawer');
+    expect(drawer).toHaveAttribute('aria-modal', 'true');
+    expect(drawer.contains(document.activeElement)).toBe(true);
+
+    const items = Array.from(drawer.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    expect(items.length).toBeGreaterThan(1);
+    const first = items[0];
+    const last = items[items.length - 1];
+
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(first);
+
+    first.focus();
+    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('service-queue-drawer')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(row);
+  });
+
+  it('focus trap yields while the status listbox is open, then resumes', async () => {
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
+    await screen.findByRole('listbox');
+
+    const items = Array.from(drawer.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    const first = items[0];
+    const last = items[items.length - 1];
+
+    // Trap stands down: Tab on last does NOT wrap to first.
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(last);
+
+    // Escape is owned by the Select: menu closes, drawer stays, trap resumes.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('service-queue-drawer')).toBeInTheDocument();
+    // Re-focus: Select open/close shifts activeElement in jsdom — pin it so
+    // the wrap assertion below is deterministic.
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(first);
+  });
+});
+
+describe('ServiceQueue FE-06 status outcome scoping (#150)', () => {
+  it('status confirm does not bleed onto another ticket mid-flight', async () => {
+    const { client } = renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+
+    // Hold T1's mutation mid-flight.
+    const gate = deferred<Ticket>();
+    vi.mocked(patchTicketStatus).mockReturnValueOnce(gate.promise);
+
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer1 = await screen.findByTestId('service-queue-drawer');
+    fireEvent.click(within(drawer1).getByRole('button', { name: 'Update Status' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    // Mutation execution is async — wait for the call rather than asserting sync.
+    await waitFor(() => expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS'));
+
+    // Switch to T2 mid-flight.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('service-queue-drawer')).not.toBeInTheDocument();
+    fireEvent.click(within(queue).getByText('TKT-1047'));
+    const drawer2 = await screen.findByTestId('service-queue-drawer');
+    expect(within(drawer2).getByText('TKT-1047')).toBeInTheDocument();
+
+    // T1's mutation resolves after the switch → no confirm on T2.
+    gate.resolve({ ...T1, status: 'IN_PROGRESS' });
+    await waitFor(() =>
+      expect(client.getMutationCache().getAll().some((m) => m.state.status === 'success')).toBe(true),
+    );
+    expect(within(drawer2).queryByText(/Status updated to/)).not.toBeInTheDocument();
+  });
+
+  it('status error does not bleed onto another ticket mid-flight', async () => {
+    const { client } = renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+
+    const gate = deferred<Ticket>();
+    vi.mocked(patchTicketStatus).mockReturnValueOnce(gate.promise);
+
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer1 = await screen.findByTestId('service-queue-drawer');
+    fireEvent.click(within(drawer1).getByRole('button', { name: 'Update Status' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    // Ensure the mutation is genuinely in-flight before switching tickets.
+    await waitFor(() => expect(patchTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS'));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(within(queue).getByText('TKT-1047'));
+    const drawer2 = await screen.findByTestId('service-queue-drawer');
+
+    gate.reject(new Error('mid-flight boom'));
+    await waitFor(() =>
+      expect(client.getMutationCache().getAll().some((m) => m.state.status === 'error')).toBe(true),
+    );
+    expect(within(drawer2).queryByText('mid-flight boom')).not.toBeInTheDocument();
+  });
+
+  it('status error is cleared when the drawer closes', async () => {
+    vi.mocked(patchTicketStatus).mockRejectedValueOnce(new Error('close clears me'));
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Update Status' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'IN_PROGRESS' }));
+    expect(await within(drawer).findByText('close clears me')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('service-queue-drawer')).not.toBeInTheDocument();
+
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const reopened = await screen.findByTestId('service-queue-drawer');
+    expect(within(reopened).queryByText('close clears me')).not.toBeInTheDocument();
+  });
+});
+
+describe('ServiceQueue CT-01 staff-only status mutation (#155)', () => {
+  it('EMPLOYEE sees a read-only status badge, no status mutation', async () => {
+    localStorage.setItem(
+      'itms_user',
+      JSON.stringify({ id: 'u9', email: 'e@x.com', name: 'E', role: 'EMPLOYEE', department: 'IT' }),
+    );
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+    expect(within(drawer).queryByRole('button', { name: 'Update Status' })).not.toBeInTheDocument();
+    expect(within(drawer).queryByText('Update Status')).not.toBeInTheDocument();
+    // Read-only StatusBadge still shows the ticket status.
+    expect(within(drawer).getByText('OPEN')).toBeInTheDocument();
+  });
+
+  it('staff roles keep the Update Status mutation', async () => {
+    localStorage.setItem(
+      'itms_user',
+      JSON.stringify({ id: 'u1', email: 'a@x.com', name: 'A', role: 'ADMIN', department: 'IT' }),
+    );
+    renderQueue();
+    const queue = await screen.findByTestId('service-queue');
+    await within(queue).findByText('TKT-1048');
+    fireEvent.click(within(queue).getByText('TKT-1048'));
+    const drawer = await screen.findByTestId('service-queue-drawer');
+    expect(within(drawer).getByRole('button', { name: 'Update Status' })).toBeInTheDocument();
   });
 });

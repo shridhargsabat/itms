@@ -8,6 +8,8 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** Stacking order (FE-01) — defaults to the classic 60; confirms nested over the z-70 drawer pass 80. */
+  zIndex?: number;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -19,20 +21,28 @@ const FOCUSABLE_SELECTOR =
  * creates a stacking context that would cap this z-[60] below the z-50 bottom
  * nav (real bug: submit buttons behind the nav on mobile).
  */
-export default function Modal({ title, onClose, children }: ModalProps) {
+export default function Modal({ title, onClose, children, zIndex = 60 }: ModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // FE-02: capture-phase + stopPropagation — with a drawer underneath, this
+  // topmost Escape wins and the lower layer never sees the key (Escape used
+  // to close both). The listbox guard stays: an open Select/Canned menu owns
+  // keyboard handling.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (e.defaultPrevented || document.querySelector('[role="listbox"]')) return;
-        onClose();
-      }
+      if (e.key !== 'Escape') return;
+      if (document.querySelector('[role="listbox"]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
   // Focus trap + restore. The listbox guard mirrors the Escape handler: while
   // a Select menu is open it owns keyboard handling, so the trap stands down.
+  // Capture-phase (FE-02): the topmost layer routes Tab first, and lower
+  // layers (drawer) stand down while [data-modal] is present — nested
+  // drawer+modal traps used to deadlock Tab between them.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -62,14 +72,17 @@ export default function Modal({ title, onClose, children }: ModalProps) {
         first.focus();
       }
     };
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     return () => {
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
       previouslyFocused?.focus();
     };
   }, []);
   return createPortal(
-    <div ref={containerRef} className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
+    // data-modal lets lower layers (drawer trap/Escape) stand down while a
+    // Modal is open (FE-02). Inline zIndex carries the prop (default 60, the
+    // unchanged classic); the class stays as the no-prop fallback.
+    <div ref={containerRef} data-modal="true" style={{ zIndex }} className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
       <LiquidGlassSurface
         variant="chrome"

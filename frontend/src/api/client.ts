@@ -817,8 +817,10 @@ export const uploadTicketAttachment = async (ticketId: string, file: File) => {
   form.append('file', file);
   // FormData needs the browser-set multipart boundary — bypass apiFetchRaw
   // entirely (it forces a JSON Content-Type on any body).
-  const token = localStorage.getItem('itms_token');
-  if (token) await enforceSessionFreshness();
+  // CT-05: the Bearer lives in module memory (wave-2b); localStorage
+  // `itms_token` is purged on load and always reads null — use getToken().
+  const token = getToken();
+  await enforceSessionFreshness();
   const res = await fetch(`/api/v1/tickets/${ticketId}/attachments`, {
     method: 'POST',
     body: form,
@@ -826,15 +828,13 @@ export const uploadTicketAttachment = async (ticketId: string, file: File) => {
     credentials: 'include',
   });
   if (res.status === 401) {
-    if (token) {
-      await clearSession();
-      if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
-    }
+    await clearSession();
+    if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
     throw new ApiError(401, 'Session expired — please sign in again');
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => null);
-    throw new Error(err?.error || `upload failed: ${res.status}`);
+    const err = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new ApiError(res.status, err?.error || `upload failed: ${res.status}`);
   }
   notifyRequestSuccess();
   return res.json() as Promise<TicketAttachment>;
@@ -844,17 +844,16 @@ export const deleteTicketAttachment = (ticketId: string, attachmentId: string) =
   apiFetch<void>(`/tickets/${ticketId}/attachments/${attachmentId}`, { method: 'DELETE' });
 
 export const downloadTicketAttachment = async (attachmentId: string) => {
-  const token = localStorage.getItem('itms_token');
-  if (token) await enforceSessionFreshness();
+  // CT-05: Bearer from module memory (getToken) — localStorage is purged.
+  const token = getToken();
+  await enforceSessionFreshness();
   const res = await fetch(`/api/v1/attachments/${attachmentId}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: 'include',
   });
   if (res.status === 401) {
-    if (token) {
-      await clearSession();
-      if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
-    }
+    await clearSession();
+    if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
     throw new ApiError(401, 'Session expired — please sign in again');
   }
   if (!res.ok) {

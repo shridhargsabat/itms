@@ -125,3 +125,129 @@ describe('Select aria-label wiring (TFE-33)', () => {
     expect(screen.getByRole('button', { name: 'Rows per page' })).toBeInTheDocument();
   });
 });
+
+describe('Select keyboard model (FE-08, issue 152)', () => {
+  const options = [
+    { value: 'LOW', label: 'LOW' },
+    { value: 'MEDIUM', label: 'MEDIUM' },
+    { value: 'HIGH', label: 'HIGH' },
+    { value: 'URGENT', label: 'URGENT' },
+  ];
+
+  function openMenu(value = 'MEDIUM', onChange = vi.fn()) {
+    render(<Select ariaLabel="Priority" value={value} onChange={onChange} options={options} />);
+    const trigger = screen.getByRole('button', { name: 'Priority' });
+    fireEvent.click(trigger);
+    const menu = document.body.querySelector('[role="listbox"]') as HTMLElement;
+    expect(menu).not.toBeNull();
+    return { trigger, menu, onChange };
+  }
+
+  function activeOption(menu: HTMLElement) {
+    const id = menu.getAttribute('aria-activedescendant');
+    expect(id).toBeTruthy();
+    return document.getElementById(id as string) as HTMLElement;
+  }
+
+  it('moves focus into the portaled menu on open and exposes the selection via aria-activedescendant', () => {
+    const { menu } = openMenu();
+    expect(document.activeElement).toBe(menu);
+    expect(menu.getAttribute('tabindex')).toBe('-1');
+    // Selected MEDIUM (index 1) is the initial active option.
+    expect(activeOption(menu)).toHaveTextContent('MEDIUM');
+    // Options stay out of the tab order — arrows, not Tab, move between them.
+    for (const opt of screen.getAllByRole('option')) {
+      expect(opt.getAttribute('tabindex')).toBe('-1');
+    }
+  });
+
+  it('ArrowDown/ArrowUp move the active option without selecting', () => {
+    const { menu, onChange } = openMenu();
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(activeOption(menu)).toHaveTextContent('HIGH');
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(activeOption(menu)).toHaveTextContent('URGENT');
+    // Clamps at the last option.
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(activeOption(menu)).toHaveTextContent('URGENT');
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(activeOption(menu)).toHaveTextContent('HIGH');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
+  });
+
+  it('Home/End jump to the first/last option', () => {
+    const { menu } = openMenu();
+    fireEvent.keyDown(menu, { key: 'End' });
+    expect(activeOption(menu)).toHaveTextContent('URGENT');
+    fireEvent.keyDown(menu, { key: 'Home' });
+    expect(activeOption(menu)).toHaveTextContent('LOW');
+  });
+
+  it('Enter selects the active option, closes, and returns focus to the trigger', () => {
+    const { menu, trigger, onChange } = openMenu();
+    fireEvent.keyDown(menu, { key: 'ArrowDown' }); // MEDIUM -> HIGH
+    fireEvent.keyDown(menu, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('HIGH');
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('Space selects the active option', () => {
+    const { menu, onChange } = openMenu('LOW');
+    fireEvent.keyDown(menu, { key: 'End' });
+    fireEvent.keyDown(menu, { key: ' ' });
+    expect(onChange).toHaveBeenCalledWith('URGENT');
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+  });
+
+  it('Escape closes and returns focus to the trigger', () => {
+    const { menu, trigger, onChange } = openMenu();
+    expect(document.activeElement).toBe(menu);
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('Escape with focus outside the menu closes without stealing focus (drawer traps keep working)', () => {
+    const { menu } = openMenu();
+    // Focus moved elsewhere (e.g. tabbed to another drawer control).
+    menu.blur();
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('Tab closes and resumes the tab order from the trigger', () => {
+    const { menu, trigger } = openMenu();
+    fireEvent.keyDown(menu, { key: 'Tab' });
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('ArrowDown on a closed trigger opens the menu and focuses it', () => {
+    render(<Select ariaLabel="Priority" value="" onChange={vi.fn()} options={options} />);
+    const trigger = screen.getByRole('button', { name: 'Priority' });
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    const menu = document.body.querySelector('[role="listbox"]') as HTMLElement;
+    expect(menu).not.toBeNull();
+    expect(document.activeElement).toBe(menu);
+    // No selection → first option active.
+    expect(activeOption(menu)).toHaveTextContent('LOW');
+  });
+
+  it('ArrowUp on a closed trigger opens with the last option active', () => {
+    render(<Select ariaLabel="Priority" value="" onChange={vi.fn()} options={options} />);
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Priority' }), { key: 'ArrowUp' });
+    const menu = document.body.querySelector('[role="listbox"]') as HTMLElement;
+    expect(activeOption(menu)).toHaveTextContent('URGENT');
+  });
+
+  it('mouse hover syncs the active option (aria-activedescendant follows)', () => {
+    const { menu } = openMenu();
+    fireEvent.mouseEnter(screen.getByRole('option', { name: 'LOW' }));
+    expect(activeOption(menu)).toHaveTextContent('LOW');
+  });
+});
