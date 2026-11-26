@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import PaginationFooter from './PaginationFooter';
 
 // RTL auto-cleanup needs globals (off in this repo), so clean up explicitly:
@@ -59,5 +59,113 @@ describe('pagination footer ghost nav (task-15 sweep)', () => {
   it('page-size select has an accessible label', () => {
     render(<PaginationFooter page={1} pageSize={20} total={45} rowsLength={20} />);
     expect(screen.getByLabelText('Rows per page')).toBeInTheDocument();
+  });
+});
+
+describe('pagination footer jump controls (UX-09 #183)', () => {
+  const gotoValue = () => (screen.getByLabelText('Go to page') as HTMLInputElement).value;
+
+  it('First and Last jump to the ends', () => {
+    const onPageChange = vi.fn();
+    render(
+      <PaginationFooter page={3} pageSize={20} total={100} rowsLength={20} onPageChange={onPageChange} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'First page' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Last page' }));
+    expect(onPageChange).toHaveBeenNthCalledWith(1, 1);
+    expect(onPageChange).toHaveBeenNthCalledWith(2, 5);
+  });
+
+  it('First is disabled on page 1, Last on the last page — both stay ghost', () => {
+    const { rerender } = render(
+      <PaginationFooter page={1} pageSize={20} total={100} rowsLength={20} />,
+    );
+    const first = screen.getByRole('button', { name: 'First page' });
+    expect(first).toBeDisabled();
+    expect(first.className).not.toMatch(/bg-accent(?!\/)/);
+    // Last stays ghost even when ENABLED (only Next gets the CTA fill).
+    const last = screen.getByRole('button', { name: 'Last page' });
+    expect(last).not.toBeDisabled();
+    expect(last.className).not.toMatch(/bg-accent(?!\/)/);
+    rerender(<PaginationFooter page={5} pageSize={20} total={100} rowsLength={20} />);
+    expect(screen.getByRole('button', { name: 'Last page' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'First page' })).not.toBeDisabled();
+  });
+
+  it('jump cluster hides when the page count is unknown', () => {
+    // rowsLength-only mode (no total): Last/go-to have no target, so the old
+    // Prev/Next-only UI renders exactly as before.
+    render(<PaginationFooter page={1} pageSize={20} rowsLength={20} />);
+    expect(screen.queryByRole('button', { name: 'First page' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Last page' })).toBeNull();
+    expect(screen.queryByLabelText('Go to page')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Previous page' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeInTheDocument();
+  });
+
+  it('go-to commits on Enter', () => {
+    const onPageChange = vi.fn();
+    render(
+      <PaginationFooter page={3} pageSize={20} total={100} rowsLength={20} onPageChange={onPageChange} />,
+    );
+    expect(gotoValue()).toBe('3');
+    fireEvent.change(screen.getByLabelText('Go to page'), { target: { value: '5' } });
+    fireEvent.keyDown(screen.getByLabelText('Go to page'), { key: 'Enter' });
+    expect(onPageChange).toHaveBeenCalledWith(5);
+  });
+
+  it('go-to clamps out-of-range input into [1, pages]', () => {
+    const onPageChange = vi.fn();
+    render(
+      <PaginationFooter page={3} pageSize={20} total={100} rowsLength={20} onPageChange={onPageChange} />,
+    );
+    const box = () => screen.getByLabelText('Go to page');
+    fireEvent.change(box(), { target: { value: '999' } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    fireEvent.change(box(), { target: { value: '0' } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    fireEvent.change(box(), { target: { value: '-3' } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    expect(onPageChange).toHaveBeenNthCalledWith(1, 5);
+    expect(onPageChange).toHaveBeenNthCalledWith(2, 1);
+    expect(onPageChange).toHaveBeenNthCalledWith(3, 1);
+  });
+
+  it('go-to garbage and empty input navigate nowhere and revert', () => {
+    const onPageChange = vi.fn();
+    render(
+      <PaginationFooter page={3} pageSize={20} total={100} rowsLength={20} onPageChange={onPageChange} />,
+    );
+    const box = () => screen.getByLabelText('Go to page');
+    fireEvent.change(box(), { target: { value: 'abc' } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    fireEvent.change(box(), { target: { value: '' } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    // Typing the page we're already on is a silent no-op too.
+    fireEvent.change(box(), { target: { value: '3' } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    expect(onPageChange).not.toHaveBeenCalled();
+    expect(gotoValue()).toBe('3');
+  });
+
+  it('Go button commits the draft', () => {
+    const onPageChange = vi.fn();
+    render(
+      <PaginationFooter page={3} pageSize={20} total={100} rowsLength={20} onPageChange={onPageChange} />,
+    );
+    fireEvent.change(screen.getByLabelText('Go to page'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('Escape reverts the draft without navigating', () => {
+    const onPageChange = vi.fn();
+    render(
+      <PaginationFooter page={3} pageSize={20} total={100} rowsLength={20} onPageChange={onPageChange} />,
+    );
+    fireEvent.change(screen.getByLabelText('Go to page'), { target: { value: '5' } });
+    fireEvent.keyDown(screen.getByLabelText('Go to page'), { key: 'Escape' });
+    expect(onPageChange).not.toHaveBeenCalled();
+    expect(gotoValue()).toBe('3');
   });
 });

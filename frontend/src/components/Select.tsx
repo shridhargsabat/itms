@@ -25,6 +25,11 @@ interface SelectProps {
   ariaLabel?: string;
   /** Accessible label forwarded to the trigger button (e.g. "Rows per page"). Alias of ariaLabel. */
   'aria-label'?: string;
+  /** When true, renders a filter input at the top of the menu that filters
+   *  options by label (case-insensitive substring). The keyboard model is
+   *  unchanged — arrows/Home/End/Enter/Escape/Tab operate on the filtered
+   *  list. Default false. */
+  searchable?: boolean;
 }
 
 /**
@@ -38,6 +43,12 @@ interface SelectProps {
  * via aria-activedescendant), Enter/Space selects, Tab closes and resumes
  * the natural tab order from the trigger, Escape closes returning focus to
  * the trigger.
+ *
+ * When `searchable` is set, a filter input renders at the top of the menu
+ * (focused on open so typing starts immediately). It filters options by
+ * label; navigation keys bubble from the input to the same menu handler, so
+ * the keyboard model above operates on the filtered list unchanged — except
+ * Space, which types filter text instead of selecting.
  */
 export default function Select({
   value,
@@ -49,24 +60,34 @@ export default function Select({
   triggerClassName,
   ariaLabel,
   'aria-label': ariaLabelAttr,
+  searchable = false,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<{ top: number; left: number; width: number; maxWidth: number } | null>(null);
   const [active, setActive] = useState(0);
+  const [query, setQuery] = useState('');
   const menuHeight = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const listId = useId();
   const optId = (i: number) => `${listId}-opt-${i}`;
 
-  const selectedIndex = options.findIndex((o) => o.value === value);
+  // UX-04: the searchable filter narrows by label (case-insensitive
+  // substring). Everything below — keyboard nav, aria-activedescendant,
+  // choose() — operates on `visible`, never the full list.
+  const needle = query.trim().toLowerCase();
+  const visible = searchable && needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
+
+  const selectedIndex = visible.findIndex((o) => o.value === value);
   // Guard against the option list shrinking while the menu is open.
-  const safeActive = options.length === 0 ? 0 : Math.min(Math.max(active, 0), options.length - 1);
+  const safeActive = visible.length === 0 ? 0 : Math.min(Math.max(active, 0), visible.length - 1);
 
   const close = () => {
     setOpen(false);
     setMenu(null);
+    setQuery('');
   };
 
   const closeReturnFocus = () => {
@@ -83,12 +104,13 @@ export default function Select({
   };
 
   const openMenu = (initialActive?: number) => {
+    setQuery('');
     setActive(initialActive ?? (selectedIndex >= 0 ? selectedIndex : 0));
     setOpen(true);
   };
 
   const choose = (index: number) => {
-    const o = options[index];
+    const o = visible[index];
     if (!o) return;
     onChange(o.value);
     closeReturnFocus();
@@ -103,15 +125,15 @@ export default function Select({
     switch (e.key) {
       case 'ArrowDown': {
         e.preventDefault();
-        if (!options.length) return;
-        const next = Math.min(safeActive + 1, options.length - 1);
+        if (!visible.length) return;
+        const next = Math.min(safeActive + 1, visible.length - 1);
         setActive(next);
         reveal(next);
         break;
       }
       case 'ArrowUp': {
         e.preventDefault();
-        if (!options.length) return;
+        if (!visible.length) return;
         const next = Math.max(safeActive - 1, 0);
         setActive(next);
         reveal(next);
@@ -119,23 +141,26 @@ export default function Select({
       }
       case 'Home': {
         e.preventDefault();
-        if (!options.length) return;
+        if (!visible.length) return;
         setActive(0);
         reveal(0);
         break;
       }
       case 'End': {
         e.preventDefault();
-        if (!options.length) return;
-        setActive(options.length - 1);
-        reveal(options.length - 1);
+        if (!visible.length) return;
+        setActive(visible.length - 1);
+        reveal(visible.length - 1);
         break;
       }
       case 'Enter':
-      case ' ':
+      case ' ': {
+        // UX-04: a Space typed in the filter input is filter text, not "select".
+        if (e.key === ' ' && (e.target as HTMLElement | null)?.tagName === 'INPUT') return;
         e.preventDefault();
         choose(safeActive);
         break;
+      }
       case 'Escape':
         // Normally intercepted by the window capture listener below (which
         // also swallows the event so parent dialogs stay open); this is the
@@ -158,7 +183,7 @@ export default function Select({
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       ref.current?.scrollIntoView({ block: 'nearest' });
-      openMenu(e.key === 'ArrowDown' ? (selectedIndex >= 0 ? selectedIndex : 0) : Math.max(options.length - 1, 0));
+      openMenu(e.key === 'ArrowDown' ? (selectedIndex >= 0 ? selectedIndex : 0) : Math.max(visible.length - 1, 0));
     }
   };
 
@@ -238,7 +263,10 @@ export default function Select({
     if (!open) return;
     if (menuRef.current) menuHeight.current = menuRef.current.offsetHeight;
     placeMenu();
-    menuRef.current?.focus({ preventScroll: true });
+    // UX-04: searchable menus focus the filter so typing starts immediately;
+    // navigation keys bubble from the input to the menu handler unchanged.
+    if (searchable) searchRef.current?.focus({ preventScroll: true });
+    else menuRef.current?.focus({ preventScroll: true });
   }, [open]);
 
   const toggle = () => {
@@ -298,11 +326,29 @@ export default function Select({
             }}
             role="listbox"
             tabIndex={-1}
-            aria-activedescendant={options.length ? optId(safeActive) : undefined}
+            aria-activedescendant={visible.length ? optId(safeActive) : undefined}
             onKeyDown={onMenuKeyDown}
             className="animate-menu-in z-[70] max-h-64 overflow-auto rounded-lg border border-edge bg-surface p-1 shadow-xl outline-none"
           >
-            {options.map((o, i) => {
+            {searchable && (
+              <div className="sticky -top-1 bg-surface pb-1 pt-1">
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setActive(0);
+                  }}
+                  placeholder="Filter options"
+                  aria-label="Filter options"
+                  className={cn(inputCls, 'py-1.5')}
+                />
+              </div>
+            )}
+            {visible.length === 0 && searchable && needle ? (
+              <p className="px-3 py-2 text-sm text-muted">No matching options</p>
+            ) : (
+              visible.map((o, i) => {
               const highlighted = i === safeActive;
               const isSelected = o.value === value;
               return (
@@ -326,7 +372,8 @@ export default function Select({
                   {isSelected && <Check className="h-4 w-4 shrink-0 text-accent" />}
                 </button>
               );
-            })}
+              }))
+            }
           </div>,
           document.body,
         )}

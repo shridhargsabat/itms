@@ -30,6 +30,7 @@ import {
   downloadTicketAttachment,
   exportTicketsCsv,
   getTicketTimeline,
+  listAssets,
   listCanned,
   listTickets,
   listUsers,
@@ -41,7 +42,7 @@ import { ALLOWED_TICKET_TRANSITIONS, PRIORITIES, TICKET_STATUSES, TICKET_TYPES }
 import type { Priority, Ticket, TicketStatus, UpdateTicketInput } from '@/api/types';
 import DataTable, { type Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
-import { FieldError } from '@/components/FieldError';
+import { FieldError, errProps } from '@/components/FieldError';
 import FilterBar from '@/components/FilterBar';
 import Modal from '@/components/Modal';
 import NewTicketForm from '@/components/NewTicketForm';
@@ -68,6 +69,27 @@ const FOCUSABLE_SELECTOR =
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ATTACHMENT_ACCEPT = '.pdf,.json,.zip,.doc,.docx,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.md';
 
+// UX-04 (#178): the drawer assignee picker is searchable. `searchable` lands
+// on Select.tsx from the sibling — spread-typed so tsc stays green until the
+// prop exists (spreads bypass excess-property checks; inert at runtime).
+const ASSIGNEE_SEARCHABLE = { searchable: true } as { searchable?: boolean };
+
+// UX-12 (#186): compact kanban sort — value encodes `sort:order` so one
+// Select writes both ?sort= and ?order= (sla_due_at sorts nulls last server-side).
+const KANBAN_SORT_OPTIONS = [
+  { value: '', label: 'Default order' },
+  { value: 'sla_due_at:asc', label: 'SLA due ↑' },
+  { value: 'sla_due_at:desc', label: 'SLA due ↓' },
+  { value: 'ticket_number:asc', label: 'Ticket # ↑' },
+  { value: 'ticket_number:desc', label: 'Ticket # ↓' },
+  { value: 'priority:asc', label: 'Priority ↑' },
+  { value: 'priority:desc', label: 'Priority ↓' },
+  { value: 'status:asc', label: 'Status ↑' },
+  { value: 'status:desc', label: 'Status ↓' },
+  { value: 'ticket_type:asc', label: 'Type ↑' },
+  { value: 'ticket_type:desc', label: 'Type ↓' },
+];
+
 export default function Tickets() {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -76,6 +98,13 @@ export default function Tickets() {
   const [selectedId, setSelectedId] = useState<string | null>(() => params.get('open'));
   const [newOpen, setNewOpen] = useState(false);
   const { page, pageSize, setPage, setPageSize, reset, offset } = useServerPagination(20);
+  // UX-09 (#183): ?page= read once on mount (the sibling owns usePagination,
+  // so the URL sync lives here, not in the hook).
+  useEffect(() => {
+    const initial = Number.parseInt(params.get('page') ?? '', 10);
+    if (Number.isInteger(initial) && initial >= 1 && initial !== page) setPage(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // TFE-03: EMPLOYEE is read-only — staff-only editing UI is gated on this.
   const user = getCachedUser();
@@ -88,6 +117,10 @@ export default function Tickets() {
   const sort = params.get('sort') ?? null;
   const order = (params.get('order') as 'asc' | 'desc' | null) ?? null;
   const overdueOnly = params.get('overdue') === 'true';
+
+  // UX-07 (#181): filters counted across status/priority/type/search/overdue.
+  const activeFilterCount =
+    [status, priority, type, search].filter(Boolean).length + (overdueOnly ? 1 : 0);
 
   // TFE-05: debounced search — the box is local state; the param (and the API
   // call) follows ~300ms after the user stops typing.
@@ -158,6 +191,8 @@ export default function Tickets() {
   // FE-07: deep link resolving — a pending drawer skeleton (below) instead of nothing.
   const deepLinkPending = Boolean(selectedId && !rowMatch && singleTicket.isPending);
   const users = useQuery({ queryKey: ['users', 'picker'], queryFn: () => listUsers({ limit: 200 }) });
+  // UX-05 (#179): drawer asset picker source (NewTicketForm pattern, limit 200).
+  const assets = useQuery({ queryKey: ['assets', 'picker'], queryFn: () => listAssets({ limit: 200 }) });
   // TFE-28: live SLA policy with the const as fallback (values match the server today).
   const slaPolicy = useQuery({ queryKey: ['sla-policy'], queryFn: getSlaPolicy, staleTime: Infinity, retry: false });
   const slaHours = (p: string) => slaPolicy.data?.[p]?.hours ?? SLA_HOURS[p] ?? 24;
@@ -165,8 +200,12 @@ export default function Tickets() {
   // TFE-29: staff can fix title/description/type (C1 — PATCH accepts them).
   const [editingDetails, setEditingDetails] = useState(false);
   const [detailsDraft, setDetailsDraft] = useState({ title: '', description: '', ticket_type: '' });
+  // UX-06 (#180): inline title error (FieldError + errProps + focus-first-invalid).
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setEditingDetails(false);
+    setTitleError(null);
   }, [selectedId]);
   const openDetailsEditor = () => {
     if (!selected) return;
@@ -175,6 +214,7 @@ export default function Tickets() {
       description: selected.description ?? '',
       ticket_type: selected.ticket_type,
     });
+    setTitleError(null);
     setEditingDetails(true);
   };
 
@@ -235,8 +275,20 @@ export default function Tickets() {
   // any filter change or view switch resets to page 1
   // FE-11: overdue is a filter too — omitting it left page 2+ active with a
   // narrowed result set (often an empty page).
+  // UX-09 (#183): the reset also drops ?page=; skipped on first render so the
+  // mount-time ?page= read above survives (page already starts at 1).
+  const firstFilterPass = useRef(true);
   useEffect(() => {
+    if (firstFilterPass.current) {
+      firstFilterPass.current = false;
+      return;
+    }
     reset();
+    const next = new URLSearchParams(params);
+    if (next.has('page')) {
+      next.delete('page');
+      setParams(next, { replace: true });
+    }
   }, [status, priority, type, search, view, sort, order, overdueOnly]);
 
   const onSortChange = (s: { key: string; dir: 'asc' | 'desc' } | null) => {
@@ -284,6 +336,21 @@ export default function Tickets() {
                   ? null
                   : (users.data?.items.find((u) => u.id === input.assignee_id)?.name ?? selected.assignee_name),
             };
+      // UX-05 (#179): optimistic asset link/unlink mirrors the assignee above.
+      const optimisticAsset =
+        input.asset_id === undefined
+          ? undefined
+          : {
+              asset_id: input.asset_id,
+              asset_tag:
+                input.asset_id === null
+                  ? null
+                  : (assets.data?.items.find((a) => a.id === input.asset_id)?.asset_tag ?? selected.asset_tag),
+              asset_name:
+                input.asset_id === null
+                  ? null
+                  : (assets.data?.items.find((a) => a.id === input.asset_id)?.name ?? selected.asset_name),
+            };
       const apply = (t: Ticket): Ticket =>
         t.id !== ticketId
           ? t
@@ -291,6 +358,7 @@ export default function Tickets() {
               ...t,
               ...(input.priority !== undefined ? { priority: input.priority } : {}),
               ...(optimisticAssignee ?? {}),
+              ...(optimisticAsset ?? {}),
             };
       qc.setQueriesData<{ items: Ticket[]; total: number }>({ queryKey: ['tickets'] }, (old) =>
         old ? { ...old, items: old.items.map(apply) } : old,
@@ -374,6 +442,42 @@ export default function Tickets() {
     setParams(next, { replace: true });
   };
 
+  // UX-07 (#181) / UX-11 (#185): one-tap clear across the five list filters.
+  const clearFilters = () => {
+    const next = new URLSearchParams(params);
+    for (const k of ['status', 'priority', 'type', 'search', 'overdue']) next.delete(k);
+    setParams(next, { replace: true });
+  };
+
+  // UX-09 (#183): page changes write ?page= back (page 1 omits it).
+  const handlePageChange = (p: number) => {
+    setPage(p);
+    const next = new URLSearchParams(params);
+    if (p <= 1) {
+      next.delete('page');
+    } else {
+      next.set('page', String(p));
+    }
+    setParams(next, { replace: true });
+  };
+  const handlePageSizeChange = (s: number) => {
+    setPageSize(s);
+    const next = new URLSearchParams(params);
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  // UX-12 (#186): kanban sort Select value ↔ ?sort=&order=.
+  const kanbanSortValue = sort ? `${sort}:${order ?? 'asc'}` : '';
+  const onKanbanSortChange = (v: string) => {
+    if (!v) {
+      onSortChange(null);
+      return;
+    }
+    const [key, dir] = v.split(':');
+    onSortChange({ key, dir: dir === 'desc' ? 'desc' : 'asc' });
+  };
+
   const columns: Column<Ticket>[] = [
     {
       key: 'ticket_number',
@@ -397,7 +501,7 @@ export default function Tickets() {
         )}
       </span>
     ) },
-    { key: 'sla', header: 'SLA', sortable: false, render: (t) => <span className="whitespace-nowrap"><SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} /></span> },
+    { key: 'sla', header: 'SLA', sortable: true, sortKey: 'sla_due_at', render: (t) => <span className="whitespace-nowrap"><SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} /></span> },
     {
       key: 'ticket_type',
       header: 'Type',
@@ -430,6 +534,19 @@ export default function Tickets() {
   const staffUsers = (users.data?.items ?? []).filter(
     (u) => (u.role === 'ADMIN' || u.role === 'AGENT') && u.active,
   );
+
+  // UX-05 (#179): NewTicketForm asset-picker pattern (`None (optional)` +
+  // `TAG · name`) + FE-10-style pinning of the current asset past page 1.
+  const assetPickerOptions = [
+    { value: '', label: 'None (optional)' },
+    ...(selected?.asset_id && !(assets.data?.items ?? []).some((a) => a.id === selected.asset_id)
+      ? [{ value: selected.asset_id, label: `${selected.asset_tag} · ${selected.asset_name}` }]
+      : []),
+    ...(assets.data?.items ?? []).map((a) => ({
+      value: a.id,
+      label: `${a.asset_tag} · ${a.name}`,
+    })),
+  ];
 
   const matchCount = data?.total ?? rows.length;
   const kanbanTruncated = view === 'kanban' && (data?.total ?? 0) > rows.length;
@@ -528,6 +645,34 @@ export default function Tickets() {
           ]}
         />
         </div>
+        {/* UX-08 (#182): overdue toggle beside the three Selects — writes
+            ?overdue=true; the active-state chip below stays as-is. It sits
+            outside the mobile grid (Mobile #4 pins that grid at 4 cells). */}
+        <button
+          type="button"
+          onClick={() => update('overdue', overdueOnly ? '' : 'true')}
+          aria-pressed={overdueOnly}
+          aria-label="Show overdue only"
+          className={cn(
+            'inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors',
+            overdueOnly
+              ? 'border-amber-500/40 bg-amber-500/15 font-medium text-amber-700 dark:text-amber-400'
+              : 'border-edge bg-surface text-secondary hover:text-primary',
+          )}
+        >
+          Overdue
+        </button>
+        {/* UX-07 (#181): N-filters-active badge + one-tap Clear all. */}
+        {activeFilterCount > 0 && (
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent">
+              {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'} active
+            </span>
+            <Button type="button" variant="secondary" size="sm" onClick={clearFilters}>
+              Clear all
+            </Button>
+          </div>
+        )}
       </FilterBar>
 
       {(overdueOnly || exportError) && (
@@ -576,16 +721,29 @@ export default function Tickets() {
           <EmptyState
             icon={TicketIcon}
             title="No tickets found"
-            description="No tickets match the current filters. Adjust the filters or create a new ticket."
+            description={
+              search
+                ? `No tickets match "${search}". Try a different search or clear the filters below.`
+                : 'No tickets match the current filters. Adjust the filters or create a new ticket.'
+            }
             action={
-              <Button
-                type="button"
-                onClick={() => setNewOpen(true)}
-                variant="primary"
-                leftIcon={<Plus className="h-4 w-4" />}
-              >
-                New Ticket
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setNewOpen(true)}
+                  variant="primary"
+                  leftIcon={<Plus className="h-4 w-4" />}
+                >
+                  New Ticket
+                </Button>
+                {/* UX-11 (#185): secondary clear — for query empties and
+                    filter-only empties alike. */}
+                {activeFilterCount > 0 && (
+                  <Button type="button" onClick={clearFilters} variant="secondary">
+                    Clear search & filters
+                  </Button>
+                )}
+              </div>
             }
           />
         ) : view === 'table' ? (
@@ -595,8 +753,8 @@ export default function Tickets() {
               total={data?.total}
               page={page}
               pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
               sort={sort ? { key: sort, dir: order === 'desc' ? 'desc' : 'asc' } : null}
               onSortChange={onSortChange}
               loading={isLoading}
@@ -605,7 +763,20 @@ export default function Tickets() {
               highlightId={selectedId ?? undefined}
               onRowClick={(t) => selectTicket(t.id)}
             />
-          ) : isLoading ? (
+          ) : (
+            /* UX-12 (#186): compact kanban sort above the board (table keeps
+               its header sorting). */
+            <div className="space-y-2">
+              <div className="flex justify-end">
+                <Select
+                  ariaLabel="Sort kanban tickets"
+                  className="w-full sm:w-auto sm:min-w-[180px]"
+                  value={kanbanSortValue}
+                  onChange={onKanbanSortChange}
+                  options={KANBAN_SORT_OPTIONS}
+                />
+              </div>
+              {isLoading ? (
             <ScrollX innerClassName="pb-2">
               <div className="flex snap-x gap-4 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-4" aria-busy="true" aria-label="Loading tickets">
                 {TICKET_STATUSES.map((st) => (
@@ -659,8 +830,12 @@ export default function Tickets() {
                             style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-mono text-[10px] text-muted">
-                                {t.ticket_number}
+                              {/* UX-10 (#184): SLA chip on the number row. */}
+                              <span className="flex min-w-0 items-center gap-1.5">
+                                <span className="font-mono text-[10px] text-muted">
+                                  {t.ticket_number}
+                                </span>
+                                <SlaChip dueAt={t.sla_due_at} policyHours={slaHours(t.priority)} />
                               </span>
                               <PriorityBadge priority={t.priority} />
                             </div>
@@ -681,6 +856,8 @@ export default function Tickets() {
                 })}
               </div>
             </ScrollX>
+              )}
+            </div>
           )}
         </div>
 
@@ -785,13 +962,21 @@ export default function Tickets() {
                   <label className={labelCls} htmlFor="ticket-edit-title">Title</label>
                   <input
                     id="ticket-edit-title"
+                    ref={titleRef}
                     className={inputCls}
                     value={detailsDraft.title}
                     // CT-06: backend allows 255 — the old 200 cap rejected valid titles client-side.
                     maxLength={255}
                     disabled={saveDetails.isPending}
-                    onChange={(e) => setDetailsDraft((d) => ({ ...d, title: e.target.value }))}
+                    onChange={(e) => {
+                      setDetailsDraft((d) => ({ ...d, title: e.target.value }));
+                      if (titleError) setTitleError(null);
+                    }}
+                    {...errProps('ticket-edit-title', titleError)}
                   />
+                  {/* UX-06 (#180): inline error under the title input (not a
+                      silent disabled Save) — wired via aria-describedby. */}
+                  <FieldError id="ticket-edit-title-error" error={titleError} />
                 </div>
                 <div>
                   <label className={labelCls}>Type</label>
@@ -833,15 +1018,23 @@ export default function Tickets() {
                     type="button"
                     variant="primary"
                     size="sm"
-                    disabled={!detailsDraft.title.trim() || saveDetails.isPending}
+                    disabled={saveDetails.isPending}
                     loading={saveDetails.isPending}
-                    onClick={() =>
+                    // UX-06 (#180): empty title → inline error + focus the
+                    // input (focus-first-invalid), not a silent disable.
+                    onClick={() => {
+                      if (!detailsDraft.title.trim()) {
+                        setTitleError('Title is required.');
+                        titleRef.current?.focus();
+                        return;
+                      }
+                      setTitleError(null);
                       saveDetails.mutate({
                         title: detailsDraft.title.trim(),
                         description: detailsDraft.description,
                         ticket_type: detailsDraft.ticket_type,
-                      })
-                    }
+                      });
+                    }}
                   >
                     Save changes
                   </Button>
@@ -900,6 +1093,7 @@ export default function Tickets() {
                     <label className={labelCls}>Assignee</label>
                     <div className={cn(editTicket.isPending && 'pointer-events-none opacity-60')} aria-disabled={editTicket.isPending}>
                       <Select
+                        {...ASSIGNEE_SEARCHABLE}
                         ariaLabel="Ticket assignee"
                         className="w-full"
                         value={selected.assignee_id ?? ''}
@@ -927,6 +1121,30 @@ export default function Tickets() {
                     {users.data && users.data.total > users.data.items.length && (
                       <p className="mt-1 text-[10px] text-muted">
                         Showing first 200 of {users.data.total} users
+                      </p>
+                    )}
+                  </div>
+                  {/* UX-05 (#179): staff asset link/unlink — same picker
+                      pattern as NewTicketForm, PATCHes asset_id. */}
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Linked asset</label>
+                    <div className={cn(editTicket.isPending && 'pointer-events-none opacity-60')} aria-disabled={editTicket.isPending}>
+                      <Select
+                        ariaLabel="Ticket linked asset"
+                        className="w-full"
+                        value={selected.asset_id ?? ''}
+                        // FE-12-style guard — re-selecting the current asset
+                        // is a no-op (no pointless PATCH).
+                        onChange={(v) => {
+                          if (v === (selected.asset_id ?? '')) return;
+                          editTicket.mutate({ asset_id: v || null });
+                        }}
+                        options={assetPickerOptions}
+                      />
+                    </div>
+                    {assets.data && assets.data.total > assets.data.items.length && (
+                      <p className="mt-1 text-[10px] text-muted">
+                        Showing first {assets.data.items.length} of {assets.data.total} assets
                       </p>
                     )}
                   </div>

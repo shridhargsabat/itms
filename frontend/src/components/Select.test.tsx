@@ -251,3 +251,130 @@ describe('Select keyboard model (FE-08, issue 152)', () => {
     expect(activeOption(menu)).toHaveTextContent('LOW');
   });
 });
+
+describe('Select id passthrough (UX-02, issue 176)', () => {
+  it('forwards id to the trigger button so a <label htmlFor> can target it', () => {
+    render(
+      <Select
+        id="new-ticket-priority"
+        value="MEDIUM"
+        onChange={vi.fn()}
+        options={[{ value: 'MEDIUM', label: 'MEDIUM' }]}
+      />,
+    );
+    expect(screen.getByRole('button')).toHaveAttribute('id', 'new-ticket-priority');
+  });
+});
+
+describe('Select searchable filter (UX-04, issue 178)', () => {
+  const options = [
+    { value: 'LOW', label: 'LOW' },
+    { value: 'MEDIUM', label: 'MEDIUM' },
+    { value: 'HIGH', label: 'HIGH' },
+    { value: 'URGENT', label: 'URGENT' },
+  ];
+
+  function openSearchable(onChange = vi.fn()) {
+    render(<Select ariaLabel="Assignee" value="" onChange={onChange} options={options} searchable />);
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }));
+    const menu = document.body.querySelector('[role="listbox"]') as HTMLElement;
+    expect(menu).not.toBeNull();
+    return { menu, onChange };
+  }
+
+  function filterInput() {
+    return screen.getByRole('textbox', { name: 'Filter options' });
+  }
+
+  it('renders no filter input by default (searchable defaults to false)', () => {
+    render(<Select ariaLabel="Priority" value="" onChange={vi.fn()} options={options} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Priority' }));
+    expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Filter options' })).not.toBeInTheDocument();
+  });
+
+  it('renders a filter input in the menu when searchable and focuses it on open', () => {
+    const { menu } = openSearchable();
+    const input = filterInput();
+    expect(menu.contains(input)).toBe(true);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('filters options by label, case-insensitively', () => {
+    openSearchable();
+    fireEvent.change(filterInput(), { target: { value: 'urg' } });
+    expect(screen.getByRole('option', { name: 'URGENT' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'LOW' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'MEDIUM' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'HIGH' })).not.toBeInTheDocument();
+  });
+
+  it('clearing the filter restores all options', () => {
+    openSearchable();
+    const input = filterInput();
+    fireEvent.change(input, { target: { value: 'urg' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.change(input, { target: { value: '' } });
+    expect(screen.getAllByRole('option')).toHaveLength(4);
+  });
+
+  it('Space typed in the filter is filter text, not "select"', () => {
+    const { onChange } = openSearchable();
+    const input = filterInput() as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'UR ' } });
+    fireEvent.keyDown(input, { key: ' ' });
+    expect(input.value).toBe('UR ');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
+  });
+
+  it('ArrowDown/Enter operate on the filtered list and return focus to the trigger', () => {
+    const { onChange } = openSearchable();
+    const input = filterInput();
+    fireEvent.change(input, { target: { value: 'g' } }); // HIGH, URGENT
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+    fireEvent.keyDown(input, { key: 'ArrowDown' }); // HIGH -> URGENT
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('URGENT');
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Assignee' }));
+  });
+
+  it('Escape from the filter closes without selecting', () => {
+    const { onChange } = openSearchable();
+    const input = filterInput();
+    fireEvent.change(input, { target: { value: 'urg' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Tab from the filter closes and resumes the tab order from the trigger', () => {
+    openSearchable();
+    fireEvent.keyDown(filterInput(), { key: 'Tab' });
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Assignee' }));
+  });
+
+  it('shows an empty state when nothing matches and Enter selects nothing', () => {
+    const { onChange } = openSearchable();
+    const input = filterInput();
+    fireEvent.change(input, { target: { value: 'zzz-no-match' } });
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    expect(screen.getByText('No matching options')).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
+  });
+
+  it('resets the filter on close so reopening shows all options', () => {
+    openSearchable();
+    fireEvent.change(filterInput(), { target: { value: 'urg' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.keyDown(filterInput(), { key: 'Escape' });
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }));
+    expect(screen.getAllByRole('option')).toHaveLength(4);
+    expect((filterInput() as HTMLInputElement).value).toBe('');
+  });
+});
