@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -47,6 +47,7 @@ export default function NewTicketForm({
   });
   const assets = useQuery({ queryKey: ['assets', 'picker'], queryFn: () => listAssets({ limit: 200 }) });
   const [titleError, setTitleError] = useState<string | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
   // TFE-15: type/priority always hold a value (defaults), so track whether the
   // user picked them — templates fill only untouched fields.
   const [customType, setCustomType] = useState(false);
@@ -91,12 +92,15 @@ export default function NewTicketForm({
   return (
     <form
       className="space-y-4"
+      noValidate
       onSubmit={(ev) => {
         ev.preventDefault();
         // TFE-17: native `required` passes whitespace — check the trimmed value.
         const title = form.title.trim();
         if (!title) {
           setTitleError('Title is required.');
+          // UX-03: focus-first-invalid — move focus to the failing field.
+          titleRef.current?.focus();
           return;
         }
         setTitleError(null);
@@ -119,8 +123,12 @@ export default function NewTicketForm({
         }))}
       />
       <div>
-        <label className={labelCls}>Title *</label>
+        <label className={labelCls} htmlFor="new-ticket-title">
+          Title *
+        </label>
         <input
+          ref={titleRef}
+          id="new-ticket-title"
           required
           maxLength={TITLE_MAX}
           className={inputCls}
@@ -129,14 +137,22 @@ export default function NewTicketForm({
             set('title', e.target.value);
             if (titleError) setTitleError(null);
           }}
+          // UX-03: same trimmed validation on blur as on submit — empty and
+          // whitespace-only titles surface the identical FieldError alert.
+          onBlur={() => {
+            setTitleError(form.title.trim() ? null : 'Title is required.');
+          }}
           placeholder="What's the issue?"
           {...errProps('new-ticket-title', titleError)}
         />
         <FieldError id="new-ticket-title-error" error={titleError} />
       </div>
       <div>
-        <label className={labelCls}>Description</label>
+        <label className={labelCls} htmlFor="new-ticket-description">
+          Description
+        </label>
         <textarea
+          id="new-ticket-description"
           className={inputCls}
           rows={3}
           maxLength={DESCRIPTION_MAX}
@@ -148,8 +164,11 @@ export default function NewTicketForm({
       <SuggestionPanel query={form.title} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className={labelCls}>Type</label>
+          <label className={labelCls} htmlFor="new-ticket-type">
+            Type
+          </label>
           <Select
+            id="new-ticket-type"
             className="w-full"
             value={form.ticket_type}
             onChange={(v) => {
@@ -161,8 +180,11 @@ export default function NewTicketForm({
           />
         </div>
         <div>
-          <label className={labelCls}>Priority</label>
+          <label className={labelCls} htmlFor="new-ticket-priority">
+            Priority
+          </label>
           <Select
+            id="new-ticket-priority"
             className="w-full"
             value={form.priority}
             onChange={(v) => {
@@ -177,13 +199,17 @@ export default function NewTicketForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {!isEmployee && (
           <div>
-            <label className={labelCls}>Requester</label>
+            <label className={labelCls} htmlFor="new-ticket-requester">
+              Requester
+            </label>
             <Select
+              id="new-ticket-requester"
               className="w-full"
               value={form.requester_id ?? ''}
               onChange={(v) => set('requester_id', v)}
               options={requesterOptions}
               ariaLabel="Requester"
+              searchable
             />
             {users.data && users.data.total > activeUsers.length && (
               <p className="mt-1 text-[11px] text-muted">
@@ -193,13 +219,17 @@ export default function NewTicketForm({
           </div>
         )}
         <div>
-          <label className={labelCls}>Linked Asset</label>
+          <label className={labelCls} htmlFor="new-ticket-asset">
+            Linked Asset
+          </label>
           <Select
+            id="new-ticket-asset"
             className="w-full"
             value={form.asset_id ?? ''}
             onChange={(v) => set('asset_id', v)}
             options={assetOptions}
             ariaLabel="Linked Asset"
+            searchable
           />
           {assets.data && assets.data.total > assets.data.items.length && (
             <p className="mt-1 text-[11px] text-muted">
@@ -243,14 +273,20 @@ function TemplatePicker({ onApply }: { onApply: (t: TicketTemplate) => void }) {
     // picker never appears).
     return (
       <div className="min-h-[68px]" aria-busy="true">
-        <label className={labelCls}>Start from a template</label>
+        <label className={labelCls} htmlFor="new-ticket-template">
+          Start from a template
+        </label>
         <div className="pointer-events-none opacity-60" aria-disabled="true">
           <Select
+            id="new-ticket-template"
             className="w-full"
             value=""
             onChange={() => {}}
             options={[]}
             placeholder="Loading templates…"
+            // FORM-10: the skeleton trigger keeps its loading name — the
+            // UX-02 htmlFor label ("Start from a template") must not rename it.
+            ariaLabel="Loading templates…"
           />
         </div>
       </div>
@@ -259,8 +295,11 @@ function TemplatePicker({ onApply }: { onApply: (t: TicketTemplate) => void }) {
   if (!templates.data?.length) return null;
   return (
     <div>
-      <label className={labelCls}>Start from a template</label>
+      <label className={labelCls} htmlFor="new-ticket-template">
+        Start from a template
+      </label>
       <Select
+        id="new-ticket-template"
         className="w-full"
         value={selected}
         placeholder="Choose a template…"

@@ -1134,6 +1134,9 @@
    :where() guard carries zero specificity).
    Day ink = Apple light semantic (brief verbatim); night ink = Apple dark
    semantic (#FF453A/#FF9F0A/#0A84FF/#30D158) for AA contrast on dark glass.
+   UX-01 (#175): MEDIUM (text-yellow-700) is the exception — AA-safe amber
+   (#92400E day / #FBBF24 night), never Apple blue, so OPEN and MEDIUM stay
+   distinguishable by color as well as text.
    --tw-ring-color is the pill border (Tailwind v4 ring paints from it). */
 :root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-red-700 {
   color: #FF3B30;
@@ -1146,9 +1149,9 @@
   --tw-ring-color: rgb(255 149 0 / 0.35);
 }
 :root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-yellow-700 {
-  color: #007AFF;
-  background-color: rgb(0 122 255 / 0.12);
-  --tw-ring-color: rgb(0 122 255 / 0.35);
+  color: #92400E;
+  background-color: rgb(146 64 14 / 0.12);
+  --tw-ring-color: rgb(146 64 14 / 0.35);
 }
 :root:not(.dark):not(.theme-paper):not(.theme-console):not(.theme-bold):not(.theme-shell):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark):not(.ledgerly-light) .ring-inset.text-blue-700 {
   color: #007AFF;
@@ -1176,9 +1179,9 @@
   --tw-ring-color: rgb(255 159 10 / 0.40);
 }
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-yellow-700 {
-  color: #0A84FF;
-  background-color: rgb(10 132 255 / 0.14);
-  --tw-ring-color: rgb(10 132 255 / 0.40);
+  color: #FBBF24;
+  background-color: rgb(251 191 36 / 0.14);
+  --tw-ring-color: rgb(251 191 36 / 0.40);
 }
 .dark:not(.theme-console):not(.theme-bold):not(.theme-terminal):not(.theme-clarity):not(.theme-clarity-dark):not(.ledgerly-dark) .ring-inset.text-blue-700 {
   color: #0A84FF;

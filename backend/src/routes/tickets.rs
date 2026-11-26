@@ -45,6 +45,9 @@ const ALLOWED_SORTS: &[&str] = &[
     "updated_at",
     "priority",
     "created_at",
+    // UX-12 (#186): sibling Tickets.tsx writes ?sort=sla_due_at — the key name
+    // is a cross-file contract, keep it exactly.
+    "sla_due_at",
 ];
 /// Title mirrors VARCHAR(255) (TBE-10: overlong → 422, never 500).
 pub const MAX_TITLE_CHARS: usize = 255;
@@ -92,6 +95,7 @@ fn ticket_sort(col: &str) -> &'static str {
         "ticket_type" => "t.ticket_type",
         "updated_at" => "t.updated_at",
         "priority" => "CASE t.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END",
+        "sla_due_at" => "t.sla_due_at",
         _ => "t.created_at",
     }
 }
@@ -127,6 +131,20 @@ fn parse_order_asc(raw: Option<&str>) -> Result<bool, AppError> {
             format!("invalid order: {s} (expected asc or desc)"),
         )),
     }
+}
+
+/// ORDER BY builder shared by list + export so the two can't drift.
+/// Nullable sort keys (sla_due_at — UX-12 #186) sort NULLS LAST in BOTH
+/// directions so tickets without a deadline sink to the end instead of
+/// topping the list; every other key keeps the bare ASC/DESC. The trailing
+/// `t.created_at DESC` is the long-standing stable tiebreak.
+fn push_order_by(qb: &mut QueryBuilder<'_, Postgres>, sort_sql: &str, asc: bool) {
+    qb.push(" ORDER BY ").push(sort_sql);
+    qb.push(if asc { " ASC" } else { " DESC" });
+    if sort_sql == "t.sla_due_at" {
+        qb.push(" NULLS LAST");
+    }
+    qb.push(", t.created_at DESC");
 }
 
 /// Normalize a raw ticket-type filter/body value: trim + uppercase, default
@@ -487,9 +505,7 @@ async fn list_tickets(
     push_filter_clauses(&mut qb, &filters, scope);
     push_filter_clauses(&mut cqb, &filters, scope);
 
-    qb.push(" ORDER BY ").push(sort_sql);
-    qb.push(if asc { " ASC" } else { " DESC" });
-    qb.push(", t.created_at DESC");
+    push_order_by(&mut qb, sort_sql, asc);
     crate::pagination::push_pagination(&mut qb, limit, offset);
 
     let tickets = qb.build_query_as::<Ticket>().fetch_all(&state.pool).await?;
@@ -1121,9 +1137,7 @@ async fn export_tickets(
     let mut qb = QueryBuilder::new(TICKET_SELECT);
     qb.push(" WHERE ");
     push_filter_clauses(&mut qb, &filters, None);
-    qb.push(" ORDER BY ").push(sort_sql);
-    qb.push(if asc { " ASC" } else { " DESC" });
-    qb.push(", t.created_at DESC");
+    push_order_by(&mut qb, sort_sql, asc);
     qb.push(" LIMIT 10000");
 
     let tickets = qb.build_query_as::<Ticket>().fetch_all(&state.pool).await?;
@@ -1330,6 +1344,53 @@ mod tests {
         assert!(!parse_order_asc(Some("desc")).unwrap());
         let err = parse_order_asc(Some("sideways")).unwrap_err();
         assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn ux12_sla_due_at_sort_key_accepted() {
+        // UX-12 (#186): the Tickets.tsx sibling writes ?sort=sla_due_at — the
+        // key must resolve (case-insensitively, like every other key) and show
+        // up in the 422 allowlist message; near-misses still 422.
+        assert_eq!(parse_sort_key(Some("sla_due_at")).unwrap(), "t.sla_due_at");
+        assert_eq!(parse_sort_key(Some("SLA_DUE_AT")).unwrap(), "t.sla_due_at");
+        assert_eq!(parse_sort_key(Some(" Sla_Due_At ")).unwrap(), "t.sla_due_at");
+        assert_eq!(ticket_sort("sla_due_at"), "t.sla_due_at");
+        for bad in ["sla", "sla_due", "due_at", "sla-due-at"] {
+            let err = parse_sort_key(Some(bad)).unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "for {bad:?}");
+            assert!(
+                err.message.contains("sla_due_at"),
+                "allowlist message names the key: {}",
+                err.message
+            );
+        }
+    }
+
+    #[test]
+    fn ux12_sla_due_at_orders_nulls_last_both_directions() {
+        // The generated ORDER BY carries NULLS LAST for sla_due_at in both
+        // directions, and bare ASC/DESC for every non-nullable key.
+        fn order_by_for(key: &str, asc: bool) -> String {
+            let sort_sql = parse_sort_key(Some(key)).unwrap();
+            let mut qb = QueryBuilder::<Postgres>::new("SELECT 1");
+            push_order_by(&mut qb, sort_sql, asc);
+            qb.sql().to_string()
+        }
+        assert_eq!(
+            order_by_for("sla_due_at", true),
+            "SELECT 1 ORDER BY t.sla_due_at ASC NULLS LAST, t.created_at DESC"
+        );
+        assert_eq!(
+            order_by_for("sla_due_at", false),
+            "SELECT 1 ORDER BY t.sla_due_at DESC NULLS LAST, t.created_at DESC"
+        );
+        for key in ["created_at", "priority", "title", "status", "ticket_number", "ticket_type", "updated_at"] {
+            for asc in [true, false] {
+                let sql = order_by_for(key, asc);
+                assert!(!sql.contains("NULLS"), "no NULLS for {key} (asc={asc}): {sql}");
+                assert!(sql.ends_with(", t.created_at DESC"), "stable tiebreak kept: {sql}");
+            }
+        }
     }
 
     #[test]
@@ -1595,5 +1656,158 @@ mod r2_p3_regression_tests {
         assert!(parse_filters(&list_params(Some("true"))).unwrap().overdue);
         assert!(!parse_filters(&list_params(Some("0"))).unwrap().overdue);
         assert!(!parse_filters(&list_params(None)).unwrap().overdue);
+    }
+}
+
+/// UX-12 (#186) regression tests: `?sort=sla_due_at` orders by the SLA
+/// deadline with NULLS LAST in both directions at the handler level. Same
+/// TEST_DATABASE_URL-with-skip pattern as routes::intake::r2_regression_tests.
+#[cfg(test)]
+mod ux12_regression_tests {
+    use super::*;
+    use axum::response::IntoResponse;
+    use sqlx::postgres::PgPoolOptions;
+
+    const DEFAULT_TEST_DB_URL: &str = "postgres://itms_test:itms_test_pw@127.0.0.1:55434/itms_test";
+
+    async fn test_pool() -> Option<sqlx::PgPool> {
+        let url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| DEFAULT_TEST_DB_URL.to_string());
+        match PgPoolOptions::new().max_connections(5).connect(&url).await {
+            Ok(pool) => {
+                sqlx::migrate!("./migrations")
+                    .run(&pool)
+                    .await
+                    .expect("test DB migrations must apply");
+                Some(pool)
+            }
+            Err(e) => {
+                eprintln!("ux12_regression_tests(tickets): skipping — no test DB at {url} ({e})");
+                None
+            }
+        }
+    }
+
+    fn test_state(pool: sqlx::PgPool) -> AppState {
+        AppState { pool, login_attempts: Default::default(), opencode_api_key: None }
+    }
+
+    async fn staff_actor(pool: &sqlx::PgPool) -> Uuid {
+        let email = format!("ux12-staff-{}@example.com", Uuid::new_v4().simple());
+        sqlx::query_scalar(
+            "INSERT INTO users (name, email, role, department, password_hash) \
+             VALUES ('UX12 Staff', $1, 'ADMIN', 'IT', 'test-hash') RETURNING id",
+        )
+        .bind(&email)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Insert one ticket with an explicit sla_due_at (None = undated);
+    /// returns its ticket_number for order assertions.
+    async fn make_ticket(
+        pool: &sqlx::PgPool,
+        requester: Uuid,
+        sla_due_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> String {
+        let number = format!("INC-8{:09}", rand::random::<u32>() % 1_000_000_000);
+        sqlx::query_scalar(
+            "INSERT INTO tickets (ticket_number, title, description, requester_id, sla_due_at) \
+             VALUES ($1, 'ux12 sort probe', 'd', $2, $3) RETURNING ticket_number",
+        )
+        .bind(&number)
+        .bind(requester)
+        .bind(sla_due_at)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Call the list handler and read the JSON body back into tickets (the
+    /// handler returns `impl IntoResponse`, so round-trip through the
+    /// response like a real client would).
+    async fn list_sorted(pool: &sqlx::PgPool, actor: Uuid, sort: &str, order: &str) -> Vec<Ticket> {
+        let params = TicketListParams {
+            status: None,
+            priority: None,
+            overdue: None,
+            ticket_type: None,
+            limit: Some("all".to_string()),
+            offset: None,
+            sort: Some(sort.to_string()),
+            order: Some(order.to_string()),
+            search: None,
+        };
+        let res = list_tickets(
+            State(test_state(pool.clone())),
+            Extension(actor),
+            Extension("ADMIN".to_string()),
+            Query(params),
+        )
+        .await;
+        let resp = match res {
+            Ok(ok) => ok.into_response(),
+            Err(e) => panic!("sort={sort} order={order} should pass, got {} {}", e.status, e.message),
+        };
+        let bytes = axum::body::to_bytes(resp.into_body(), 16 * 1024 * 1024).await.unwrap();
+        serde_json::from_slice::<Vec<Ticket>>(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn sla_due_at_sorts_nulls_last_asc_and_desc() {
+        let Some(pool) = test_pool().await else { return };
+        let actor = staff_actor(&pool).await;
+        let now = chrono::Utc::now();
+        let early = make_ticket(&pool, actor, Some(now - chrono::Duration::days(30))).await;
+        let late = make_ticket(&pool, actor, Some(now + chrono::Duration::days(365))).await;
+        let undated = make_ticket(&pool, actor, None).await;
+        // Relative order of OUR rows only — other tests' rows may interleave.
+        let ours = |rows: Vec<Ticket>| {
+            rows.into_iter()
+                .map(|t| t.ticket_number)
+                .filter(|n| *n == early || *n == late || *n == undated)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            ours(list_sorted(&pool, actor, "sla_due_at", "asc").await),
+            vec![early.clone(), late.clone(), undated.clone()],
+            "asc: earliest first, undated last"
+        );
+        assert_eq!(
+            ours(list_sorted(&pool, actor, "sla_due_at", "desc").await),
+            vec![late, early, undated],
+            "desc: latest first, undated STILL last (not PG's NULLS FIRST default)"
+        );
+    }
+
+    #[tokio::test]
+    async fn unknown_sort_key_still_422() {
+        let Some(pool) = test_pool().await else { return };
+        let actor = staff_actor(&pool).await;
+        let params = TicketListParams {
+            status: None,
+            priority: None,
+            overdue: None,
+            ticket_type: None,
+            limit: None,
+            offset: None,
+            sort: Some("sla".to_string()),
+            order: None,
+            search: None,
+        };
+        let err = match list_tickets(
+            State(test_state(pool.clone())),
+            Extension(actor),
+            Extension("ADMIN".to_string()),
+            Query(params),
+        )
+        .await
+        {
+            Ok(_) => panic!("sort=sla should be 422"),
+            Err(e) => e,
+        };
+        assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(err.message.contains("invalid sort"), "message: {}", err.message);
+        assert!(err.message.contains("sla_due_at"), "message: {}", err.message);
     }
 }
