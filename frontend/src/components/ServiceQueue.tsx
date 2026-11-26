@@ -82,6 +82,12 @@ export default function ServiceQueue() {
   const liveSelected = (data?.items ?? []).find((t) => t.id === selectedId) ?? null;
   const selected = liveSelected ?? (selectedId && snapshot?.id === selectedId ? snapshot : null);
   const selectionStale = selected !== null && liveSelected === null;
+  // FE-15: the queue reads a 50-row server window — when data.total exceeds
+  // it, say so with a link to the full Tickets view instead of implying the
+  // queue is the whole backlog.
+  const queueTotal = data?.total ?? 0;
+  const queueShown = data?.items.length ?? 0;
+  const queueTruncated = queueTotal > queueShown;
   // TFE-19: badges/Select render the post-mutation status (cache lags behind).
   const displayStatus: TicketStatus = confirmed ?? selected?.status ?? 'OPEN';
 
@@ -206,6 +212,7 @@ export default function ServiceQueue() {
             description="No open tickets match. New incidents and requests will show up here automatically."
           />
         ) : (
+          <>
           <div className="space-y-2">
             {rows.map((t) => (
               <button
@@ -241,6 +248,15 @@ export default function ServiceQueue() {
               </button>
             ))}
           </div>
+          {queueTruncated && (
+            <p className="pt-1 text-center text-xs text-muted">
+              {`Showing ${queueShown} of ${queueTotal} tickets — `}
+              <Link to="/tickets" className="font-semibold text-[#007AFF] hover:underline">
+                View all in Tickets
+              </Link>
+            </p>
+          )}
+          </>
         )}
       </section>
 

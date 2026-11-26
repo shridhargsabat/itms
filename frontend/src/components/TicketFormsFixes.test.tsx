@@ -126,7 +126,8 @@ describe('TicketFormsFixes (FE2: TFE-02/06/14/15/17/20/37)', () => {
     const { onDone } = renderForm();
 
     const title = screen.getByPlaceholderText("What's the issue?") as HTMLInputElement;
-    expect(title).toHaveAttribute('maxlength', '200');
+    // CT-06: title cap raised 200 → 255 to match the backend.
+    expect(title).toHaveAttribute('maxlength', '255');
     expect(screen.getByPlaceholderText('Details (optional)')).toHaveAttribute('maxlength', '4000');
 
     fireEvent.change(title, { target: { value: '   ' } });

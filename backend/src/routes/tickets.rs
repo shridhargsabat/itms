@@ -66,7 +66,10 @@ pub fn router() -> Router<AppState> {
 pub struct TicketListParams {
     pub status: Option<String>,
     pub priority: Option<String>,
-    pub overdue: Option<bool>,
+    /// Overdue as raw text ("true"/"false"/"1"/"0"): parsed manually so
+    /// `?overdue=maybe` is a 422 with a message, not axum's bare 400
+    /// (R2-BE-14 #161 — tickets-limit pattern).
+    pub overdue: Option<String>,
     #[serde(rename = "type")]
     pub ticket_type: Option<String>,
     /// Page size as raw text: integer, or "all" for the explicit unlimited
@@ -214,6 +217,20 @@ fn parse_status_filter(raw: &str) -> Result<Vec<String>, AppError> {
         .collect()
 }
 
+/// R2-BE-14 (#161): `?overdue=` accepts true/false/1/0 (case-insensitive
+/// for the words); absent/blank → false (no filter). Anything else is 422.
+fn parse_overdue_filter(raw: Option<&str>) -> Result<bool, AppError> {
+    match raw.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(false),
+        Some(s) if s.eq_ignore_ascii_case("true") || s == "1" => Ok(true),
+        Some(s) if s.eq_ignore_ascii_case("false") || s == "0" => Ok(false),
+        Some(s) => Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("invalid overdue: {s} (expected true, false, 1 or 0)"),
+        )),
+    }
+}
+
 /// TBE-16: default cap 100; explicit `limit=all` restores unlimited;
 /// integers clamp to [1, 500]. Zero/negative/garbage → 422 (TBE-20: no more
 /// silent clamp-to-1).
@@ -302,7 +319,7 @@ fn parse_filters(params: &TicketListParams) -> Result<ParsedFilters, AppError> {
         statuses,
         priority,
         ticket_type,
-        overdue: params.overdue == Some(true),
+        overdue: parse_overdue_filter(params.overdue.as_deref())?,
         search_like,
     })
 }
@@ -1280,6 +1297,27 @@ mod tests {
     }
 
     #[test]
+    fn be14_overdue_accepts_bool_forms_and_rejects_garbage() {
+        // R2-BE-14 (#161): ?overdue=maybe is 422, not axum 400.
+        // The struct itself accepts arbitrary strings (Query won't 400 first).
+        let p: TicketListParams = serde_json::from_value(serde_json::json!({"overdue": "maybe"})).unwrap();
+        assert_eq!(p.overdue.as_deref(), Some("maybe"));
+        assert!(!parse_overdue_filter(None).unwrap());
+        assert!(!parse_overdue_filter(Some("")).unwrap());
+        assert!(!parse_overdue_filter(Some("   ")).unwrap());
+        for yes in ["true", "TRUE", " True ", "1"] {
+            assert!(parse_overdue_filter(Some(yes)).unwrap(), "for {yes:?}");
+        }
+        for no in ["false", "FALSE", " False ", "0"] {
+            assert!(!parse_overdue_filter(Some(no)).unwrap(), "for {no:?}");
+        }
+        for bad in ["maybe", "yes", "2", "truee", "on"] {
+            let err = parse_overdue_filter(Some(bad)).unwrap_err();
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "for {bad:?}");
+        }
+    }
+
+    #[test]
     fn sort_and_order_reject_garbage() {
         assert_eq!(parse_sort_key(None).unwrap(), "t.created_at");
         assert_eq!(parse_sort_key(Some("priority")).unwrap(), ticket_sort("priority"));
@@ -1454,5 +1492,108 @@ mod r2_p2_regression_tests {
         .unwrap();
         assert_eq!("PROBLEM", out.0.ticket_type);
         assert_eq!("PROBLEM", stored_type(&pool, tid).await);
+    }
+}
+
+/// R2 P3 regression tests (issue #161 R2-BE-14): `?overdue=` garbage is 422
+/// at the handler, valid bool forms pass. Same TEST_DATABASE_URL-with-skip
+/// pattern as routes::intake::r2_regression_tests.
+#[cfg(test)]
+mod r2_p3_regression_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+
+    const DEFAULT_TEST_DB_URL: &str = "postgres://itms_test:itms_test_pw@127.0.0.1:55434/itms_test";
+
+    async fn test_pool() -> Option<sqlx::PgPool> {
+        let url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| DEFAULT_TEST_DB_URL.to_string());
+        match PgPoolOptions::new().max_connections(5).connect(&url).await {
+            Ok(pool) => {
+                sqlx::migrate!("./migrations")
+                    .run(&pool)
+                    .await
+                    .expect("test DB migrations must apply");
+                Some(pool)
+            }
+            Err(e) => {
+                eprintln!("r2_p3_regression_tests(tickets): skipping — no test DB at {url} ({e})");
+                None
+            }
+        }
+    }
+
+    fn test_state(pool: sqlx::PgPool) -> AppState {
+        AppState { pool, login_attempts: Default::default(), opencode_api_key: None }
+    }
+
+    async fn staff_actor(pool: &sqlx::PgPool) -> Uuid {
+        let email = format!("r2-p3-staff-{}@example.com", Uuid::new_v4().simple());
+        sqlx::query_scalar(
+            "INSERT INTO users (name, email, role, department, password_hash) \
+             VALUES ('R2P3 Staff', $1, 'ADMIN', 'IT', 'test-hash') RETURNING id",
+        )
+        .bind(&email)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    fn list_params(overdue: Option<&str>) -> TicketListParams {
+        TicketListParams {
+            status: None,
+            priority: None,
+            overdue: overdue.map(|s| s.to_string()),
+            ticket_type: None,
+            limit: None,
+            offset: None,
+            sort: None,
+            order: None,
+            search: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn overdue_garbage_returns_422() {
+        let Some(pool) = test_pool().await else { return };
+        let actor = staff_actor(&pool).await;
+        for bad in ["maybe", "yes", "2", "on"] {
+            let res = list_tickets(
+                State(test_state(pool.clone())),
+                Extension(actor),
+                Extension("ADMIN".to_string()),
+                Query(list_params(Some(bad))),
+            )
+            .await;
+            let err = match res {
+                Ok(_) => panic!("overdue={bad:?} should be 422"),
+                Err(e) => e,
+            };
+            assert_eq!(err.status, StatusCode::UNPROCESSABLE_ENTITY, "for {bad:?}");
+            assert!(err.message.contains("overdue"), "message: {}", err.message);
+        }
+    }
+
+    #[tokio::test]
+    async fn overdue_bool_forms_accepted() {
+        let Some(pool) = test_pool().await else { return };
+        let actor = staff_actor(&pool).await;
+        // None + blank + all four bool forms reach the DB (Ok), not 422.
+        for raw in [None, Some(""), Some("true"), Some("FALSE"), Some("1"), Some("0")] {
+            let res = list_tickets(
+                State(test_state(pool.clone())),
+                Extension(actor),
+                Extension("ADMIN".to_string()),
+                Query(list_params(raw)),
+            )
+            .await;
+            match res {
+                Ok(_) => {}
+                Err(e) => panic!("overdue={raw:?} should pass, got {} {}", e.status, e.message),
+            }
+        }
+        // parse_filters agrees with the handler path.
+        assert!(parse_filters(&list_params(Some("true"))).unwrap().overdue);
+        assert!(!parse_filters(&list_params(Some("0"))).unwrap().overdue);
+        assert!(!parse_filters(&list_params(None)).unwrap().overdue);
     }
 }
